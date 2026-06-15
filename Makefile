@@ -1,0 +1,40 @@
+# ── Shared environment ────────────────────────────────────────────────────────
+# One .venv at learning/ root. Run `make venv` once, then `make kernel`.
+
+.PHONY: venv install kernel deps clean
+
+venv:
+	python -m venv .venv
+	.venv/Scripts/pip install --upgrade pip
+	.venv/Scripts/pip install numpy scipy matplotlib nbformat nbconvert jupyter ipykernel
+
+kernel:
+	.venv/Scripts/python -m ipykernel install --user --name learning --display-name "Learning (shared)"
+
+install:
+	pip install numpy scipy matplotlib nbformat nbconvert jupyter ipykernel
+
+# ── Open a subfolder's teaching notebook ──────────────────────────────────────
+turbo-quant-notebook:
+	jupyter notebook turbo-quant/turbo_quant_explainer.ipynb
+
+attention-transformer-notebook:
+	jupyter notebook attention-transformer/attention_explainer.ipynb
+
+# ── Maintenance (Claude regenerates notebooks from generators) ─────────────────
+turbo-quant-regen:
+	cd turbo-quant && python create_notebook.py
+
+attention-transformer-regen:
+	cd attention-transformer && python create_notebook.py
+
+# ── Housekeeping ──────────────────────────────────────────────────────────────
+deps:
+	@echo "Subfolder dependency groups in pyproject.toml:"
+	@python -c "import tomllib; d=tomllib.load(open('pyproject.toml','rb')); \
+	  [print(f'  [{k}]') for k in d['project']['optional-dependencies'] if k != 'all']"
+
+clean:
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; \
+	find . -name "*.pyc" -delete 2>/dev/null; \
+	echo "Clean."
