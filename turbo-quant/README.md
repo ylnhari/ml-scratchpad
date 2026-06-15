@@ -20,9 +20,15 @@ By the end of this path you will be able to answer:
 
 ## Setup — Do This Once
 
+Run from the `learning/` root (one shared env for all subfolders):
+
 ```bash
-pip install numpy scipy matplotlib nbformat nbconvert jupyter
+cd ..                # go to learning/ root
+make venv            # creates .venv and installs all deps
+make kernel          # registers "Learning (shared)" Jupyter kernel
 ```
+
+Then open the notebook and select **Kernel → Change Kernel → Learning (shared)**.
 
 ---
 
