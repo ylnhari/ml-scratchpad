@@ -71,6 +71,7 @@ the learner runs or reads. The `.ipynb` is the deliverable.
 |--------|---------|------------------|------------|
 | turbo-quant/ | TurboQuant vector quantization (ICLR 2026) | turbo_quant_explainer.ipynb | `turbo-quant` |
 | attention-transformer/ | Attention Is All You Need (Vaswani 2017) | attention_explainer.ipynb | `attention-transformer` |
+| nanogpt-from-scratch/ | Train a GPT + manual backprop (NumPy) | nanogpt_explainer.ipynb | `nanogpt-from-scratch` |
 
 ## Running
 

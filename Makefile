@@ -1,7 +1,7 @@
 # ── Shared environment ────────────────────────────────────────────────────────
 # One .venv at learning/ root. Run `make venv` once, then `make kernel`.
 
-.PHONY: venv install kernel deps clean
+.PHONY: venv install kernel deps clean nanogpt-notebook nanogpt-regen turbo-quant-notebook attention-transformer-notebook turbo-quant-regen attention-transformer-regen
 
 venv:
 	python -m venv .venv
@@ -21,12 +21,18 @@ turbo-quant-notebook:
 attention-transformer-notebook:
 	jupyter notebook attention-transformer/attention_explainer.ipynb
 
+nanogpt-notebook:
+	jupyter notebook nanogpt-from-scratch/nanogpt_explainer.ipynb
+
 # ── Maintenance (Claude regenerates notebooks from generators) ─────────────────
 turbo-quant-regen:
 	cd turbo-quant && python create_notebook.py
 
 attention-transformer-regen:
 	cd attention-transformer && python create_notebook.py
+
+nanogpt-regen:
+	cd nanogpt-from-scratch && python create_notebook.py
 
 # ── Housekeeping ──────────────────────────────────────────────────────────────
 deps:

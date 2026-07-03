@@ -28,6 +28,7 @@ Then open any notebook and select **Kernel → Change Kernel → Learning (share
 |--------|-------|-----------|
 | `turbo-quant/` | TurboQuant — vector quantization (ICLR 2026) | `make turbo-quant-notebook` |
 | `attention-transformer/` | Attention Is All You Need (Vaswani 2017) | `make attention-transformer-notebook` |
+| `nanogpt-from-scratch/` | Train a GPT + backprop by hand, in NumPy | `make nanogpt-notebook` |
 
 ---
 
@@ -48,4 +49,5 @@ make venv                         # first-time env setup
 make kernel                       # first-time kernel registration
 make turbo-quant-notebook         # open TurboQuant explainer
 make attention-transformer-notebook  # open Attention explainer
+make nanogpt-notebook             # open nanoGPT (train + backprop) explainer
 ```
