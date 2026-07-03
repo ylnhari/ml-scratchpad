@@ -32,6 +32,27 @@ nanogpt-from-scratch = [
     "nbconvert>=7",
     "jupyter>=1.0",
 ]
+kv-cache = [
+    "numpy>=1.26",
+    "matplotlib>=3.8",
+    "nbformat>=5.9",
+    "nbconvert>=7",
+    "jupyter>=1.0",
+]
+rope = [
+    "numpy>=1.26",
+    "matplotlib>=3.8",
+    "nbformat>=5.9",
+    "nbconvert>=7",
+    "jupyter>=1.0",
+]
+inference-engine = [
+    "numpy>=1.26",
+    "matplotlib>=3.8",
+    "nbformat>=5.9",
+    "nbconvert>=7",
+    "jupyter>=1.0",
+]
 all = [
     "numpy>=1.26",
     "scipy>=1.12",

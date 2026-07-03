@@ -29,6 +29,9 @@ Then open any notebook and select **Kernel → Change Kernel → Learning (share
 | `turbo-quant/` | TurboQuant — vector quantization (ICLR 2026) | `make turbo-quant-notebook` |
 | `attention-transformer/` | Attention Is All You Need (Vaswani 2017) | `make attention-transformer-notebook` |
 | `nanogpt-from-scratch/` | Train a GPT + backprop by hand, in NumPy | `make nanogpt-notebook` |
+| `kv-cache/` | KV-cache: make generation O(n) not O(n²) | `make kv-cache-notebook` |
+| `rope/` | Rotary positional embeddings (Llama/Mistral) | `make rope-notebook` |
+| `inference-engine/` | Paged KV-cache + speculative decoding (vLLM ideas) | `make inference-engine-notebook` |
 
 ---
 
@@ -50,4 +53,7 @@ make kernel                       # first-time kernel registration
 make turbo-quant-notebook         # open TurboQuant explainer
 make attention-transformer-notebook  # open Attention explainer
 make nanogpt-notebook             # open nanoGPT (train + backprop) explainer
+make kv-cache-notebook            # open KV-cache explainer
+make rope-notebook                # open RoPE explainer
+make inference-engine-notebook    # open inference-engine explainer
 ```
