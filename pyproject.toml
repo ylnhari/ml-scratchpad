@@ -53,6 +53,13 @@ inference-engine = [
     "nbconvert>=7",
     "jupyter>=1.0",
 ]
+continuous-batching = [
+    "numpy>=1.26",
+    "matplotlib>=3.8",
+    "nbformat>=5.9",
+    "nbconvert>=7",
+    "jupyter>=1.0",
+]
 all = [
     "numpy>=1.26",
     "scipy>=1.12",

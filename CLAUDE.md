@@ -75,6 +75,7 @@ the learner runs or reads. The `.ipynb` is the deliverable.
 | kv-cache/ | KV-cache inference speedup (builds on nanogpt) | kvcache_explainer.ipynb | `kv-cache` |
 | rope/ | Rotary positional embeddings (RoPE) | rope_explainer.ipynb | `rope` |
 | inference-engine/ | Paged KV-cache + speculative decoding | inference_engine_explainer.ipynb | `inference-engine` |
+| continuous-batching/ | Continuous batching request scheduler | continuous_batching_explainer.ipynb | `continuous-batching` |
 
 ## Running
 

@@ -1,7 +1,7 @@
 # ── Shared environment ────────────────────────────────────────────────────────
 # One .venv at learning/ root. Run `make venv` once, then `make kernel`.
 
-.PHONY: venv install kernel deps clean nanogpt-notebook nanogpt-regen kv-cache-notebook kv-cache-regen rope-notebook rope-regen inference-engine-notebook inference-engine-regen turbo-quant-notebook attention-transformer-notebook turbo-quant-regen attention-transformer-regen
+.PHONY: venv install kernel deps clean nanogpt-notebook nanogpt-regen kv-cache-notebook kv-cache-regen rope-notebook rope-regen inference-engine-notebook inference-engine-regen continuous-batching-notebook continuous-batching-regen turbo-quant-notebook attention-transformer-notebook turbo-quant-regen attention-transformer-regen
 
 venv:
 	python -m venv .venv
@@ -33,6 +33,9 @@ rope-notebook:
 inference-engine-notebook:
 	jupyter notebook inference-engine/inference_engine_explainer.ipynb
 
+continuous-batching-notebook:
+	jupyter notebook continuous-batching/continuous_batching_explainer.ipynb
+
 # ── Maintenance (Claude regenerates notebooks from generators) ─────────────────
 turbo-quant-regen:
 	cd turbo-quant && python create_notebook.py
@@ -51,6 +54,9 @@ rope-regen:
 
 inference-engine-regen:
 	cd inference-engine && python create_notebook.py
+
+continuous-batching-regen:
+	cd continuous-batching && python create_notebook.py
 
 # ── Housekeeping ──────────────────────────────────────────────────────────────
 deps:

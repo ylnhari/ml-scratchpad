@@ -32,6 +32,7 @@ Then open any notebook and select **Kernel → Change Kernel → Learning (share
 | `kv-cache/` | KV-cache: make generation O(n) not O(n²) | `make kv-cache-notebook` |
 | `rope/` | Rotary positional embeddings (Llama/Mistral) | `make rope-notebook` |
 | `inference-engine/` | Paged KV-cache + speculative decoding (vLLM ideas) | `make inference-engine-notebook` |
+| `continuous-batching/` | Rolling-slot request scheduling (vLLM core) | `make continuous-batching-notebook` |
 
 ---
 
@@ -56,4 +57,5 @@ make nanogpt-notebook             # open nanoGPT (train + backprop) explainer
 make kv-cache-notebook            # open KV-cache explainer
 make rope-notebook                # open RoPE explainer
 make inference-engine-notebook    # open inference-engine explainer
+make continuous-batching-notebook # open continuous-batching explainer
 ```
