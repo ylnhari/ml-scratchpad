@@ -10,7 +10,7 @@ Each subfolder is one topic: notebook-first, visual, step-by-step.
 One shared Python environment for all subfolders.
 
 ```bash
-cd C:\Users\ylnha\Projects\learning
+cd <path-to-learning>
 
 make venv      # creates .venv + installs all deps (numpy, scipy, matplotlib, jupyter …)
 make kernel    # registers "Learning (shared)" Jupyter kernel system-wide

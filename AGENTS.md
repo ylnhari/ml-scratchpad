@@ -39,7 +39,7 @@ learning/
 ### First-time setup (run once)
 
 ```bash
-cd C:\Users\ylnha\Projects\learning
+cd <path-to-learning>
 make venv       # creates .venv and installs all deps
 make kernel     # registers "Learning (shared)" kernel in Jupyter
 ```
