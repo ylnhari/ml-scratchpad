@@ -76,6 +76,7 @@ the learner runs or reads. The `.ipynb` is the deliverable.
 | rope/ | Rotary positional embeddings (RoPE) | rope_explainer.ipynb | `rope` |
 | inference-engine/ | Paged KV-cache + speculative decoding | inference_engine_explainer.ipynb | `inference-engine` |
 | continuous-batching/ | Continuous batching request scheduler | continuous_batching_explainer.ipynb | `continuous-batching` |
+| additive-inference/ | Ternary 1.7-bit multiply-free inference (Mach-1 / BitNet) | additive_inference_explainer.ipynb | `additive-inference` |
 
 ## Running
 
