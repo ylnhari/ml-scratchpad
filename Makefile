@@ -1,7 +1,7 @@
 # ── Shared environment ────────────────────────────────────────────────────────
 # One .venv at learning/ root. Run `make venv` once, then `make kernel`.
 
-.PHONY: venv install kernel deps clean nanogpt-notebook nanogpt-regen kv-cache-notebook kv-cache-regen rope-notebook rope-regen inference-engine-notebook inference-engine-regen continuous-batching-notebook continuous-batching-regen turbo-quant-notebook attention-transformer-notebook turbo-quant-regen attention-transformer-regen additive-inference-notebook additive-inference-regen
+.PHONY: venv install kernel deps clean nanogpt-notebook nanogpt-regen kv-cache-notebook kv-cache-regen rope-notebook rope-regen inference-engine-notebook inference-engine-regen continuous-batching-notebook continuous-batching-regen turbo-quant-notebook attention-transformer-notebook turbo-quant-regen attention-transformer-regen additive-inference-notebook additive-inference-regen vllm-memory-notebook vllm-memory-regen vllm-memory-html
 
 venv:
 	python -m venv .venv
@@ -36,6 +36,9 @@ inference-engine-notebook:
 continuous-batching-notebook:
 	jupyter notebook continuous-batching/continuous_batching_explainer.ipynb
 
+vllm-memory-notebook:
+	jupyter notebook vllm-memory/vllm_memory_explainer.ipynb
+
 additive-inference-notebook:
 	jupyter notebook additive-inference/additive_inference_explainer.ipynb
 
@@ -60,6 +63,14 @@ inference-engine-regen:
 
 continuous-batching-regen:
 	cd continuous-batching && python create_notebook.py
+
+vllm-memory-regen:
+	cd vllm-memory && python create_notebook.py
+
+# Publish: self-contained HTML of the executed notebook, served by GitHub Pages at
+# https://ylnhari.github.io/learning/vllm-memory/ . Re-run after ANY change to the notebook.
+vllm-memory-html:
+	jupyter nbconvert --to html --embed-images vllm-memory/vllm_memory_explainer.ipynb --output index.html --output-dir vllm-memory
 
 additive-inference-regen:
 	cd additive-inference && python create_notebook.py

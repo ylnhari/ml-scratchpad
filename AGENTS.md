@@ -65,6 +65,17 @@ Some subfolders keep a `create_notebook.py`. That is **maintenance tooling** for
 regenerate the `.ipynb` (editing notebook JSON by hand is error-prone) — it is not something
 the learner runs or reads. The `.ipynb` is the deliverable.
 
+## Published pages (living artifacts)
+
+GitHub Pages serves this repository from `main` (root, `.nojekyll`). A subfolder may publish a
+self-contained HTML export of its executed notebook as `<subfolder>/index.html`; that file is a
+**generated snapshot** and must be regenerated after any change to the notebook, or the page
+silently describes an older version.
+
+| Page | Source | Regenerate |
+|------|--------|------------|
+| https://ylnhari.github.io/learning/vllm-memory/ | `vllm-memory/vllm_memory_explainer.ipynb` (executed) | `make vllm-memory-html` |
+
 ## Subfolders
 
 | Folder | Concept | Primary artifact | Deps group |
@@ -77,6 +88,7 @@ the learner runs or reads. The `.ipynb` is the deliverable.
 | inference-engine/ | Paged KV-cache + speculative decoding | inference_engine_explainer.ipynb | `inference-engine` |
 | continuous-batching/ | Continuous batching request scheduler | continuous_batching_explainer.ipynb | `continuous-batching` |
 | additive-inference/ | Ternary 1.7-bit multiply-free inference (Mach-1 / BitNet) | additive_inference_explainer.ipynb | `additive-inference` |
+| vllm-memory/ | vLLM GPU-memory lifecycle: profile run, KV pool sizing, scheduler steps, preemption | vllm_memory_explainer.ipynb | (numpy + matplotlib only) |
 
 ## Running
 
@@ -85,3 +97,6 @@ the learner runs or reads. The `.ipynb` is the deliverable.
 make turbo-quant-notebook
 make attention-transformer-notebook
 ```
+
+## Related tool: interview preparation
+Concept chapters used for interview preparation live in the sibling repository `../interview-prep` (`core/library.js` and per-company packs). When a learner asks to go deeper on a concept that already has a prep chapter, link to it; when a prep chapter needs a worked derivation or runnable exploration, build the notebook here and link back from the chapter's readings.

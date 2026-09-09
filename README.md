@@ -33,6 +33,7 @@ Then open any notebook and select **Kernel → Change Kernel → Learning (share
 | `rope/` | Rotary positional embeddings (Llama/Mistral) | `make rope-notebook` |
 | `inference-engine/` | Paged KV-cache + speculative decoding (vLLM ideas) | `make inference-engine-notebook` |
 | `continuous-batching/` | Rolling-slot request scheduling (vLLM core) | `make continuous-batching-notebook` |
+| `vllm-memory/` | How vLLM budgets GPU memory: profiling, KV pool, scheduler, preemption — also published as a web page: https://ylnhari.github.io/learning/vllm-memory/ | `make vllm-memory-notebook` |
 
 ---
 
@@ -58,4 +59,5 @@ make kv-cache-notebook            # open KV-cache explainer
 make rope-notebook                # open RoPE explainer
 make inference-engine-notebook    # open inference-engine explainer
 make continuous-batching-notebook # open continuous-batching explainer
+make vllm-memory-notebook         # open vLLM memory explainer
 ```
