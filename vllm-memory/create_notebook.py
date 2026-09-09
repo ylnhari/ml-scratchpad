@@ -36,9 +36,9 @@ memory budget, so you can see how the toy versions show up inside a real server.
 | 1 | What is a token, a parameter, a forward pass, attention, a KV cache, prefill, decode, a batch, a block? |
 | 2 | What does each `vllm serve` flag mean in plain words, and what does it move? |
 | 3 | Startup, second by second: what is allocated, in what order, and why one step is *measured* |
-| 4 | Runtime, one request: memory and time from arrival to last token |
-| 5 | Runtime, many requests: the scheduler loop, the block table, the three concurrency limits, preemption |
-| 6 | Engineering: what actually limits speed in prefill vs decode, and how each flag trades memory for speed |
+| 4 | One request, start to finish: memory and time from arrival to its last token |
+| 5 | Many requests at once: the scheduling loop, the block table, the three concurrency limits, and what happens when memory runs out |
+| 6 | Speed: what makes prefill and decode fast or slow, and how each flag trades memory for speed |
 | 7 | Models that take images and video |
 | 8 | Reading your own startup log line by line |
 
@@ -473,10 +473,10 @@ plt.tight_layout(); plt.show()
 """))
 
 # =============================================================================
-# 4. Runtime: one request
+# 4. One request, start to finish
 # =============================================================================
 cells.append(md(r"""---
-# Part 4 — Runtime, one request: memory and time from arrival to last token
+# Part 4 — One request, start to finish: memory and time from arrival to its last token
 
 The server is idle: weights loaded, pool empty, memory flat. A request arrives over HTTP with a
 1 000-token prompt and asks for up to 300 new tokens. Here is exactly what happens, in order.
@@ -499,7 +499,7 @@ cells.append(code(r"""steps  = np.arange(0, ANSWER + 1)
 tokens = PROMPT + steps
 blocks = np.ceil(tokens / BLOCK).astype(int)
 
-# Engineering-side time model (peak numbers; real kernels reach ~50-70% of peak, so scale by 0.6):
+# A time model (peak numbers; real kernels reach ~50-70% of peak, so scale by 0.6):
 EFF = 0.6
 def prefill_time_ms(n_tok):          # compute-bound: 2 FLOPs per parameter per token
     return 2 * PARAMS * n_tok / (GPU_TFLOPS * 1e12 * EFF) * 1e3
@@ -528,10 +528,10 @@ weights once serves 64 requests as easily as 1. Part 6 quantifies it.
 """))
 
 # =============================================================================
-# 5. Runtime: many requests
+# 5. Many requests at once
 # =============================================================================
 cells.append(md(r"""---
-# Part 5 — Runtime, many requests: the scheduler loop, the block table, and preemption
+# Part 5 — Many requests at once: the scheduling loop, the block table, and what happens when memory runs out
 
 Every step, the scheduler (`vllm/v1/core/sched/scheduler.py`) runs this exact loop:
 
@@ -716,10 +716,10 @@ the signal that the pool is too small for the traffic: lower `--max-num-seqs`, l
 """))
 
 # =============================================================================
-# 6. Engineering: speed
+# 6. Speed
 # =============================================================================
 cells.append(md(r"""---
-# Part 6 — Engineering: what actually limits speed, and how the flags trade memory for it
+# Part 6 — Speed: what makes prefill and decode fast or slow, and how the flags trade memory for it
 
 A GPU has two ceilings. **Compute**: how many multiply-adds per second (H100 BF16 ≈ 989 TFLOP/s).
 **Memory bandwidth**: how many bytes per second it can stream from its memory (H100 ≈ 3.35 TB/s).
@@ -774,7 +774,7 @@ plt.tight_layout(); plt.show()
 
 cells.append(md(r"""## 6.2 The full trade-off table
 
-| Flag ↑ (increase it) | Startup memory | Runtime memory | Speed |
+| Flag ↑ (increase it) | Startup memory | Memory while serving | Speed |
 |---|---|---|---|
 | `--gpu-memory-utilization` | bigger KV pool | more resident tokens | more concurrency; risk of OOM at CUDA-graph capture / from other processes |
 | `--max-model-len` | (modern vLLM) little; attention workspace | each request may hold more KV → fewer fit at full length | longer prompts allowed; TTFT of long prompts |
@@ -915,7 +915,7 @@ GPU total 79.6 GiB
 ```
 
 - **Startup:** measure the worst-case step; give the KV cache the remainder.
-- **Runtime:** every step = 1 token for each running request + as much new prompt as fits under
+- **While serving:** every step = 1 token for each running request + as much new prompt as fits under
   `max-num-batched-tokens`; blocks are claimed 16 tokens at a time and returned at the end.
 - **Concurrency** = min(`max-num-seqs`, pool ÷ tokens per request); short traffic hits the
   first, long traffic the second; the pool evicts and recomputes rather than crash.

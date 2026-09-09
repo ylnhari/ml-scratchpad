@@ -7796,7 +7796,7 @@ a.anchor-link {
 <!-- End of mermaid configuration --></head>
 <body class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
 <main>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1b1c705a">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=227fb5b2">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7832,15 +7832,15 @@ memory budget, so you can see how the toy versions show up inside a real server.
 </tr>
 <tr>
 <td>4</td>
-<td>Runtime, one request: memory and time from arrival to last token</td>
+<td>One request, start to finish: memory and time from arrival to its last token</td>
 </tr>
 <tr>
 <td>5</td>
-<td>Runtime, many requests: the scheduler loop, the block table, the three concurrency limits, preemption</td>
+<td>Many requests at once: the scheduling loop, the block table, the three concurrency limits, and what happens when memory runs out</td>
 </tr>
 <tr>
 <td>6</td>
-<td>Engineering: what actually limits speed in prefill vs decode, and how each flag trades memory for speed</td>
+<td>Speed: what makes prefill and decode fast or slow, and how each flag trades memory for speed</td>
 </tr>
 <tr>
 <td>7</td>
@@ -7859,7 +7859,7 @@ memory budget, so you can see how the toy versions show up inside a real server.
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=97cb13d2">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=fd17290a">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7910,7 +7910,7 @@ memory budget, so you can see how the toy versions show up inside a real server.
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=c5aef34b">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=29975097">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7925,7 +7925,7 @@ limits — is counted in tokens, never in words or characters.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=258800fe">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=74e1cfec">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7965,7 +7965,7 @@ limits — is counted in tokens, never in words or characters.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8394b5e5">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ec93f601">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8012,7 +8012,7 @@ in the room the weights leave.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f6d13340">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=904d05ad">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8048,7 +8048,7 @@ in the room the weights leave.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1ddc4747">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=63be7e43">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8069,7 +8069,7 @@ reason a serving GPU fills up, and the reason concurrency is limited.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=d89434f5">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=0b499695">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8122,7 +8122,7 @@ per token : 32 layers × 4,096 B = 131,072 B = 128 KiB
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a026208e">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8f19e9f3">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8147,7 +8147,7 @@ is heavy on memory traffic and light on compute. The time per pass is the <stron
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=07059f0a">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=55f25a09">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8181,7 +8181,7 @@ is heavy on memory traffic and light on compute. The time per pass is the <stron
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=5e3080fb">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2e0f26ee">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8200,7 +8200,7 @@ request in it — is a <strong>step</strong> (vLLM also says <em>iteration</em>)
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=0524b4b6">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=5911d7f5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8245,7 +8245,7 @@ request in it — is a <strong>step</strong> (vLLM also says <em>iteration</em>)
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=04bc9693">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a2f45767">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8264,7 +8264,7 @@ with three requests inside.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e35d5df9">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=49c8de2f">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8303,7 +8303,7 @@ with three requests inside.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=402c2157">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=612f6f5a">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8395,7 +8395,7 @@ decide memory and speed. Each row says what it <em>means</em> first, then what i
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3da4272a">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=0932caf9">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8454,7 +8454,7 @@ typical for an 8 B model on a fast disk; the <em>order</em> is what matters.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=b2b13812">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=08c5f9a5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8513,7 +8513,7 @@ typical for an 8 B model on a fast disk; the <em>order</em> is what matters.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=306796d0">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=27e83c23">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8616,7 +8616,7 @@ from 18 GiB to 1.4 GiB when the flag was lowered.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=3de96fe4">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=113d482c">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8659,7 +8659,7 @@ from 18 GiB to 1.4 GiB when the flag was lowered.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=851fbbd2">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=12614dd2">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8676,7 +8676,7 @@ every request at its maximum length. Real traffic is shorter, so real concurrenc
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=335af752">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=6bac767f">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8732,7 +8732,7 @@ Maximum concurrency for 32,768 tokens per request: 13.49x
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=4c33cc53">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=57971196">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8746,7 +8746,7 @@ let the KV cache grow into it.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4080c128">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=b865277e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8783,14 +8783,14 @@ let the KV cache grow into it.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8e74a15d">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=61ad7e92">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <hr/>
-<h1 id="Part-4-%E2%80%94-Runtime,-one-request:-memory-and-time-from-arrival-to-last-token">Part 4 — Runtime, one request: memory and time from arrival to last token<a class="anchor-link" href="#Part-4-%E2%80%94-Runtime,-one-request:-memory-and-time-from-arrival-to-last-token">¶</a></h1><p>The server is idle: weights loaded, pool empty, memory flat. A request arrives over HTTP with a
+<h1 id="Part-4-%E2%80%94-One-request,-start-to-finish:-memory-and-time-from-arrival-to-its-last-token">Part 4 — One request, start to finish: memory and time from arrival to its last token<a class="anchor-link" href="#Part-4-%E2%80%94-One-request,-start-to-finish:-memory-and-time-from-arrival-to-its-last-token">¶</a></h1><p>The server is idle: weights loaded, pool empty, memory flat. A request arrives over HTTP with a
 1 000-token prompt and asks for up to 300 new tokens. Here is exactly what happens, in order.</p>
 <ol>
 <li><strong>Tokenize</strong> on the CPU: text → 1 000 ids. Check <code>1 000 + 300 ≤ max-model-len</code>; else reject.</li>
@@ -8809,7 +8809,7 @@ pass that reads all cached K/V, write one new K/V entry, sample. Each pass is on
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=82f7d1f6">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f8b7bbef">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8821,7 +8821,7 @@ pass that reads all cached K/V, write one new K/V entry, sample. Each pass is on
 <span class="n">tokens</span> <span class="o">=</span> <span class="n">PROMPT</span> <span class="o">+</span> <span class="n">steps</span>
 <span class="n">blocks</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">tokens</span> <span class="o">/</span> <span class="n">BLOCK</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
 
-<span class="c1"># Engineering-side time model (peak numbers; real kernels reach ~50-70% of peak, so scale by 0.6):</span>
+<span class="c1"># A time model (peak numbers; real kernels reach ~50-70% of peak, so scale by 0.6):</span>
 <span class="n">EFF</span> <span class="o">=</span> <span class="mf">0.6</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">prefill_time_ms</span><span class="p">(</span><span class="n">n_tok</span><span class="p">):</span>          <span class="c1"># compute-bound: 2 FLOPs per parameter per token</span>
     <span class="k">return</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">PARAMS</span> <span class="o">*</span> <span class="n">n_tok</span> <span class="o">/</span> <span class="p">(</span><span class="n">GPU_TFLOPS</span> <span class="o">*</span> <span class="mf">1e12</span> <span class="o">*</span> <span class="n">EFF</span><span class="p">)</span> <span class="o">*</span> <span class="mf">1e3</span>
@@ -8868,7 +8868,7 @@ total ≈ 2447 ms for 300 tokens; KV at the end: 82 blocks = 164 MiB (0.30 % of 
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=f77a12ba">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=93259e48">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8882,14 +8882,14 @@ weights once serves 64 requests as easily as 1. Part 6 quantifies it.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=19d36f44">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=f65b241e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <hr/>
-<h1 id="Part-5-%E2%80%94-Runtime,-many-requests:-the-scheduler-loop,-the-block-table,-and-preemption">Part 5 — Runtime, many requests: the scheduler loop, the block table, and preemption<a class="anchor-link" href="#Part-5-%E2%80%94-Runtime,-many-requests:-the-scheduler-loop,-the-block-table,-and-preemption">¶</a></h1><p>Every step, the scheduler (<code>vllm/v1/core/sched/scheduler.py</code>) runs this exact loop:</p>
+<h1 id="Part-5-%E2%80%94-Many-requests-at-once:-the-scheduling-loop,-the-block-table,-and-what-happens-when-memory-runs-out">Part 5 — Many requests at once: the scheduling loop, the block table, and what happens when memory runs out<a class="anchor-link" href="#Part-5-%E2%80%94-Many-requests-at-once:-the-scheduling-loop,-the-block-table,-and-what-happens-when-memory-runs-out">¶</a></h1><p>Every step, the scheduler (<code>vllm/v1/core/sched/scheduler.py</code>) runs this exact loop:</p>
 <pre><code>budget = max_num_batched_tokens
 1. for each RUNNING request (in order):            # decodes first — never starve a stream
        give it 1 token (or its next prompt chunk); allocate its next block if needed
@@ -8907,7 +8907,7 @@ how many requests were running and waiting, and which blocks each request owned.
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=145dcda7">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=9e4b2024">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9008,7 +9008,7 @@ how many requests were running and waiting, and which blocks each request owned.
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=5276a290">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=71b6019b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9021,7 +9021,7 @@ their blocks, which the next admissions reuse — the pool never fragments.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=3547db62">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=dacc1114">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9058,7 +9058,7 @@ their blocks, which the next admissions reuse — the pool never fragments.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3f687e09">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=e8edb9c4">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9095,7 +9095,7 @@ their blocks, which the next admissions reuse — the pool never fragments.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=34b5df96">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f140aff5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9130,7 +9130,7 @@ their blocks, which the next admissions reuse — the pool never fragments.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1cb630ba">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=075ef6c2">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9144,7 +9144,7 @@ token each; a longer prompt needs 2 steps (chunked), and a burst adds queueing o
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=b5925335">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=a9fec4d7">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9188,7 +9188,7 @@ token each; a longer prompt needs 2 steps (chunked), and a burst adds queueing o
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=5f752c91">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8e12dfc5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9200,7 +9200,7 @@ does it do?</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=847d486d">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=aaf84d71">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9240,7 +9240,7 @@ does it do?</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=cecec21f">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=45ed48be">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9257,14 +9257,14 @@ the signal that the pool is too small for the traffic: lower <code>--max-num-seq
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=fc12f3ba">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=0320db53">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <hr/>
-<h1 id="Part-6-%E2%80%94-Engineering:-what-actually-limits-speed,-and-how-the-flags-trade-memory-for-it">Part 6 — Engineering: what actually limits speed, and how the flags trade memory for it<a class="anchor-link" href="#Part-6-%E2%80%94-Engineering:-what-actually-limits-speed,-and-how-the-flags-trade-memory-for-it">¶</a></h1><p>A GPU has two ceilings. <strong>Compute</strong>: how many multiply-adds per second (H100 BF16 ≈ 989 TFLOP/s).
+<h1 id="Part-6-%E2%80%94-Speed:-what-makes-prefill-and-decode-fast-or-slow,-and-how-the-flags-trade-memory-for-it">Part 6 — Speed: what makes prefill and decode fast or slow, and how the flags trade memory for it<a class="anchor-link" href="#Part-6-%E2%80%94-Speed:-what-makes-prefill-and-decode-fast-or-slow,-and-how-the-flags-trade-memory-for-it">¶</a></h1><p>A GPU has two ceilings. <strong>Compute</strong>: how many multiply-adds per second (H100 BF16 ≈ 989 TFLOP/s).
 <strong>Memory bandwidth</strong>: how many bytes per second it can stream from its memory (H100 ≈ 3.35 TB/s).
 A step is bound by whichever it exhausts first.</p>
 <ul>
@@ -9279,7 +9279,7 @@ prefills so they do not stall the decodes behind them.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=57358f1a">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=aa25a444">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9323,7 +9323,7 @@ prefills so they do not stall the decodes behind them.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3887c4aa">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=5a010cbf">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9336,7 +9336,7 @@ long prompt. And, from Part 3, the cap also sets the activation spike and theref
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=fce56682">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=46bce8ae">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9376,7 +9376,7 @@ long prompt. And, from Part 3, the cap also sets the activation spike and theref
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8b03dc4a">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a4afebe4">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9387,7 +9387,7 @@ long prompt. And, from Part 3, the cap also sets the activation spike and theref
 <tr>
 <th>Flag ↑ (increase it)</th>
 <th>Startup memory</th>
-<th>Runtime memory</th>
+<th>Memory while serving</th>
 <th>Speed</th>
 </tr>
 </thead>
@@ -9452,7 +9452,7 @@ long prompt. And, from Part 3, the cap also sets the activation spike and theref
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=9dff93ea">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=dd4427b4">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9470,7 +9470,7 @@ image tokens cost KV cache exactly like text tokens: 1 170 × 128 KiB ≈ 146 Mi
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ff9963c4">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4bade2e7">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9511,7 +9511,7 @@ image tokens cost KV cache exactly like text tokens: 1 170 × 128 KiB ≈ 146 Mi
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1e130679">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=c1fab57d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9539,7 +9539,7 @@ profile — more KV pool, but safe only if you have also constrained image size 
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e2348e2e">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=edc6f7c3">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9582,7 +9582,7 @@ profile — more KV pool, but safe only if you have also constrained image size 
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=414eb4f5">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3981d43a">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9627,7 +9627,7 @@ occupancy; <code>Prefix cache hit rate</code> is how much prefill was skipped by
 </code></pre>
 <ul>
 <li><strong>Startup:</strong> measure the worst-case step; give the KV cache the remainder.</li>
-<li><strong>Runtime:</strong> every step = 1 token for each running request + as much new prompt as fits under
+<li><strong>While serving:</strong> every step = 1 token for each running request + as much new prompt as fits under
 <code>max-num-batched-tokens</code>; blocks are claimed 16 tokens at a time and returned at the end.</li>
 <li><strong>Concurrency</strong> = min(<code>max-num-seqs</code>, pool ÷ tokens per request); short traffic hits the
 first, long traffic the second; the pool evicts and recomputes rather than crash.</li>
