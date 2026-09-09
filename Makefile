@@ -71,6 +71,7 @@ vllm-memory-regen:
 # https://ylnhari.github.io/learning/vllm-memory/ . Re-run after ANY change to the notebook.
 vllm-memory-html:
 	jupyter nbconvert --to html --embed-images vllm-memory/vllm_memory_explainer.ipynb --output index.html --output-dir vllm-memory
+	python -c "import io; p='vllm-memory/index.html'; s=io.open(p,encoding='utf-8').read(); io.open(p,'w',encoding='utf-8').write(s.replace('<title>vllm_memory_explainer</title>', '<title>vLLM GPU Memory — From Startup Profiling to Serving Requests</title>'))"
 
 additive-inference-regen:
 	cd additive-inference && python create_notebook.py

@@ -18,15 +18,16 @@ cells = []
 # =============================================================================
 # 0. Title + map
 # =============================================================================
-cells.append(md(r"""# How an LLM server uses a GPU — vLLM from power-on to the thousandth request
+cells.append(md(r"""# vLLM GPU Memory — From Startup Profiling to Serving Requests
 
 This notebook assumes you know *nothing* about serving. Every term is defined the first time it
 appears, every claim is shown with a number, and every mechanism gets a picture.
 
-**Where this sits:** `../kv-cache` → `../inference-engine` → `../continuous-batching` → **here**.
-Those notebooks build the ideas from scratch in NumPy. This one shows how the real server, vLLM,
-turns those ideas into a memory budget and a scheduler, and how each command-line flag moves
-memory and speed.
+**How this relates to the earlier notebooks.** `../kv-cache` builds a KV cache in NumPy;
+`../inference-engine` builds a paged block table; `../continuous-batching` builds a scheduler
+loop. This notebook does not extend that code — it is independent and self-contained. It
+revisits the same two ideas (the cache, the scheduler) using vLLM's *actual* numbers, flags, and
+memory budget, so you can see how the toy versions show up inside a real server.
 
 **One worked example runs through everything:** Llama-3.1-8B-Instruct, one NVIDIA H100 80 GB.
 
@@ -221,19 +222,24 @@ request in it — is a **step** (vLLM also says *iteration*). Two flags cap the 
 *tokens* may be in it. The picture shows the difference.
 """))
 
-cells.append(code(r"""fig, ax = plt.subplots(figsize=(12, 3.2))
+cells.append(code(r"""fig, ax = plt.subplots(figsize=(12, 3.6))
 # a step with 3 requests in decode (1 token each) and 2 prompts in prefill
-parts = [("req A decode", 1, "#4e79a7"), ("req B decode", 1, "#4e79a7"), ("req C decode", 1, "#4e79a7"),
-         ("req D prefill (700 tok)", 700, "#f28e2b"), ("req E prefill, first chunk (7 489 tok)", 7489, "#f28e2b")]
+DECODE_W = 350                                # decode tokens drawn this wide, purely so the label fits
+parts = [("req A\ndecode", DECODE_W, "#4e79a7", True), ("req B\ndecode", DECODE_W, "#4e79a7", True),
+         ("req C\ndecode", DECODE_W, "#4e79a7", True), ("req D prefill (700 tok)", 700, "#f28e2b", False),
+         ("req E prefill, first chunk (7 489 tok)", 7489, "#f28e2b", False)]
 x = 0
-for name, n, c in parts:
-    w = max(n, 120)                       # decode tokens drawn wide enough to see
+for i, (name, w, c, is_decode) in enumerate(parts):
     ax.add_patch(Rectangle((x, 0.3), w, 0.5, fc=c, ec="white"))
-    ax.text(x + w/2, 0.55, name, ha="center", va="center", fontsize=8, rotation=90 if w < 400 else 0, color="white")
+    if is_decode:                              # thin decode box: label ABOVE with a leader line, staggered so they never touch
+        ax.annotate(name, xy=(x + w/2, 0.8), xytext=(x + w/2, 1.3 + 0.55 * i),
+                    ha="center", va="bottom", fontsize=8.5, arrowprops=dict(arrowstyle="-", color="gray", lw=0.8))
+    else:
+        ax.text(x + w/2, 0.55, name, ha="center", va="center", fontsize=9, color="white")
     x += w
-ax.axvline(x, color="black", ls="--"); ax.text(x + 100, 0.9, "--max-num-batched-tokens = 8 192 tokens reached", fontsize=9, ha="left")
-ax.set_xlim(0, 11000); ax.set_ylim(0, 1.05); ax.set_yticks([]); ax.set_xlabel("tokens in this ONE step (decode boxes widened for visibility)")
-ax.set_title("A single step: 5 requests (counts toward --max-num-seqs = 256), 8 192 tokens (the token cap). Req E's prompt continues next step.")
+ax.axvline(x, color="black", ls="--"); ax.text(x + 150, 0.55, "--max-num-batched-tokens\n= 8 192 tokens reached", fontsize=9, ha="left", va="center")
+ax.set_xlim(0, 11200); ax.set_ylim(0, 2.7); ax.set_yticks([]); ax.set_xlabel("tokens in this ONE step (decode boxes widened for visibility)")
+ax.set_title("A single step: 5 requests, 8 192 tokens. Req E's prompt continues next step.")
 plt.tight_layout(); plt.show()
 """))
 
@@ -605,13 +611,16 @@ cells.append(code(r"""def simulate(n_req, prompt_range, answer_range, pool_block
 log, pre, snaps, ttft_steps, prompts = simulate(60, (500, 3000), (150, 400), kv_blocks, snapshot_steps=(2, 12, 200))
 step, pre_tok, dec_tok, n_run, n_wait, used = log.T
 print(f"60 requests: done in {len(log)} steps, preemptions {pre}, peak running {n_run.max()} (cap {MAX_NUM_SEQS}), peak pool use {used.max()/kv_blocks*100:.1f} %")
-fig, (a1, a2) = plt.subplots(2, 1, figsize=(12, 5.6), sharex=True)
+fig, (a1, a2) = plt.subplots(2, 1, figsize=(12, 6.0), sharex=True)
 a1.bar(step, pre_tok, color="#f28e2b", width=1, label="prefill tokens (prompts, chunked)"); a1.bar(step, dec_tok, bottom=pre_tok, color="#4e79a7", width=1, label="decode tokens (1 per running request)")
-a1.set_yscale("symlog", linthresh=100); a1.axhline(MAX_BATCH_TOK, color="black", ls="--", lw=1); a1.text(len(step) * 0.99, MAX_BATCH_TOK * 1.15, "--max-num-batched-tokens = 8 192", ha="right", fontsize=8)
-a1.set_ylabel("tokens in the step (symlog)"); a1.legend(loc="center right"); a1.set_title("60 requests arrive at once: the first ~10 steps are prompt-chewing at the cap; afterwards each step is 1 token per running request")
+a1.set_yscale("symlog", linthresh=100); a1.set_ylim(top=30000); a1.axhline(MAX_BATCH_TOK, color="black", ls="--", lw=1)
+a1.text(len(step) * 0.5, MAX_BATCH_TOK * 0.55, "--max-num-batched-tokens = 8 192", ha="center", va="top", fontsize=8.5)
+a1.set_ylabel("tokens in the step (symlog)"); a1.legend(loc="upper right", fontsize=8)
+a1.set_title("the first ~10 steps are prompt-chewing at the cap; afterwards each step is 1 token per running request", fontsize=9, color="#555555")
+fig.suptitle("60 requests arrive at once", fontsize=13, y=1.0)
 a2.plot(step, n_run, color="#59a14f", label="running"); a2.plot(step, n_wait, color="#e15759", label="waiting"); a2.plot(step, used / kv_blocks * 100, color="#4e79a7", ls="--", label="KV pool used (%)")
-a2.set_xlabel("step"); a2.set_ylabel("requests / % pool"); a2.legend()
-plt.tight_layout(); plt.show()
+a2.set_xlabel("step"); a2.set_ylabel("requests / % pool"); a2.legend(fontsize=8)
+plt.tight_layout(rect=[0, 0, 1, 0.95]); plt.show()
 """))
 
 cells.append(md(r"""## 5.1 The block table, frozen at three moments
