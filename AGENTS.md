@@ -1,8 +1,8 @@
-# Learning project instructions
+# ml-scratchpad project instructions
 
 ## What This Is
 
-`learning/` is the parent project (treat it like a monorepo root: shared env, shared tooling).
+`ml-scratchpad/` is the parent project (treat it like a monorepo root: shared env, shared tooling).
 Each subfolder is a learning sub-project on one concept, algorithm, or paper.
 
 ## Operating Principles (these govern everything — there are no mandatory file lists)
@@ -74,7 +74,7 @@ silently describes an older version.
 
 | Page | Source | Regenerate |
 |------|--------|------------|
-| https://ylnhari.github.io/learning/vllm-memory/ | `vllm-memory/vllm_memory_explainer.ipynb` (executed) | `make vllm-memory-html` |
+| https://ylnhari.github.io/ml-scratchpad/vllm-memory/ | `vllm-memory/vllm_memory_explainer.ipynb` (executed) | `make vllm-memory-html` |
 
 ## Subfolders
 

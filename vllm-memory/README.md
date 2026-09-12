@@ -14,7 +14,7 @@ Llama-3.1-8B-Instruct in BF16 on a single H100 80 GB with vLLM's defaults.
 | 7 | Image and video models: pixels to tokens, what the encoder and encoder cache add at profile time and at runtime |
 | 8 | Reading your own startup log line by line |
 
-**Read it in a browser, no setup:** https://ylnhari.github.io/learning/vllm-memory/
+**Read it in a browser, no setup:** https://ylnhari.github.io/ml-scratchpad/vllm-memory/
 
 Open the notebook with `make vllm-memory-notebook` from the `learning/` root. The notebook is pre-executed;
 all 20 figures are embedded, so it reads without running anything. To change the example, edit
