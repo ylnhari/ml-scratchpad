@@ -10,7 +10,7 @@ recovering 95% of the original model's quality.
 ## Open it
 
 ```bash
-# from learning/ root
+# from ml-scratchpad/ root
 make additive-inference-notebook
 ```
 

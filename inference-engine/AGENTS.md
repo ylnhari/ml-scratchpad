@@ -41,7 +41,7 @@ data/                            scratch outputs (gitignored)
 
 ## Running
 ```bash
-# from learning/ root:
+# from ml-scratchpad/ root:
 make inference-engine-notebook    # open the explainer
 make inference-engine-regen       # rebuild the .ipynb
 ../.venv/Scripts/python inference-engine/engine.py   # paging + speculative self-test

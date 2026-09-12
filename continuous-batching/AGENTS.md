@@ -40,7 +40,7 @@ data/                                scratch outputs (gitignored)
 
 ## Running
 ```bash
-# from learning/ root:
+# from ml-scratchpad/ root:
 make continuous-batching-notebook   # open the explainer
 make continuous-batching-regen      # rebuild the .ipynb
 ../.venv/Scripts/python continuous-batching/batching.py   # equivalence + utilization self-test

@@ -22,10 +22,10 @@ yourself — the "framework builder, not just framework user" depth.
 
 ## Setup
 
-Run from the `learning/` root (one shared env for all subfolders):
+Run from the `ml-scratchpad/` root (one shared env for all subfolders):
 
 ```bash
-cd ..                # go to learning/ root
+cd ..                # go to ml-scratchpad/ root
 make venv            # creates .venv and installs all deps
 make kernel          # registers "Learning (shared)" Jupyter kernel
 ```
@@ -50,7 +50,7 @@ Open `nanogpt.py` top-to-bottom. Focus on the shape comments and on how each lay
 ### Step 2 — Walk the notebook (60–90 min)
 
 ```bash
-cd ..                              # from learning/ root
+cd ..                              # from ml-scratchpad/ root
 make nanogpt-notebook
 ```
 

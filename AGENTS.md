@@ -27,10 +27,10 @@ Each subfolder is a learning sub-project on one concept, algorithm, or paper.
 
 ## Python Environment — Shared, One .venv
 
-**One `.venv` at `learning/` root.** Never create a per-subfolder venv.
+**One `.venv` at `ml-scratchpad/` root.** Never create a per-subfolder venv.
 
 ```
-learning/
+ml-scratchpad/
   .venv/              ← single shared environment (gitignored)
   pyproject.toml      ← dep list (all optional groups collapsed into install target)
   Makefile            ← venv + kernel + open-notebook shortcuts
@@ -41,14 +41,14 @@ learning/
 ```bash
 cd <path-to-learning>
 make venv       # creates .venv and installs all deps
-make kernel     # registers "Learning (shared)" kernel in Jupyter
+make kernel     # registers "ML Scratchpad (shared)" kernel in Jupyter
 ```
 
 ### Connecting a notebook to the kernel
 
-When opening any notebook in this repo: **Kernel → Change Kernel → Learning (shared)**
+When opening any notebook in this repo: **Kernel → Change Kernel → ML Scratchpad (shared)**
 
-The kernel name is `learning` (registered at `%APPDATA%\jupyter\kernels\learning`).
+The kernel name is `ml-scratchpad` (registered at `%APPDATA%\jupyter\kernels\ml-scratchpad`).
 All subfolders share it — no per-subfolder kernel needed.
 
 ### Adding a new subfolder
@@ -57,7 +57,7 @@ All subfolders share it — no per-subfolder kernel needed.
 2. If new deps needed, `cd learning && .venv/Scripts/pip install <pkg>` — no pyproject.toml edit required for one-off installs.
 3. Add an open shortcut to `Makefile` if it has a notebook.
 4. Add a row to the Subfolders table below.
-5. Notebook kernels auto-use "Learning (shared)" — no per-subfolder setup needed.
+5. Notebook kernels auto-use "ML Scratchpad (shared)" — no per-subfolder setup needed.
 
 ## Maintenance Note (not learner-facing)
 
@@ -75,6 +75,14 @@ silently describes an older version.
 | Page | Source | Regenerate |
 |------|--------|------------|
 | https://ylnhari.github.io/ml-scratchpad/vllm-memory/ | `vllm-memory/vllm_memory_explainer.ipynb` (executed) | `make vllm-memory-html` |
+| https://ylnhari.github.io/ml-scratchpad/turbo-quant/ | `turbo-quant/turbo_quant_explainer.ipynb` (executed) | `make turbo-quant-html` |
+| https://ylnhari.github.io/ml-scratchpad/attention-transformer/ | `attention-transformer/attention_explainer.ipynb` (executed) | `make attention-transformer-html` |
+| https://ylnhari.github.io/ml-scratchpad/nanogpt-from-scratch/ | `nanogpt-from-scratch/nanogpt_explainer.ipynb` (executed) | `make nanogpt-html` |
+| https://ylnhari.github.io/ml-scratchpad/kv-cache/ | `kv-cache/kvcache_explainer.ipynb` (executed) | `make kv-cache-html` |
+| https://ylnhari.github.io/ml-scratchpad/rope/ | `rope/rope_explainer.ipynb` (executed) | `make rope-html` |
+| https://ylnhari.github.io/ml-scratchpad/inference-engine/ | `inference-engine/inference_engine_explainer.ipynb` (executed) | `make inference-engine-html` |
+| https://ylnhari.github.io/ml-scratchpad/continuous-batching/ | `continuous-batching/continuous_batching_explainer.ipynb` (executed) | `make continuous-batching-html` |
+| https://ylnhari.github.io/ml-scratchpad/additive-inference/ | `additive-inference/additive_inference_explainer.ipynb` (executed) | `make additive-inference-html` |
 
 ## Subfolders
 
@@ -93,7 +101,7 @@ silently describes an older version.
 ## Running
 
 ```bash
-# from learning/ root:
+# from ml-scratchpad/ root:
 make turbo-quant-notebook
 make attention-transformer-notebook
 ```

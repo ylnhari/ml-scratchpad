@@ -31,7 +31,7 @@ data/                       scratch outputs (gitignored)
 
 ## Running
 ```bash
-# from learning/ root:
+# from ml-scratchpad/ root:
 make install                  # shared env
 make turbo-quant-notebook     # open the explainer
 ```

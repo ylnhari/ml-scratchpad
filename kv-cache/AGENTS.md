@@ -37,7 +37,7 @@ data/                      scratch outputs (gitignored)
 
 ## Running
 ```bash
-# from learning/ root:
+# from ml-scratchpad/ root:
 make kv-cache-notebook     # open the explainer
 make kv-cache-regen        # rebuild the .ipynb
 ../.venv/Scripts/python kv-cache/kvcache.py   # equivalence + timing self-test

@@ -18,10 +18,10 @@
 
 ## Setup
 
-Run from the `learning/` root (one shared env for all subfolders):
+Run from the `ml-scratchpad/` root (one shared env for all subfolders):
 
 ```bash
-cd ../               # go to learning/ root
+cd ../               # go to ml-scratchpad/ root
 make venv            # creates .venv and installs all deps
 make kernel          # registers "Learning (shared)" Jupyter kernel
 ```
@@ -48,7 +48,7 @@ Focus on function signatures, arguments, return shapes, and the one-line comment
 ### Step 2 — Walk Through the Notebook (60–90 min)
 
 ```bash
-cd ../   # from learning/ root
+cd ../   # from ml-scratchpad/ root
 make attention-transformer-notebook
 ```
 
@@ -121,6 +121,6 @@ data/                         scratch outputs (gitignored)
 ## Quick Reference
 
 ```bash
-# From learning/ root:
+# From ml-scratchpad/ root:
 make attention-transformer-notebook   # open the explainer
 ```

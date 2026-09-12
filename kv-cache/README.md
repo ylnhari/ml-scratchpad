@@ -22,7 +22,7 @@ why KV-cache *memory* becomes the next bottleneck (the reason KV compression exi
 ## Setup
 
 ```bash
-cd ..                # learning/ root
+cd ..                # ml-scratchpad/ root
 make venv            # once
 make kernel          # once
 ```

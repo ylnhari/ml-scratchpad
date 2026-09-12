@@ -37,7 +37,7 @@ data/                   scratch outputs (gitignored)
 
 ## Running
 ```bash
-# from learning/ root:
+# from ml-scratchpad/ root:
 make rope-notebook     # open the explainer
 make rope-regen        # rebuild the .ipynb
 ../.venv/Scripts/python rope/rope.py   # relative-property proof + extrapolation demo

@@ -20,10 +20,10 @@ By the end of this path you will be able to answer:
 
 ## Setup — Do This Once
 
-Run from the `learning/` root (one shared env for all subfolders):
+Run from the `ml-scratchpad/` root (one shared env for all subfolders):
 
 ```bash
-cd ..                # go to learning/ root
+cd ..                # go to ml-scratchpad/ root
 make venv            # creates .venv and installs all deps
 make kernel          # registers "Learning (shared)" Jupyter kernel
 ```

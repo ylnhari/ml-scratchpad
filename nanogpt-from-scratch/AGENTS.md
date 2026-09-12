@@ -42,7 +42,7 @@ data/                   scratch outputs (gitignored)
 
 ## Running
 ```bash
-# from learning/ root:
+# from ml-scratchpad/ root:
 make nanogpt-notebook     # open the explainer
 make nanogpt-regen        # rebuild the .ipynb from create_notebook.py
 ../.venv/Scripts/python nanogpt-from-scratch/nanogpt.py   # self-test: gradient check + train + sample

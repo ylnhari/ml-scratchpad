@@ -1,5 +1,5 @@
 [project]
-name = "learning"
+name = "ml-scratchpad"
 version = "0.1.0"
 description = "Personal learning lab — algorithm implementations and visualizations"
 requires-python = ">=3.11"
