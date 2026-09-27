@@ -19,6 +19,7 @@ Reuses the verified model (nanogpt.py) and cache/decoder (kvcache.py).
 """
 import os
 import sys
+from collections import deque
 from dataclasses import dataclass, field
 import numpy as np
 
@@ -58,6 +59,33 @@ class _Seq:
         return False
 
 
+def _positive_int(value, name):
+    """Reject values that make scheduling ambiguous or fail later inside a loop."""
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)) or value <= 0:
+        raise ValueError(f"{name} must be a positive integer; got {value!r}")
+    return int(value)
+
+
+def _validate_requests(requests, B):
+    _positive_int(B, "B")
+    seen = set()
+    for request in requests:
+        _positive_int(request.gen_len, f"request {request.rid} gen_len")
+        if not request.prompt_ids:
+            raise ValueError(f"request {request.rid} prompt_ids must not be empty")
+        if request.rid in seen:
+            raise ValueError(f"duplicate request id {request.rid!r}")
+        seen.add(request.rid)
+
+
+def _validated_generation_lengths(gen_lens, B):
+    _positive_int(B, "B")
+    lengths = list(gen_lens)
+    for index, length in enumerate(lengths):
+        _positive_int(length, f"gen_lens[{index}]")
+    return lengths
+
+
 def standalone_greedy(model, req):
     """Ground truth: generate this one request by itself, greedily."""
     seq = _Seq(model, Request(req.rid, req.prompt_ids, req.gen_len))
@@ -72,6 +100,7 @@ def run_static(model, requests, B):
     Returns (outputs, slot_steps, useful_steps). slot_steps counts every occupied batch slot
     per tick (incl. idle ones waiting for the longest); useful_steps counts real decode work.
     """
+    _validate_requests(requests, B)
     outputs, slot_steps, useful_steps = {}, 0, 0
     for i in range(0, len(requests), B):
         group = [Request(r.rid, r.prompt_ids, r.gen_len) for r in requests[i:i + B]]
@@ -96,6 +125,10 @@ def run_continuous(model, requests, B):
     Returns (outputs, slot_steps, useful_steps). A finished slot is refilled from the queue in
     the same tick, so slots rarely sit idle.
     """
+    # Validation iterates over the workload; materialize first so one-shot request
+    # streams retain the same behavior as reusable lists and tuples.
+    requests = list(requests)
+    _validate_requests(requests, B)
     outputs, slot_steps, useful_steps = {}, 0, 0
     queue = [Request(r.rid, r.prompt_ids, r.gen_len) for r in requests]
     waiting = iter(queue)
@@ -133,23 +166,26 @@ def occupancy_static(gen_lens, B):
     Faithful to run_static's schedule (a group runs until its longest member finishes), but
     needs no model — occupancy depends only on the generation lengths, B, and the policy.
     """
+    gen_lens = _validated_generation_lengths(gen_lens, B)
+    indexed_lengths = list(enumerate(gen_lens))
     rows = []
     for i in range(0, len(gen_lens), B):
-        group = list(enumerate(gen_lens))[i:i + B]     # (rid, length)
+        group = indexed_lengths[i:i + B]                # (rid, length)
         ticks = max(l for _, l in group)
         for t in range(ticks):
             row = [-1] * B
             for slot, (rid, l) in enumerate(group):
                 row[slot] = rid if t < l else -1        # idle once this request is done
             rows.append(row)
-    return np.array(rows)
+    return np.asarray(rows, dtype=int).reshape((-1, B))
 
 
 def occupancy_continuous(gen_lens, B):
     """Slot-occupancy grid (ticks x B) for continuous batching; -1 = idle (only at the drain)."""
+    gen_lens = _validated_generation_lengths(gen_lens, B)
     remaining = {rid: l for rid, l in enumerate(gen_lens)}
-    waiting = list(range(len(gen_lens)))
-    slots = [waiting.pop(0) if waiting else -1 for _ in range(B)]
+    waiting = deque(range(len(gen_lens)))
+    slots = [waiting.popleft() if waiting else -1 for _ in range(B)]
     rows = []
     while any(s != -1 for s in slots):
         rows.append(list(slots))
@@ -158,8 +194,8 @@ def occupancy_continuous(gen_lens, B):
                 continue
             remaining[rid] -= 1
             if remaining[rid] == 0:                     # finished -> admit next immediately
-                slots[i] = waiting.pop(0) if waiting else -1
-    return np.array(rows)
+                slots[i] = waiting.popleft() if waiting else -1
+    return np.asarray(rows, dtype=int).reshape((-1, B))
 
 
 def make_requests(tok, n=12, seed=0):
