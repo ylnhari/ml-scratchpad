@@ -366,7 +366,7 @@ footer{max-width:1240px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 </main>
 </div>
 
-<footer>Source: <a href="https://developer.nvidia.com/blog/mastering-llm-techniques-inference-optimization/">NVIDIA Technical Blog — Mastering LLM Techniques: Inference Optimization</a>. Shapes and formulas follow the article. Grid sizes are scaled down for drawing, and utilisation bars are illustrative. Go deeper with the runnable notebooks in this repo: <a href="../attention-transformer/">attention</a> · <a href="../rope/">RoPE</a> · <a href="../nanogpt-from-scratch/">nanoGPT + backprop</a> · <a href="../kv-cache/">KV cache</a> · <a href="../continuous-batching/">continuous batching</a> · <a href="../inference-engine/">paged KV + speculative decoding</a> · <a href="../vllm-memory/">vLLM memory</a>.</footer>
+<footer>Source: <a href="https://developer.nvidia.com/blog/mastering-llm-techniques-inference-optimization/">NVIDIA Technical Blog — Mastering LLM Techniques: Inference Optimization</a>. Shapes and formulas follow the article. Grid sizes are scaled down for drawing, and utilisation bars are illustrative. Go deeper with the runnable notebooks in this repo: <a href="https://ylnhari.github.io/ml-scratchpad/attention-transformer/">attention</a> · <a href="https://ylnhari.github.io/ml-scratchpad/rope/">RoPE</a> · <a href="https://ylnhari.github.io/ml-scratchpad/nanogpt-from-scratch/">nanoGPT + backprop</a> · <a href="https://ylnhari.github.io/ml-scratchpad/kv-cache/">KV cache</a> · <a href="https://ylnhari.github.io/ml-scratchpad/continuous-batching/">continuous batching</a> · <a href="https://ylnhari.github.io/ml-scratchpad/inference-engine/">paged KV + speculative decoding</a> · <a href="https://ylnhari.github.io/ml-scratchpad/vllm-memory/">vLLM memory</a>.</footer>
 
 <script>
 const NS="http://www.w3.org/2000/svg";
@@ -433,22 +433,6 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       T(svg,tx,ty+12*cs+18,`V = ${M().V.toLocaleString()} rows, h = ${M().h.toLocaleString()} cols`,{class:'lbl'});
       used.forEach((r,i)=>arrow(tx+8*cs+6,ty+r*cs+7,470,96+i*12,null,.2+i*.08));
       iso(560,110,8,6,2,12,'var(--accent)',{an:A(.9),title:'X'});big(440,280,'X  '+shp(['b','s','h']));}},
-   {n:'Positions',f:'RoPE:  q_m ← R(m·θ)·q_m,   k_n ← R(n·θ)·k_n     ⇒     q_m · k_n depends only on (m − n)',c:'Attention only compares token contents, so on its own "dog bites man" looks the same as "man bites dog". The original Transformer <b>added</b> a sinusoidal position vector [s, h] to X. Modern LLMs use <b>RoPE</b> instead: inside attention, Q and K are <b>rotated</b> by an angle proportional to their position (each pair of dims at its own frequency). Rotation doesn\'t change a vector\'s length, and the angle between q and k depends only on <b>how far apart</b> the two tokens are. Shapes don\'t change.',
-    d(){const th=Math.PI/7,cx=170,cy=150,r=92;
-      S('circle',{cx,cy,r,style:'fill:none;stroke:var(--line);stroke-dasharray:3 3'},svg);T(svg,cx,40,'one q vector, rotated at positions 0…5',{'text-anchor':'middle',class:'lbl'});
-      for(let m=0;m<6;m++){const a=.25-m*th,g=S('g',{style:A(m*.22)},svg);
-        S('line',{x1:cx,y1:cy,x2:cx+r*Math.cos(a),y2:cy-r*Math.sin(a),style:`stroke:${HC(m%4)};stroke-width:3`},g);
-        S('circle',{cx:cx+r*Math.cos(a),cy:cy-r*Math.sin(a),r:4,style:`fill:${HC(m%4)}`},g);
-        T(g,cx+(r+18)*Math.cos(a),cy-(r+18)*Math.sin(a)+4,'m='+m,{'text-anchor':'middle',style:'font-size:11px;font-weight:700'});}
-      [[2,0,450],[5,3,640]].forEach(([m,n,x],i)=>{const g=S('g',{style:A(1.4+i*.4)},svg),y=150,rr=68,aq=.25-m*th,ak=.25-n*th;
-        S('circle',{cx:x,cy:y,r:rr,style:'fill:none;stroke:var(--line);stroke-dasharray:3 3'},g);
-        S('line',{x1:x,y1:y,x2:x+rr*Math.cos(ak),y2:y-rr*Math.sin(ak),style:'stroke:var(--g3);stroke-width:3'},g);
-        S('line',{x1:x,y1:y,x2:x+rr*Math.cos(aq),y2:y-rr*Math.sin(aq),style:'stroke:var(--g0);stroke-width:3'},g);
-        const pts=[];for(let t=0;t<=20;t++){const a=ak+(aq-ak)*t/20;pts.push((x+30*Math.cos(a)).toFixed(1)+','+(y-30*Math.sin(a)).toFixed(1));}
-        S('polyline',{points:pts.join(' '),style:'fill:none;stroke:var(--bad);stroke-width:2.5'},g);
-        T(g,x,y-rr-12,`q at ${m},  k at ${n}`,{'text-anchor':'middle',style:'font-weight:700'});T(g,x,y+rr+20,'angle gap = 2θ',{'text-anchor':'middle',style:'fill:var(--bad);font-weight:700'});});
-      T(svg,545,262,'same gap → same score q·k',{'text-anchor':'middle',style:'font-weight:700'});
-      big(40,296,'applied to Q, K  '+shp(['b','nh','s','dh'])+'  shape unchanged');}},
    {n:'LayerNorm',f:'LN(x) = γ ⊙ (x − μ) / √(σ² + ε) + β        μ, σ² taken over h',c:'LayerNorm normalises each token\'s h-vector on its own (the dark row), so it is <b>independent across tokens</b>. That is why §04 can split it along s. The shape does not change.',
     d(){iso(300,86,8,6,2,17,'var(--accent)',{hl:2,an:A(0),title:'X  [b, s, h]'});
       const g=S('g',{style:A(.4)},svg);T(g,500,120,'one token = one h-vector',{style:'font-weight:700'});T(g,500,142,'normalise across its h values',{style:'fill:var(--muted)'});T(g,500,164,'every token on its own',{style:'fill:var(--muted)'});
@@ -463,6 +447,22 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       arrow(205,150,290,150,'reshape',.2);
       for(let i=0;i<4;i++)iso(370+i*100,110,2,6,2,12,HC(i),{an:A(.4+i*.15),title:'head '+i,lab:i===3?{x:'d_head',y:'s',z:'b'}:false});
       big(40,290,shp(['b','nh','s','dh']));}},
+   {n:'Positions (RoPE)',f:'RoPE:  q_m ← R(m·θ)·q_m,   k_n ← R(n·θ)·k_n     ⇒     q_m · k_n depends only on (m − n)',c:'So far nothing records <b>word order</b>. The next step scores tokens with q·k, which compares contents only, so "dog bites man" and "man bites dog" would score the same. The 2017 Transformer fixed this early by <b>adding</b> a sinusoidal position vector [s, h] to X at the embedding step. Modern LLMs (Llama, Mistral, Qwen) use <b>RoPE</b> instead, applied <b>right here</b>: in every head, each token\'s q and k (from steps 4–5) are <b>rotated</b> by an angle proportional to its position, each pair of dims at its own frequency. V is not rotated. Rotation keeps a vector\'s length, so the angle between q and k, and therefore their score, depends only on <b>how far apart</b> the two tokens are. Shapes don\'t change.',
+    d(){const th=Math.PI/7,cx=170,cy=150,r=92;
+      S('circle',{cx,cy,r,style:'fill:none;stroke:var(--line);stroke-dasharray:3 3'},svg);T(svg,cx,40,'one head\'s q vector at positions 0…5',{'text-anchor':'middle',class:'lbl'});
+      for(let m=0;m<6;m++){const a=.25-m*th,g=S('g',{style:A(m*.22)},svg);
+        S('line',{x1:cx,y1:cy,x2:cx+r*Math.cos(a),y2:cy-r*Math.sin(a),style:`stroke:${HC(m%4)};stroke-width:3`},g);
+        S('circle',{cx:cx+r*Math.cos(a),cy:cy-r*Math.sin(a),r:4,style:`fill:${HC(m%4)}`},g);
+        T(g,cx+(r+18)*Math.cos(a),cy-(r+18)*Math.sin(a)+4,'m='+m,{'text-anchor':'middle',style:'font-size:11px;font-weight:700'});}
+      [[2,0,450],[5,3,640]].forEach(([m,n,x],i)=>{const g=S('g',{style:A(1.4+i*.4)},svg),y=150,rr=68,aq=.25-m*th,ak=.25-n*th;
+        S('circle',{cx:x,cy:y,r:rr,style:'fill:none;stroke:var(--line);stroke-dasharray:3 3'},g);
+        S('line',{x1:x,y1:y,x2:x+rr*Math.cos(ak),y2:y-rr*Math.sin(ak),style:'stroke:var(--g3);stroke-width:3'},g);
+        S('line',{x1:x,y1:y,x2:x+rr*Math.cos(aq),y2:y-rr*Math.sin(aq),style:'stroke:var(--g0);stroke-width:3'},g);
+        const pts=[];for(let t=0;t<=20;t++){const a=ak+(aq-ak)*t/20;pts.push((x+30*Math.cos(a)).toFixed(1)+','+(y-30*Math.sin(a)).toFixed(1));}
+        S('polyline',{points:pts.join(' '),style:'fill:none;stroke:var(--bad);stroke-width:2.5'},g);
+        T(g,x,y-rr-12,`q at ${m},  k at ${n}`,{'text-anchor':'middle',style:'font-weight:700'});T(g,x,y+rr+20,'angle gap = 2θ',{'text-anchor':'middle',style:'fill:var(--bad);font-weight:700'});});
+      T(svg,545,262,'same gap → same score q·k',{'text-anchor':'middle',style:'font-weight:700'});
+      big(40,296,'applied to Q, K  '+shp(['b','nh','s','dh'])+'  shape unchanged');}},
    {n:'Scores',f:'S = Q·Kᵀ / √d_head  + causal mask      → [b, n_heads, s, s]',c:'In each head, every token scores every earlier token. The upper triangle is masked because a token can\'t see the future. This <b>s × s</b> matrix is why attention cost grows with s², and it is the matrix FlashAttention (§06) never writes to HBM.',
     d(){const tk=['The','cat','sat','on','the','mat'];
       for(let i=0;i<4;i++){const x=60+i*175,y=70;T(svg,x,y-14,'head '+i,{style:`font-weight:700;fill:${HC(i)}`});heat(x+30,y,6,16,i+3,false,HC(i),i*.2);
