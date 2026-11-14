@@ -119,7 +119,7 @@ footer{max-width:1240px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <header>
   <h1>LLM Inference, Visualized</h1>
-  <p class="dek">Every concept from NVIDIA's <em>Mastering LLM Techniques: Inference Optimization</em>, drawn as a live figure. Part I builds the model with the tensor shapes you need. Part II covers the optimisations. Part III goes deeper, into training and what modern LLMs change. Each GPU keeps the same colour throughout.</p>
+  <p class="dek">How a large language model turns text into the next token, and how inference systems make that fast, drawn as live figures you can step through. Part I builds the model with the tensor shapes you need. Part II covers the optimisations. Part III goes deeper, into training and what modern LLMs change. Each GPU keeps the same colour throughout.</p>
   <div class="legend">
     <span><i class="sw" style="background:var(--g0)"></i>GPU 0</span>
     <span><i class="sw" style="background:var(--g1)"></i>GPU 1</span>
@@ -173,7 +173,7 @@ footer{max-width:1240px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   </div>
 </section>
 
-<div class="part"><span>PART II</span><h3>Inference optimizations</h3><p class="cap">Each technique from the NVIDIA post, and which of those shapes or memory costs it attacks.</p></div>
+<div class="part"><span>PART II</span><h3>Inference optimizations</h3><p class="cap">How serving systems make inference fast and cheap, and which of those shapes or memory costs each technique attacks.</p></div>
 <section id="phases">
   <div class="sh"><span class="n">01</span><h2>Prefill vs decode</h2></div>
   <p class="cap">Prefill pushes all prompt tokens through as one matrix–matrix product. Decode handles one token per step, a matrix–vector product, and still reads every weight.</p>
@@ -785,14 +785,15 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     for(let k=z0+1;k<z1;k++){L([x0,y1,k],[x1,y1,k]);L([x1,y0,k],[x1,y1,k]);}
   }
   const MODES={
-    one:{note:'One GPU holds the whole [b, s, h] tensor.',pieces:[{b:[0,0,0,8,8,3],c:'var(--accent)',dx:0,lab:'[b, s, h]',mem:'100%'}]},
-    rep:{note:'TP outside attention/MLP (LayerNorm, Dropout): both GPUs keep a full copy. Unique data stays the same, but memory doubles.',pieces:[{b:[0,0,0,8,8,3],c:G(0),dx:-200,lab:'GPU 0  [b, s, h]',mem:'100%',dup:1},{b:[0,0,0,8,8,3],c:G(1),dx:200,lab:'GPU 1  [b, s, h]',mem:'100%',dup:1}]},
-    tph:{note:'TP inside attention/MLP: cut along h (heads or MLP columns). Each GPU holds half, with no copies.',pieces:[{b:[0,0,0,4,8,3],c:G(0),dx:-190,lab:'GPU 0  [b, s, h/2]',mem:'50%'},{b:[4,0,0,4,8,3],c:G(1),dx:190,lab:'GPU 1  [b, s, h/2]',mem:'50%'}]},
-    sps:{note:'Sequence parallelism for LayerNorm/Dropout: those ops are per-token, so cut along s instead. Half each, no copies.',pieces:[{b:[0,4,0,8,4,3],c:G(0),dx:-190,lab:'GPU 0  [b, s/2, h]  tokens 0–3',mem:'50%'},{b:[0,0,0,8,4,3],c:G(1),dx:190,lab:'GPU 1  [b, s/2, h]  tokens 4–7',mem:'50%'}]}};
+    one:{note:'One GPU holds all b sequences, all s tokens, and every weight.',pieces:[{b:[0,0,0,8,8,2],c:'var(--accent)',dx:0,lab:'[b, s, h]',mem:'100%',w:'all'}]},
+    dp:{note:'Data parallelism (DP) splits the batch b. Each GPU gets different sequences, [b/2, s, h], but a full copy of every weight. TP is the opposite: both GPUs work on the same sequences, and each holds only part of the weights. The two are often combined.',pieces:[{b:[0,0,1,8,8,1],c:G(0),dx:-190,lab:'GPU 0  [b/2, s, h]  sequence 0',mem:'50%',w:'all'},{b:[0,0,0,8,8,1],c:G(1),dx:190,lab:'GPU 1  [b/2, s, h]  sequence 1',mem:'50%',w:'all'}]},
+    tph:{note:'TP inside attention and the MLP splits the weights: each GPU owns half the heads or half the MLP columns, so it produces only its half of the activation, [b, s, h/2]. Both GPUs still see all b sequences and all s tokens.',pieces:[{b:[0,0,0,4,8,2],c:G(0),dx:-190,lab:'GPU 0  [b, s, h/2]',mem:'50%',w:'1/2'},{b:[4,0,0,4,8,2],c:G(1),dx:190,lab:'GPU 1  [b, s, h/2]',mem:'50%',w:'1/2'}]},
+    rep:{note:'Between those blocks (LayerNorm, Dropout, the residual add), TP has nothing to split, because LayerNorm has almost no weights. Both GPUs are working on the same sequences, so after the All-Reduce each holds an identical full [b, s, h] and runs the same LayerNorm on it: the same memory and the same work, twice. This is not data parallelism. DP would give each GPU different sequences.',pieces:[{b:[0,0,0,8,8,2],c:G(0),dx:-200,lab:'GPU 0  [b, s, h]',mem:'100%',w:'1/2',dup:1},{b:[0,0,0,8,8,2],c:G(1),dx:200,lab:'GPU 1  [b, s, h]',mem:'100%',w:'1/2',dup:1}]},
+    sps:{note:'Sequence parallelism fixes that waste. LayerNorm and Dropout work on each token on its own, so cut along s instead: each GPU normalises half the tokens, with no copies. All-Gather rebuilds the full sequence before the next attention or MLP block.',pieces:[{b:[0,4,0,8,4,2],c:G(0),dx:-190,lab:'GPU 0  [b, s/2, h]  tokens 0–3',mem:'50%',w:'1/2'},{b:[0,0,0,8,4,2],c:G(1),dx:190,lab:'GPU 1  [b, s/2, h]  tokens 4–7',mem:'50%',w:'1/2'}]}};
   let mode='tph';
   function render(){clear(svg);const m=MODES[mode];$('#cube-note').textContent=m.note;
     // ghost of the original tensor
-    const gg=S('g',{transform:`translate(${OX},${OY})`},svg);if(mode!=='one')box(gg,0,0,0,8,8,3,null,true);
+    const gg=S('g',{transform:`translate(${OX},${OY})`},svg);if(mode!=='one')box(gg,0,0,0,8,8,2,null,true);
     // axis labels on the ghost / tensor
     const ax=S('g',{transform:`translate(${OX},${OY})`},svg);
     const a1=P(4,8.9,0),a2=P(8.9,4,0),a3=P(-0.6,8,1.5);
@@ -804,12 +805,12 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       const ctr=P(p.b[0]+p.b[3]/2,p.b[1]+p.b[4]/2,0);
       T(lab,ctr[0],150,p.lab,{'text-anchor':'middle',style:'font-weight:700'});
       R(lab,ctr[0]-70,162,140,10,'fill:var(--surface-2)',{rx:5});R(lab,ctr[0]-70,162,140*parseFloat(p.mem)/100,10,`fill:${p.c}`,{rx:5});
-      T(lab,ctr[0],190,'activation memory '+p.mem,{'text-anchor':'middle',style:'font-size:11px;fill:var(--muted)'});
+      T(lab,ctr[0],190,'activations '+p.mem+'  ·  weights '+p.w,{'text-anchor':'middle',style:'font-size:11px;fill:var(--muted)'});
       if(p.dup)T(lab,ctr[0],-58,'DUPLICATE',{'text-anchor':'middle',style:'fill:var(--bad);font-weight:700'});
       return {inner,lab,dx:p.dx};});
     const go=()=>groups.forEach(o=>{o.inner.style.transform=`translate(${o.dx}px,0px)`;o.lab.style.opacity=1;});
     if(RM)go();else requestAnimationFrame(()=>requestAnimationFrame(go));}
-  seg($('#cube-seg'),[{l:'One GPU',v:'one'},{l:'TP · replicated ops',v:'rep'},{l:'TP · split h',v:'tph'},{l:'SP · split s',v:'sps'}],'tph',v=>{mode=v;render();});
+  seg($('#cube-seg'),[{l:'One GPU',v:'one'},{l:'DP · split b',v:'dp'},{l:'TP · split h',v:'tph'},{l:'TP · LayerNorm (copied)',v:'rep'},{l:'SP · split s',v:'sps'}],'tph',v=>{mode=v;render();});
   $('#cube-replay').onclick=render;render();
 })();
 
