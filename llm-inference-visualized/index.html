@@ -102,6 +102,13 @@ svg .big{font-size:15px;font-weight:700}
 .part span{font:700 12px var(--f-mono);color:var(--accent);letter-spacing:.14em}
 .part h3{font:800 32px/1.1 var(--f-display);margin:2px 0 0;letter-spacing:-.01em}
 nav.rail li.grp{font:700 10.5px var(--f-mono);color:var(--muted);letter-spacing:.12em;padding:12px 8px 3px}
+nav.rail a.sub{padding:3px 8px 3px 22px;font-size:12.5px}
+table.sum{width:100%;min-width:640px;border-collapse:collapse;font-size:13.5px}
+table.sum th{font:600 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+table.sum td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.sum td.k{font-weight:700}
+table.sum td.ok{color:var(--ok);font-weight:600}
+table.sum td.no{color:var(--bad);font-weight:600}
 footer{max-width:1240px;margin:0 auto;padding:20px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
@@ -140,6 +147,12 @@ footer{max-width:1240px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <li><a href="#kv"><b>02</b>KV cache memory</a></li>
     <li><a href="#batching"><b>03</b>Batching</a></li>
     <li><a href="#parallel"><b>04</b>Model parallelism</a></li>
+    <li><a class="sub" href="#par-why"><b>·</b>Why parallelism</a></li>
+    <li><a class="sub" href="#par-dp"><b>·</b>Data (DP)</a></li>
+    <li><a class="sub" href="#par-pp"><b>·</b>Pipeline (PP)</a></li>
+    <li><a class="sub" href="#par-tpc"><b>·</b>Tensor (TP)</a></li>
+    <li><a class="sub" href="#par-sp"><b>·</b>Sequence (SP)</a></li>
+    <li><a class="sub" href="#par-combo"><b>·</b>Combining</a></li>
     <li><a href="#attention"><b>05</b>MHA · GQA · MQA</a></li>
     <li><a href="#flash"><b>06</b>FlashAttention</a></li>
     <li><a href="#paged"><b>07</b>PagedAttention</a></li>
@@ -222,21 +235,62 @@ footer{max-width:1240px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 </section>
 
 <section id="parallel">
-  <div class="sh"><span class="n">04</span><h2>Model parallelism: how the tensors split</h2></div>
-  <p class="cap">The activation tensor [b, s, h] and the three ways it can sit on 2 GPUs.</p>
+  <div class="sh"><span class="n">04</span><h2>Model parallelism</h2></div>
+  <p class="cap">One GPU is rarely enough. This chapter takes the strategies one at a time: why we need them, what each one splits, and what it costs. They all reuse the shapes from §00.</p>
+  <div class="note">Every strategy answers one question: <b>which dimension of which tensor gets cut, and what must travel between GPUs as a result?</b> DP cuts the batch b, PP cuts the layer stack, TP cuts the weights (and with them h, the heads and ffn), SP cuts the sequence s, and EP cuts the set of experts.</div>
+</section>
+<section id="par-why">
+  <div class="sh"><span class="n">04.1</span><h2>Why one GPU is not enough</h2></div>
+  <p class="cap">Weights alone outgrow a GPU fast, and the KV cache from §02 comes on top. Parallelism serves three different goals, and each strategy helps only some of them.</p>
   <div class="fig">
-    <div class="controls"><div class="seg" id="cube-seg"></div><button class="btn solid" id="cube-replay" type="button">Replay cut</button></div>
-    <div class="svgbox"><svg id="cube-svg" viewBox="0 0 760 290" role="img" aria-label="3D activation tensor split across GPUs"></svg></div>
-    <div class="note" id="cube-note"></div>
+    <div class="controls"><span class="mono" style="font-size:12px;color:var(--muted)">precision</span><div class="seg" id="why-prec"></div></div>
+    <div class="svgbox"><svg id="why-svg" viewBox="0 0 760 290" role="img" aria-label="GPUs needed per model"></svg></div>
+    <div class="stats" id="why-stats"></div>
   </div>
-  <p class="cap" style="margin-top:22px">Now through one whole transformer layer. Coloured cells are held on that GPU, and every stage is labelled with its shape.</p>
+</section>
+<section id="par-dp">
+  <div class="sh"><span class="n">04.2</span><h2>Data parallelism: copy the model, split the batch</h2></div>
+  <p class="cap">The simplest strategy: every GPU holds a full copy, and requests are spread across them. It scales throughput almost perfectly, but only if the model fits on one GPU.</p>
   <div class="fig">
-    <div class="controls"><div class="seg" id="par-tabs"></div></div>
+    <div class="controls"><div class="seg" id="dp-model"></div><button class="btn solid" id="dp-replay" type="button">Send requests</button></div>
+    <div class="svgbox"><svg id="dp-svg" viewBox="0 0 760 300" role="img" aria-label="Data parallelism replicas"></svg></div>
+    <div class="stats" id="dp-stats"></div>
+    <div class="note">In training, DP replicas also All-Reduce their gradients after every step (see A1). At inference there is nothing to sync: replicas sit behind a load balancer.</div>
+  </div>
+</section>
+<section id="par-pp">
+  <div class="sh"><span class="n">04.3</span><h2>Pipeline parallelism: split the layers</h2></div>
+  <p class="cap">Cut the stack of layers into stages, one per GPU. Each GPU stores 1/p of the weights and passes only a small activation tensor [b, s, h] to the next stage. But stages must wait on each other, and a single request still has to walk through every stage in turn.</p>
+  <div class="fig">
     <div id="par-pipe">
       <div class="controls"><span class="mono" style="font-size:12px;color:var(--muted)">microbatches</span><div class="seg" id="pp-m"></div></div>
       <div class="svgbox"><svg id="pp-svg" viewBox="0 0 760 320" role="img" aria-label="Pipeline parallelism"></svg></div>
       <div class="stats" id="pp-stats"></div>
     </div>
+    <div class="note">Splitting the batch into microbatches keeps more stages busy at once and shrinks the idle "bubble", but never removes it. PP helps a model <b>fit</b>, and adds throughput once the pipeline is full. It does not make a single request faster.</div>
+  </div>
+</section>
+<section id="par-tpc">
+  <div class="sh"><span class="n">04.4</span><h2>Tensor parallelism: split inside each layer</h2></div>
+  <p class="cap">TP splits the <b>weight matrices themselves</b>, so every GPU works on every layer, for the same sequences, with part of the weights. Step through what gets split, how, and what it costs.</p>
+  <div class="fig">
+    <div class="controls"><button class="btn solid" id="tpc-prev" type="button">◀ Prev</button><button class="btn solid" id="tpc-next" type="button">Next ▶</button><button class="btn solid" id="tpc-play" type="button">Play all</button></div>
+    <div class="chips" id="tpc-chips"></div>
+    <div class="note" id="tpc-note" style="margin:10px 0"></div>
+    <div class="svgbox"><svg id="tpc-svg" viewBox="0 0 760 300" role="img" aria-label="Tensor parallelism component by component"></svg></div>
+  </div>
+</section>
+<section id="par-sp">
+  <div class="sh"><span class="n">04.5</span><h2>Sequence parallelism: remove TP's copies</h2></div>
+  <p class="cap">TP leaves LayerNorm and Dropout copied on every GPU. These ops treat each token on its own, so they can be split along the sequence s instead. Compare the four layouts of the same [b, s, h] tensor:</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="cube-seg"></div><button class="btn solid" id="cube-replay" type="button">Replay cut</button></div>
+    <div class="svgbox"><svg id="cube-svg" viewBox="0 0 760 290" role="img" aria-label="3D activation tensor split across GPUs"></svg></div>
+    <div class="note" id="cube-note"></div>
+  </div>
+  <p class="cap" style="margin-top:22px">Now walk one whole layer under TP and under TP + SP. Watch the grid each GPU holds, the collective between stages, and the running memory total.</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="par-tabs"></div></div>
     <div id="par-tp">
       <div class="controls">
         <button class="btn solid" id="tp-prev" type="button">◀ Prev</button>
@@ -250,6 +304,20 @@ footer{max-width:1240px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     </div>
   </div>
 </section>
+<section id="par-combo">
+  <div class="sh"><span class="n">04.6</span><h2>Putting it together</h2></div>
+  <p class="cap">Real deployments mix strategies to match the hardware: TP inside a server where NVLink is fast, PP across servers where links are slow, and DP to replicate for traffic. Pick a deployment:</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="cb-seg"></div></div>
+    <div class="note" id="cb-note" style="margin:0 0 10px"></div>
+    <div class="svgbox"><svg id="cb-svg" viewBox="0 0 760 310" role="img" aria-label="16 GPUs across two servers"></svg></div>
+    <div class="stats" id="cb-stats"></div>
+  </div>
+  <div class="fig">
+    <div class="svgbox"><table class="sum" id="sum-tbl"></table></div>
+  </div>
+</section>
+
 
 <section id="attention">
   <div class="sh"><span class="n">05</span><h2>MHA → GQA → MQA</h2></div>
@@ -706,7 +774,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
   const units=sp=>(sp.r[1]-sp.r[0])*(sp.c[1]-sp.c[0])/64;
   const total=arr=>arr.reduce((a,s)=>a+units(s.t(0)),0);
   let mode='tp',k=0,timer=null;
-  const tabs=[{l:'Pipeline',v:'pipe'},{l:'Tensor (TP=2)',v:'tp'},{l:'Tensor + Sequence (TP=2)',v:'sp'},{l:'Single GPU',v:'one'}];
+  const tabs=[{l:'Tensor (TP=2)',v:'tp'},{l:'Tensor + Sequence (TP=2)',v:'sp'},{l:'Single GPU',v:'one'}];
   const ONE=TP.map(s=>Object.assign({},s,{t:()=>Object.assign({},s.t(0).W===32?{W:32,r:[0,8],c:[0,32]}:full),comm:null,w:s.w?{k:'all',l:s.w.l.replace(/ (column|row)-split.*/,' (whole)')}:null,sh:s.t(0).W===32?'[s, 4h]':'[s, h]',note:'One GPU holds every activation and every weight in full. Memory is the limit.'}));
   const stages=()=>mode==='sp'?SP:mode==='one'?ONE:TP;
   function drawTensor(px,g,spec,stg,gpus){
@@ -738,8 +806,6 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     T(svg,px,by+28,fmt(cum,1)+' units',{style:'font-weight:700'});
   }
   function render(){
-    if(mode==='pipe'){$('#par-pipe').style.display='';$('#par-tp').style.display='none';return;}
-    $('#par-pipe').style.display='none';$('#par-tp').style.display='';
     const arr=stages(),stg=arr[k],gpus=mode==='one'?1:2;
     const chips=$('#tp-chips');chips.innerHTML='';
     arr.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=(i+1)+' '+s.n+(s.comm?' ⇄':'');
@@ -1154,6 +1220,123 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
   function draw(){clear(svg);V[tab]();}
   seg($('#md-seg'),[{l:'Pre-norm',v:'prenorm'},{l:'RMSNorm',v:'rms'},{l:'SwiGLU',v:'swiglu'},{l:'Sampling',v:'sampling'},{l:'Mixture of Experts',v:'moe'}],'prenorm',v=>{tab=v;controls();draw();});
   controls();draw();
+})();
+
+/* ---------- 04.1 why parallelism ---------- */
+(function(){
+  const svg=$('#why-svg');let bytes=2;
+  const M=[['Llama 2 7B',7],['Llama 2 13B',13],['Llama 2 70B',70],['Llama 3.1 405B',405]];
+  function render(){clear(svg);const x0=170,tw=50,gap=4;
+    T(svg,x0,20,'each box = one 80 GB GPU, filled with weights only (no KV cache yet)',{class:'lbl'});
+    M.forEach(([n,p],i)=>{const y=36+i*62,gb=p*bytes,need=Math.ceil(gb/80);
+      T(svg,20,y+22,n,{style:'font-weight:700'});T(svg,20,y+40,`${fmt(gb,gb<10?1:0)} GB`,{style:'fill:var(--muted)'});
+      for(let k=0;k<Math.max(need,1);k++){const x=x0+k*(tw+gap),f=Math.min(1,Math.max(0,(gb-k*80)/80));
+        R(svg,x,y,tw,46,'fill:none;stroke:var(--line);stroke-width:1.5',{rx:5});
+        R(svg,x+2,y+2+42*(1-f),tw-4,42*f,`fill:${need>1?'var(--bad)':'var(--accent)'};opacity:.85;${RM?'':`animation:pdIn .5s ${(i*.15+k*.05).toFixed(2)}s both;transform-box:fill-box;transform-origin:bottom`}`,{rx:3});}
+      const ex=x0+Math.max(need,1)*(tw+gap)+8;
+      if(ex<700)T(svg,ex,y+28,need>1?`≥ ${need} GPUs`:'fits on 1',{style:`font-weight:700;fill:${need>1?'var(--bad)':'var(--ok)'}`});
+      else T(svg,740,y-4,`≥ ${need} GPUs`,{'text-anchor':'end',style:'font-weight:700;fill:var(--bad)'});});
+    stats($('#why-stats'),[{v:'fit',l:'model + KV cache larger than one GPU'},{v:'throughput',l:'more requests per second'},{v:'latency',l:'each request finishes sooner'}]);}
+  seg($('#why-prec'),[{l:'FP16 (2 B)',v:2},{l:'FP8 (1 B)',v:1},{l:'INT4 (0.5 B)',v:.5}],2,v=>{bytes=v;render();});render();
+})();
+
+/* ---------- 04.2 data parallelism ---------- */
+(function(){
+  const svg=$('#dp-svg');let big=false;
+  function render(){clear(svg);const gb=big?140:14,reqs='ABCDEFGH'.split('');
+    R(svg,250,8,260,26,'fill:var(--g1)',{rx:8});T(svg,380,26,'load balancer: requests round-robin',{'text-anchor':'middle',style:'fill:#fff;font-weight:700;font-size:12px'});
+    for(let g=0;g<4;g++){const x=30+g*185,y=80,H=170,f=gb/80;
+      S('line',{x1:380,y1:34,x2:x+75,y2:y-6,style:'stroke:var(--line);stroke-width:1.5'},svg);
+      R(svg,x,y,150,H,'fill:var(--surface-2);stroke:var(--line);stroke-width:1.5',{rx:8});
+      T(svg,x+8,y+18,'GPU '+g+' · 80 GB',{style:`font-weight:700;fill:${G(g)}`});
+      const wh=Math.min(f,1)*(H-30);R(svg,x+8,y+H-8-wh,134,wh,big?'fill:var(--bad);opacity:.85':'fill:var(--accent);opacity:.85',{rx:4});
+      T(svg,x+75,y+H-8-wh/2+4,big?'140 GB weights':'full model 14 GB',{'text-anchor':'middle',style:'fill:#fff;font-weight:700;font-size:11px'});
+      if(big){R(svg,x+8,y-34,134,30,'fill:url(#hatchBad)',{rx:4});T(svg,x+75,y-14,'does not fit',{'text-anchor':'middle',style:'font-weight:800;fill:var(--bad)'});}
+      else{reqs.filter((_,i)=>i%4===g).forEach((r,j)=>{const gp=S('g',{style:RM?'':`animation:pdIn .5s ${(j*4+g)*.18}s both;transform-box:fill-box;transform-origin:center`},svg);
+          R(gp,x+12+j*68,y+30,58,26,`fill:${PAL(reqs.indexOf(r))}`,{rx:6});T(gp,x+41+j*68,y+48,'req '+r,{'text-anchor':'middle',style:'fill:#fff;font-weight:700;font-size:11.5px'});});
+        T(svg,x+75,y+78,'KV cache + free',{'text-anchor':'middle',style:'font-size:11px;fill:var(--muted)'});}}
+    T(svg,30,290,big?'Llama 2 70B: every replica needs all 140 GB, so DP alone cannot serve it.':'Llama 2 7B: 4 independent copies, 4 requests in flight, no talking between GPUs.',{style:`font-weight:700;fill:${big?'var(--bad)':'var(--ink)'}`});
+    stats($('#dp-stats'),[{v:'100%',l:'weights on every GPU'},{v:big?'—':'≈ 4×',l:'throughput vs 1 GPU',c:big?'':'good'},{v:'1×',l:'latency of one request'},{v:'none',l:'GPU-to-GPU traffic at inference'}]);}
+  seg($('#dp-model'),[{l:'Llama 2 7B',v:false},{l:'Llama 2 70B',v:true}],false,v=>{big=v;render();});$('#dp-replay').onclick=render;render();
+})();
+
+/* ---------- 04.4 tensor parallelism, component by component ---------- */
+(function(){
+  const svg=$('#tpc-svg'),{A,arrow,big}=makeKit(svg),C0=G(0),C1=G(1);
+  function mx(x,y,w,h,split,lab,sub,d,col){const g=S('g',{style:A(d||0)},svg);
+    if(split==='col'){R(g,x,y,w/2,h,`fill:${C0}`);R(g,x+w/2,y,w/2,h,`fill:${C1}`);}
+    else if(split==='row'){R(g,x,y,w,h/2,`fill:${C0}`);R(g,x,y+h/2,w,h/2,`fill:${C1}`);}
+    else if(split==='p0')R(g,x,y,w,h,`fill:url(#part0)`);else if(split==='p1')R(g,x,y,w,h,`fill:url(#part1)`);
+    else R(g,x,y,w,h,`fill:${col||'var(--accent)'}`);
+    R(g,x,y,w,h,'fill:none;stroke:var(--ink);stroke-width:1;opacity:.4');
+    if(lab)T(g,x+w/2,y-8,lab,{'text-anchor':'middle',style:'font-weight:700;font-size:12px'});
+    if(sub)T(g,x+w/2,y+h+15,sub,{'text-anchor':'middle',style:'font-size:10.5px;fill:var(--muted)'});return g;}
+  const sym=(x,y,t)=>T(svg,x,y,t,{'text-anchor':'middle',class:'big'});
+  const pillC=(x,y,w,t,col,d)=>{const g=S('g',{style:A(d||0)},svg);R(g,x,y,w,24,`fill:${col}`,{rx:12});T(g,x+w/2,y+16,t,{'text-anchor':'middle',style:'fill:#fff;font-weight:700;font-size:12px'});};
+  const ST=[
+   {n:'MLP: the matmul trick',f:'Y = GeLU(X·[A₁ | A₂]) = [GeLU(X·A₁) | GeLU(X·A₂)]        Z = [Y₁ | Y₂]·[B₁ ; B₂] = Y₁·B₁ + Y₂·B₂',c:'Split the first weight A <b>by columns</b>. Each GPU computes its half of Y, and because GeLU works element by element, it can apply GeLU to its half without seeing the other. Then split the second weight B <b>by rows</b>, so each GPU multiplies the half of Y it already holds. Each result is a <b>partial sum</b> of the full output, and one All-Reduce adds them. That is two matmuls and one communication, which is why Megatron pairs a column split with a row split.',
+    d(){mx(20,90,50,90,null,'X','[s, h]  full',0);sym(88,140,'·');mx(105,105,130,60,'col','A = [A₁ | A₂]','[h, ffn]',.2);sym(253,140,'=');
+      mx(270,90,130,90,'col','GeLU → Y₁ | Y₂','[s, ffn/2] each',.4);sym(418,140,'·');mx(435,60,55,150,'row','B = [B₁; B₂]','[ffn, h]',.6);sym(508,140,'=');
+      mx(525,70,50,60,'p0','Z₁','',.8);mx(525,150,50,60,'p1','Z₂','',.85);pillC(588,128,100,'All-Reduce','var(--accent)',1);mx(700,90,48,90,null,'Z','[s, h]',1.1);
+      T(svg,20,262,'no communication between the two matmuls',{style:'font-weight:700;fill:var(--ok)'});T(svg,20,284,'one All-Reduce after the second',{style:'font-weight:700'});}},
+   {n:'Attention: split by heads',f:'heads 0 … n/2−1 → GPU 0      heads n/2 … n−1 → GPU 1      W_QKV column-split · W_O row-split · 1 All-Reduce',c:'Each attention head runs on its own, so heads are the natural thing to split. W_Q, W_K and W_V are split by columns, which hands each GPU whole heads. Each GPU runs full attention for its heads with no communication, then the row-split W_O makes partial sums for one All-Reduce. <b>Bonus for inference:</b> each GPU caches K and V only for its own heads, so the KV cache is split too. With GQA, the number of KV heads limits the TP degree: Llama 2 70B has 8 KV heads, so TP ≤ 8.',
+    d(){mx(20,40,720,26,'col','W_QKV  [h, 3h]  column-split','',0);
+      for(let i=0;i<8;i++){const g=S('g',{style:A(.2+i*.07)},svg),x=30+i*90;R(g,x,100,72,60,`fill:${i<4?C0:C1}`,{rx:8});T(g,x+36,126,'head '+i,{'text-anchor':'middle',style:'fill:#fff;font-weight:700;font-size:12px'});T(g,x+36,146,'+ its KV',{'text-anchor':'middle',style:'fill:#fff;font-size:10.5px'});}
+      T(svg,190,180,'GPU 0: attention for heads 0–3',{'text-anchor':'middle',style:`font-weight:700;fill:${C0}`});T(svg,570,180,'GPU 1: heads 4–7',{'text-anchor':'middle',style:`font-weight:700;fill:${C1}`});
+      mx(20,200,720,26,'col','','',.8);T(svg,380,218,'W_O  [h, h]  row-split: each GPU multiplies its heads\' rows',{'text-anchor':'middle',style:'fill:#fff;font-weight:700;font-size:11.5px'});
+      pillC(310,250,140,'All-Reduce','var(--accent)',1);}},
+   {n:'Embedding & LM head: split by vocabulary',f:'E [V, h] split by rows (token ranges)        W_U [h, V] split by columns        logits [b, s, V/2] per GPU',c:'The embedding table is split by <b>token-ID range</b>. Each GPU looks up only the tokens that fall in its half and writes zeros for the rest, and an All-Reduce combines them. The LM head is split by columns, so each GPU produces logits for half the vocabulary. Softmax then needs the global max and sum, which takes a small reduction. With a vocabulary of 32,000 (or 128,000 in Llama 3), these are two of the largest matrices in the model.',
+    d(){mx(30,50,90,200,'row','E  [V, h]','',0);T(svg,128,100,'ids 0 … V/2−1',{style:`font-size:11px;fill:${C0};font-weight:700`});T(svg,128,200,'ids V/2 … V−1',{style:`font-size:11px;fill:${C1};font-weight:700`});
+      [['id 464',0],['id 22977',1],['id 3797',0]].forEach((t,i)=>{pillC(250,70+i*36,90,t[0],t[1]?C1:C0,.2+i*.1);});
+      T(svg,250,190,'each GPU fills its own rows,',{style:'font-size:11.5px'});T(svg,250,206,'zeros elsewhere → All-Reduce',{style:'font-size:11.5px'});
+      mx(450,110,280,50,'col','W_U  [h, V]  column-split','',.5);mx(450,200,140,40,null,'logits  V/2','',.7,C0);mx(590,200,140,40,null,'logits  V/2','',.75,C1);
+      T(svg,450,272,'softmax: global max & sum',{style:'font-weight:700;font-size:12px'});T(svg,450,290,'→ one tiny All-Reduce',{style:'font-weight:700;font-size:12px'});}},
+   {n:'What is not split',f:'LayerNorm · Dropout · residual add      → replicated on every TP GPU',c:'Between the split blocks, every GPU holds the <b>same full [b, s, h]</b> after the All-Reduce. LayerNorm, Dropout and the residual add have almost no weights to split, so TP simply runs them on <b>every GPU</b>: the same memory and the same work, repeated t times. §04.5 shows how sequence parallelism removes that waste.',
+    d(){const blocks=[['LN',0],['Attention',1],['AR',2],['Dropout + add',0],['LN',0],['MLP',1],['AR',2],['Dropout + add',0]];let x=20;
+      blocks.forEach((b,i)=>{const w=b[1]===2?54:b[0].length>4?112:70,d=i*.12;
+        if(b[1]===1){const g=S('g',{style:A(d)},svg);R(g,x,110,w,30,`fill:${C0}`,{rx:5});R(g,x,146,w,30,`fill:${C1}`,{rx:5});T(g,x+w/2,129,b[0]+' 1/2',{'text-anchor':'middle',style:'fill:#fff;font-weight:700;font-size:11px'});T(g,x+w/2,165,b[0]+' 1/2',{'text-anchor':'middle',style:'fill:#fff;font-weight:700;font-size:11px'});}
+        else if(b[1]===2){pillC(x,130,w,'AR','var(--accent)',d);}
+        else{const g=S('g',{style:A(d)},svg);[0,1].forEach(k=>{R(g,x,110+k*36,w,30,`fill:${G(k)};opacity:.85`,{rx:5});R(g,x,110+k*36,w,30,'fill:none;stroke:var(--bad);stroke-width:2;stroke-dasharray:4 3',{rx:5});T(g,x+w/2,129+k*36,b[0],{'text-anchor':'middle',style:'fill:#fff;font-weight:700;font-size:11px'});});}
+        x+=w+(i<blocks.length-1?10:0);});
+      T(svg,20,90,'GPU 0 (top row) · GPU 1 (bottom row) through one layer',{class:'lbl'});
+      T(svg,20,220,'two-tone = split (each GPU does half)',{style:'font-weight:700'});T(svg,20,242,'red dashed = full copy on both GPUs',{style:'font-weight:700;fill:var(--bad)'});}},
+   {n:'The cost: 2 All-Reduces per layer',f:'per layer: 2 × All-Reduce of [b, s, h]        Llama 2 70B: 80 layers → 160 All-Reduces per forward pass',c:'TP communicates <b>inside every layer</b>, so the link between GPUs sets its speed. The bars below estimate the time for one prefill of 4,096 tokens on Llama 2 70B with TP = 8, counting only All-Reduce traffic. A ring All-Reduce moves about 2·(t−1)/t of the tensor. NVLink inside an H100 server is roughly 450 GB/s per direction; a 400 Gb/s InfiniBand link between servers is about 50 GB/s. These are rough estimates that ignore latency and overlap, but the gap is why <b>TP stays inside one server</b> (usually ≤ 8 GPUs), while PP and DP cross servers.',
+    d(){const sz=4096*8192*2,mv=sz*2*7/8,n=160,nv=mv/450e9*n*1000,ib=mv/50e9*n*1000;
+      T(svg,20,40,`one All-Reduce: [1, 4096, 8192] × 2 B = ${fmt(sz/1e6,0)} MB  →  moves ≈ ${fmt(mv/1e6,0)} MB per GPU`,{style:'font-weight:700'});
+      const sc=560/ib;[['NVLink (in one server) ≈ 450 GB/s',nv,'var(--ok)'],['InfiniBand (between servers) ≈ 50 GB/s',ib,'var(--bad)']].forEach((r,i)=>{const y=90+i*80;
+        T(svg,20,y-8,r[0],{style:'font-weight:700'});R(svg,20,y,r[1]*sc,34,`fill:${r[2]};${A(i*.3)}`,{rx:5});T(svg,30+r[1]*sc,y+23,`≈ ${fmt(r[1],0)} ms`,{class:'big'});});
+      T(svg,20,272,`160 All-Reduces per forward pass, prefill of 4,096 tokens (rough estimate)`,{class:'lbl'});}}];
+  stager({svg,note:$('#tpc-note'),chips:$('#tpc-chips'),prev:$('#tpc-prev'),next:$('#tpc-next'),play:$('#tpc-play'),stages:ST});
+})();
+
+/* ---------- 04.6 combining ---------- */
+(function(){
+  const svg=$('#cb-svg');
+  const P={
+   lat:{n:'Llama 2 70B, low latency',tp:8,pp:1,dp:2,params:70,txt:'TP = 8 inside each server cuts every matmul 8 ways, so each token finishes fastest. The second server holds an independent replica (DP = 2) that doubles throughput.'},
+   big:{n:'Llama 3.1 405B, fit',tp:8,pp:2,dp:1,params:405,txt:'810 GB of FP16 weights don\'t fit in one 8-GPU server (640 GB). TP = 8 inside each server, PP = 2 across servers: server 0 runs the first half of the layers and server 1 the second. Only small activations cross the slow link.'},
+   thr:{n:'Llama 2 7B, max throughput',tp:1,pp:1,dp:16,params:7,txt:'The model fits on one GPU, so splitting it would only add communication. 16 independent replicas (DP = 16) serve 16 times the traffic.'},
+   mix:{n:'Llama 2 70B, balanced',tp:4,pp:1,dp:4,params:70,txt:'TP = 4 gives each replica 35 GB of weights per GPU, leaving room for KV cache. 4 replicas (DP = 4) spread the traffic. Every TP group stays inside one server.'}};
+  let k='lat';
+  function render(){clear(svg);const p=P[k],per=p.params*2/(p.tp*p.pp);
+    for(let n=0;n<2;n++){const y=40+n*130;R(svg,10,y-24,740,120,'fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:6 4',{rx:12});
+      T(svg,20,y-8,`server ${n}  ·  8 GPUs on NVLink`+(p.pp>1?`  ·  PP stage ${n}: layers ${n?'63–125':'0–62'}`:''),{class:'lbl'});
+      for(let g=0;g<8;g++){const id=n*8+g,x=22+g*90,rep=Math.floor(id/(p.tp*p.pp)),tpr=g%p.tp;
+        const col=p.pp>1?G(n):p.dp>4?PAL(rep):G(rep%4);
+        const gp=S('g',{style:RM?'':`animation:pdIn .45s ${(id*.04).toFixed(2)}s both;transform-box:fill-box;transform-origin:center`},svg);
+        R(gp,x,y,80,64,`fill:${col}`,{rx:8});T(gp,x+40,y+22,'GPU '+id,{'text-anchor':'middle',style:'fill:#fff;font-weight:700;font-size:12px'});
+        T(gp,x+40,y+40,p.tp>1?`TP rank ${tpr}`:'whole model',{'text-anchor':'middle',style:'fill:#fff;font-size:11px'});
+        T(gp,x+40,y+56,`replica ${rep}`,{'text-anchor':'middle',style:'fill:#fff;font-size:10.5px;opacity:.9'});}
+      if(p.tp>1)for(let s=0;s<8;s+=p.tp)R(svg,18+s*90,y-4,p.tp*90-2,72,'fill:none;stroke:var(--ink);stroke-width:2.5',{rx:10});}
+    if(p.pp>1){S('line',{x1:380,y1:110,x2:380,y2:148,'marker-end':'url(#arr)',style:'stroke:var(--bad);stroke-width:3'},svg);T(svg,390,134,'activations cross InfiniBand once per stage',{style:'font-size:11px;font-weight:700;fill:var(--bad)'});}
+    T(svg,20,300,'thick outline = one TP group (always inside a server)',{class:'lbl'});
+    $('#cb-note').textContent=p.txt;
+    stats($('#cb-stats'),[{v:p.tp,l:'TP (split weights)'},{v:p.pp,l:'PP (split layers)'},{v:p.dp,l:'DP (replicas)'},{v:fmt(per,1)+' GB',l:'FP16 weights per GPU',c:per>70?'warn':'good'}]);}
+  seg($('#cb-seg'),Object.entries(P).map(([v,p])=>({l:p.n,v})),'lat',v=>{k=v;render();});render();
+  /* summary matrix */
+  const rows=[['Data (DP)','batch b','✗','✓','✗','none at inference'],['Pipeline (PP)','layers','✓','✓ with microbatches','✗ bubbles add wait','small activations between stages'],['Tensor (TP)','weights: heads, ffn, vocab','✓','~','✓ each matmul is smaller','2 All-Reduce per layer, needs NVLink'],['Sequence (SP)','LayerNorm / Dropout along s','~ activation memory','—','—','same volume as TP'],['Expert (EP)','MoE experts across GPUs','✓','✓','~','all-to-all token routing']];
+  const cls=v=>v.startsWith('✓')?'ok':v.startsWith('✗')?'no':'';
+  $('#sum-tbl').innerHTML='<thead><tr>'+['strategy','splits','fits a bigger model','more throughput','lower latency','communication'].map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map((v,i)=>`<td class="${i===0?'k':cls(v)}">${v}</td>`).join('')+'</tr>').join('')+'</tbody>';
 })();
 
 /* nav highlight */
