@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Inference, Visualized</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* layout: sticky left rail + one wide column of live figures; text is captions only */
+  --bg:#eef0f6; --surface:#ffffff; --surface-2:#e8ebf3; --ink:#121628; --muted:#5a6280; --line:#d8dce8;
+  --accent:#4338ca; --accent-soft:#dfe1fb;
+  --g0:#2563eb; --g1:#d97706; --g2:#db2777; --g3:#0d9488;
+  --ok:#15803d; --bad:#dc2626; --idle:#c7ccda;
+  --f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0a0d16; --surface:#111626; --surface-2:#1a2135; --ink:#e9ecf6; --muted:#98a1bc; --line:#262e47;
+    --accent:#8f97ff; --accent-soft:#262b55;
+    --g0:#60a5fa; --g1:#fbbf24; --g2:#f472b6; --g3:#2dd4bf;
+    --ok:#4ade80; --bad:#f87171; --idle:#2b3350; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a0d16; --surface:#111626; --surface-2:#1a2135; --ink:#e9ecf6; --muted:#98a1bc; --line:#262e47;
+  --accent:#8f97ff; --accent-soft:#262b55;
+  --g0:#60a5fa; --g1:#fbbf24; --g2:#f472b6; --g3:#2dd4bf;
+  --ok:#4ade80; --bad:#f87171; --idle:#2b3350; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body)}
+a{color:var(--accent)}
+header{max-width:1240px;margin:0 auto;padding:44px 20px 20px}
+h1{font:800 clamp(34px,5vw,58px)/1.02 var(--f-display);margin:0 0 10px;letter-spacing:-.02em;text-wrap:balance}
+.dek{color:var(--muted);max-width:70ch;margin:0}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;font:500 13px var(--f-mono)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:14px;border-radius:4px;display:inline-block}
+.wrap{max-width:1240px;margin:0 auto;padding:0 20px 60px;display:grid;grid-template-columns:190px minmax(0,1fr);gap:36px}
+nav.rail{position:sticky;top:16px;align-self:start;font-size:13.5px}
+nav.rail ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+nav.rail a{display:flex;gap:8px;padding:5px 8px;border-radius:7px;text-decoration:none;color:var(--muted)}
+nav.rail a b{font:600 12px var(--f-mono);color:var(--accent);min-width:20px}
+nav.rail a:hover,nav.rail a.on{background:var(--surface);color:var(--ink)}
+@media (max-width:900px){.wrap{grid-template-columns:1fr}nav.rail{display:none}}
+section{padding:30px 0 10px;scroll-margin-top:10px}
+.sh{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.sh .n{font:700 13px var(--f-mono);color:var(--accent)}
+h2{font:700 26px/1.15 var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+.cap{color:var(--muted);margin:6px 0 0;max-width:80ch}
+.fig{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:14px}
+.fig svg{width:100%;height:auto;display:block}
+.svgbox{overflow-x:auto}
+.svgbox svg{min-width:640px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.seg{display:inline-flex;flex-wrap:wrap;gap:4px;background:var(--surface-2);padding:3px;border-radius:10px}
+.btn{font:500 13.5px var(--f-body);padding:6px 12px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--ink);cursor:pointer}
+.btn.solid{background:var(--surface-2);border-color:var(--line)}
+.btn:hover{border-color:var(--line)}
+.btn[aria-pressed="true"]{background:var(--accent);color:#fff}
+.btn:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.stat{background:var(--surface-2);border-radius:10px;padding:7px 12px;min-width:120px}
+.stat b{display:block;font:700 18px var(--f-mono);font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+.stat.good b{color:var(--ok)} .stat.warn b{color:var(--bad)}
+.note{font:500 13.5px var(--f-body);color:var(--ink);background:var(--accent-soft);border-radius:10px;padding:8px 12px;margin-top:10px}
+label.ctl{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+select,input[type=range]{font:500 13px var(--f-body);color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
+input[type=range]{padding:0;accent-color:var(--accent);width:170px}
+.mono{font-family:var(--f-mono)}
+.formula{font:500 13.5px var(--f-mono);background:var(--surface-2);border-radius:10px;padding:10px 12px;overflow-x:auto;white-space:nowrap;margin-top:10px}
+.formula b{color:var(--g2)}
+svg text{font-family:var(--f-mono);fill:var(--ink);font-size:12px}
+svg .lbl{font-size:10.5px;fill:var(--muted);letter-spacing:.06em}
+svg .big{font-size:15px;font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{font:500 12.5px var(--f-mono);padding:4px 9px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);cursor:pointer}
+.chip[aria-pressed="true"]{outline:2px solid var(--ink)}
+.chip.q{opacity:.45}
+.spec{display:grid;gap:10px}
+.spec-row{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center}
+.spec-k{font:600 12px var(--f-mono);color:var(--muted);letter-spacing:.05em}
+.pills{display:flex;flex-wrap:wrap;gap:6px;min-height:32px}
+.pill{font:600 14px var(--f-mono);padding:5px 10px;border-radius:8px;background:var(--surface-2);border:1.5px solid var(--line)}
+.pill.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);border-color:var(--ok)}
+.pill.no{background:color-mix(in srgb,var(--bad) 15%,transparent);border-color:var(--bad);text-decoration:line-through}
+.pill.fix{border-style:dashed;border-color:var(--accent);background:var(--accent-soft)}
+.pill.draft{border-color:var(--g1)}
+.pill.ver{border-color:var(--g0)}
+@media (max-width:560px){.spec-row{grid-template-columns:1fr}}
+@keyframes pdIn{from{opacity:0;transform:scale(.55)}60%{opacity:1;transform:scale(1.08)}to{opacity:1;transform:none}}
+.part{margin-top:30px;padding-top:18px;border-top:2px solid var(--ink)}
+.part span{font:700 12px var(--f-mono);color:var(--accent);letter-spacing:.14em}
+.part h3{font:800 32px/1.1 var(--f-display);margin:2px 0 0;letter-spacing:-.01em}
+nav.rail li.grp{font:700 10.5px var(--f-mono);color:var(--muted);letter-spacing:.12em;padding:12px 8px 3px}
+footer{max-width:1240px;margin:0 auto;padding:20px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker>
+    <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--muted);stroke-width:1.6;opacity:.55"/></pattern>
+    <pattern id="hatchBad" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--bad);stroke-width:2"/></pattern>
+    <pattern id="part0" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="7" height="7" style="fill:var(--surface)"/><line x1="0" y1="0" x2="0" y2="7" style="stroke:var(--g0);stroke-width:4"/></pattern>
+    <pattern id="part1" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="7" height="7" style="fill:var(--surface)"/><line x1="0" y1="0" x2="0" y2="7" style="stroke:var(--g1);stroke-width:4"/></pattern>
+  </defs>
+</svg>
+
+<header>
+  <h1>LLM Inference, Visualized</h1>
+  <p class="dek">Every concept from NVIDIA's <em>Mastering LLM Techniques: Inference Optimization</em>, drawn as a live figure. Part I builds the model with the tensor shapes you need. Part II covers the optimisations. Part III goes deeper, into training and what modern LLMs change. Each GPU keeps the same colour throughout.</p>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--g0)"></i>GPU 0</span>
+    <span><i class="sw" style="background:var(--g1)"></i>GPU 1</span>
+    <span><i class="sw" style="background:var(--g2)"></i>GPU 2</span>
+    <span><i class="sw" style="background:var(--g3)"></i>GPU 3</span>
+    <span><i class="sw" style="background:url(#hatch);border:1px solid var(--muted)"></i>idle / wasted</span>
+    <span>s = sequence · h = hidden (d_model) · t = GPUs</span>
+  </div>
+</header>
+
+<div class="wrap">
+<nav class="rail" aria-label="Sections">
+  <ol>
+    <li class="grp">FOUNDATIONS</li>
+    <li><a href="#anatomy"><b>00</b>Anatomy of a forward pass</a></li>
+    <li class="grp">INFERENCE</li>
+    <li><a href="#phases"><b>01</b>Prefill vs decode</a></li>
+    <li><a href="#kv"><b>02</b>KV cache memory</a></li>
+    <li><a href="#batching"><b>03</b>Batching</a></li>
+    <li><a href="#parallel"><b>04</b>Model parallelism</a></li>
+    <li><a href="#attention"><b>05</b>MHA · GQA · MQA</a></li>
+    <li><a href="#flash"><b>06</b>FlashAttention</a></li>
+    <li><a href="#paged"><b>07</b>PagedAttention</a></li>
+    <li><a href="#quant"><b>08</b>Quantization</a></li>
+    <li><a href="#sparsity"><b>09</b>2:4 sparsity</a></li>
+    <li><a href="#distill"><b>10</b>Distillation</a></li>
+    <li><a href="#spec"><b>11</b>Speculative decoding</a></li>
+    <li class="grp">DEEPER</li>
+    <li><a href="#backward"><b>A1</b>Backward &amp; training</a></li>
+    <li><a href="#modern"><b>A2</b>Modern LLM changes</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<div class="part"><span>PART I</span><h3>Foundations</h3><p class="cap">What the model computes and the shapes it moves around. Everything in Part II refers back to this.</p></div>
+<section id="anatomy">
+  <div class="sh"><span class="n">00</span><h2>Anatomy of a forward pass</h2></div>
+  <p class="cap">Before any optimisation, here is what the model actually computes. Follow one batch from raw text to the next token and watch the tensor shape at every stage. Every b, s and h later on the page refers back to this.</p>
+  <div class="fig">
+    <div class="controls">
+      <button class="btn solid" id="an-prev" type="button">◀ Prev</button>
+      <button class="btn solid" id="an-next" type="button">Next ▶</button>
+      <button class="btn solid" id="an-play" type="button">Play all</button>
+      <span class="mono" style="font-size:12px;color:var(--muted)">numbers</span><div class="seg" id="an-mode"></div>
+    </div>
+    <div class="chips" id="an-chips"></div>
+    <div class="note" id="an-note" style="margin:10px 0"></div>
+    <div class="svgbox"><svg id="an-svg" viewBox="0 0 760 310" role="img" aria-label="Transformer forward pass, stage by stage"></svg></div>
+    <div class="stats" id="an-gloss"></div>
+  </div>
+</section>
+
+<div class="part"><span>PART II</span><h3>Inference optimizations</h3><p class="cap">Each technique from the NVIDIA post, and which of those shapes or memory costs it attacks.</p></div>
+<section id="phases">
+  <div class="sh"><span class="n">01</span><h2>Prefill vs decode</h2></div>
+  <p class="cap">Prefill pushes all prompt tokens through as one matrix–matrix product. Decode handles one token per step, a matrix–vector product, and still reads every weight.</p>
+  <div class="fig">
+    <div class="controls">
+      <button class="btn solid" id="pd-next" type="button">Run prefill</button>
+      <button class="btn solid" id="pd-skip" type="button">Skip to end of step</button>
+      <button class="btn solid" id="pd-play" type="button">Auto-play</button>
+      <button class="btn solid" id="pd-reset" type="button">Reset</button>
+      <span class="mono" style="font-size:12px;color:var(--muted)">speed</span><div class="seg" id="pd-speed"></div>
+    </div>
+    <div class="note" id="pd-note" style="margin:0 0 10px;min-height:52px"></div>
+    <div class="svgbox"><svg id="pd-svg" viewBox="0 0 760 300" role="img" aria-label="Prefill and decode matrix shapes"></svg></div>
+    <div class="stats" id="pd-stats"></div>
+  </div>
+</section>
+
+<section id="kv">
+  <div class="sh"><span class="n">02</span><h2>KV cache memory</h2></div>
+  <p class="cap">The KV cache grows linearly with batch × sequence length. Drag the sliders to see how it crowds the weights out of GPU memory.</p>
+  <div class="fig">
+    <div class="controls">
+      <label class="ctl">Model<select id="kv-preset">
+        <option value="l7">Llama 2 7B</option><option value="l13">Llama 2 13B</option><option value="l70">Llama 2 70B (GQA)</option>
+      </select></label>
+      <label class="ctl">Sequence length <span class="mono" id="kv-seq-out"></span><input type="range" id="kv-seq" min="0" max="8" value="3"></label>
+      <label class="ctl">Batch size <span class="mono" id="kv-batch-out"></span><input type="range" id="kv-batch" min="0" max="7" value="0"></label>
+      <label class="ctl">KV precision<select id="kv-kvp"><option value="2">FP16 (2 B)</option><option value="1">FP8 (1 B)</option><option value="0.5">INT4 (0.5 B)</option></select></label>
+      <label class="ctl">Weight precision<select id="kv-wp"><option value="2">FP16 (2 B)</option><option value="1">INT8 (1 B)</option><option value="0.5">INT4 (0.5 B)</option></select></label>
+      <label class="ctl">GPU<select id="kv-gpu"><option value="24">24 GB</option><option value="40">40 GB</option><option value="80" selected>80 GB</option><option value="141">141 GB</option></select></label>
+    </div>
+    <div class="svgbox"><svg id="kv-svg" viewBox="0 0 760 250" role="img" aria-label="KV cache tensor and memory bar"></svg></div>
+    <div class="formula" id="kv-formula"></div>
+    <div class="stats" id="kv-stats"></div>
+  </div>
+</section>
+
+<section id="batching">
+  <div class="sh"><span class="n">03</span><h2>Static vs in-flight batching</h2></div>
+  <p class="cap">Four batch slots and twelve requests of different lengths. With static batching, a slot that finishes early sits idle. With in-flight batching, the next request takes over that slot straight away.</p>
+  <div class="fig">
+    <div class="controls"><button class="btn solid" id="bt-play" type="button">Replay</button></div>
+    <div class="svgbox"><svg id="bt-svg" viewBox="0 0 760 300" role="img" aria-label="Batching timelines"></svg></div>
+    <div class="stats" id="bt-stats"></div>
+  </div>
+</section>
+
+<section id="parallel">
+  <div class="sh"><span class="n">04</span><h2>Model parallelism: how the tensors split</h2></div>
+  <p class="cap">The activation tensor [b, s, h] and the three ways it can sit on 2 GPUs.</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="cube-seg"></div><button class="btn solid" id="cube-replay" type="button">Replay cut</button></div>
+    <div class="svgbox"><svg id="cube-svg" viewBox="0 0 760 290" role="img" aria-label="3D activation tensor split across GPUs"></svg></div>
+    <div class="note" id="cube-note"></div>
+  </div>
+  <p class="cap" style="margin-top:22px">Now through one whole transformer layer. Coloured cells are held on that GPU, and every stage is labelled with its shape.</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="par-tabs"></div></div>
+    <div id="par-pipe">
+      <div class="controls"><span class="mono" style="font-size:12px;color:var(--muted)">microbatches</span><div class="seg" id="pp-m"></div></div>
+      <div class="svgbox"><svg id="pp-svg" viewBox="0 0 760 320" role="img" aria-label="Pipeline parallelism"></svg></div>
+      <div class="stats" id="pp-stats"></div>
+    </div>
+    <div id="par-tp">
+      <div class="controls">
+        <button class="btn solid" id="tp-prev" type="button">◀ Prev</button>
+        <button class="btn solid" id="tp-next" type="button">Next ▶</button>
+        <button class="btn solid" id="tp-play" type="button">Play layer</button>
+      </div>
+      <div class="chips" id="tp-chips"></div>
+      <div class="svgbox" style="margin-top:10px"><svg id="tp-svg" viewBox="0 0 760 370" role="img" aria-label="Tensor parallel tensor ownership"></svg></div>
+      <div class="note" id="tp-note"></div>
+      <div class="stats" id="tp-stats"></div>
+    </div>
+  </div>
+</section>
+
+<section id="attention">
+  <div class="sh"><span class="n">05</span><h2>MHA → GQA → MQA</h2></div>
+  <p class="cap">Query heads keep their own projections, while K/V heads are shared across groups. Fewer KV heads means a smaller KV cache and fewer memory reads.</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="at-seg"></div></div>
+    <div class="svgbox"><svg id="at-svg" viewBox="0 0 760 290" role="img" aria-label="Query heads sharing KV heads"></svg></div>
+    <div class="stats" id="at-stats"></div>
+  </div>
+</section>
+
+<section id="flash">
+  <div class="sh"><span class="n">06</span><h2>FlashAttention: tiling in SRAM</h2></div>
+  <p class="cap">Standard attention writes the full N×N score matrix to HBM and reads it back. FlashAttention computes it tile by tile in on-chip SRAM and never stores it. The output is exactly the same.</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="fa-seg"></div><button class="btn solid" id="fa-play" type="button">Play</button></div>
+    <div class="svgbox"><svg id="fa-svg" viewBox="0 0 760 290" role="img" aria-label="FlashAttention tiling"></svg></div>
+    <div class="stats" id="fa-stats"></div>
+  </div>
+</section>
+
+<section id="paged">
+  <div class="sh"><span class="n">07</span><h2>PagedAttention: KV cache in blocks</h2></div>
+  <p class="cap">There are 256 token slots of KV memory. Contiguous allocation reserves the maximum length (64) for every request. Paging hands out 8-token blocks on demand, from anywhere in memory.</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="pg-seg"></div></div>
+    <div class="svgbox"><svg id="pg-svg" viewBox="0 0 760 250" role="img" aria-label="KV memory map"></svg></div>
+    <div class="chips" id="pg-chips"></div>
+    <div class="formula" id="pg-table"></div>
+    <div class="stats" id="pg-stats"></div>
+  </div>
+</section>
+
+<section id="quant">
+  <div class="sh"><span class="n">08</span><h2>Quantization</h2></div>
+  <p class="cap">48 weights snapped to a grid of 2<sup>b</sup> levels. A single outlier stretches the grid and wipes out resolution for everything else. Clipping the range trades that rounding error for clipping error.</p>
+  <div class="fig">
+    <div class="controls">
+      <div class="seg" id="q-bits"></div>
+      <div class="seg" id="q-out"></div>
+      <div class="seg" id="q-mode"></div>
+    </div>
+    <div class="svgbox"><svg id="q-svg" viewBox="0 0 760 230" role="img" aria-label="Quantization number line"></svg></div>
+    <div class="stats" id="q-stats"></div>
+  </div>
+</section>
+
+<section id="sparsity">
+  <div class="sh"><span class="n">09</span><h2>2:4 structured sparsity</h2></div>
+  <p class="cap">In every group of 4 weights, the 2 smallest are zeroed. The GPU stores only the survivors plus a 2-bit position index for each.</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="sp-seg"></div></div>
+    <div class="svgbox"><svg id="sp-svg" viewBox="0 0 760 220" role="img" aria-label="2:4 sparsity"></svg></div>
+    <div class="stats" id="sp-stats"></div>
+  </div>
+</section>
+
+<section id="distill">
+  <div class="sh"><span class="n">10</span><h2>Distillation: soft targets</h2></div>
+  <p class="cap">The student learns from the teacher's full probability distribution, not just the one right answer. Raise the temperature to see the information carried by the "wrong" answers.</p>
+  <div class="fig">
+    <div class="controls"><label class="ctl">Temperature T = <span class="mono" id="ds-tv"></span><input type="range" id="ds-t" min="5" max="50" value="10"></label></div>
+    <div class="svgbox"><svg id="ds-svg" viewBox="0 0 760 250" role="img" aria-label="Hard label vs soft targets"></svg></div>
+    <div class="stats">
+      <div class="stat good"><b>40%</b><span>DistilBERT: smaller than BERT</span></div>
+      <div class="stat good"><b>97%</b><span>language understanding kept</span></div>
+      <div class="stat good"><b>60%</b><span>faster</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="spec">
+  <div class="sh"><span class="n">11</span><h2>Speculative decoding</h2></div>
+  <p class="cap">A small draft model guesses several tokens. The big model checks all of them in a single parallel pass and keeps the matching prefix, plus one token of its own.</p>
+  <div class="fig">
+    <div class="controls">
+      <button class="btn solid" id="sd-next" type="button">Next step</button>
+      <button class="btn solid" id="sd-reset" type="button">Reset</button>
+    </div>
+    <div class="spec">
+      <div class="spec-row"><span class="spec-k">CONTEXT</span><div class="pills" id="sd-ctx"></div></div>
+      <div class="spec-row"><span class="spec-k" style="color:var(--g1)">DRAFT (small, fast)</span><div class="pills" id="sd-draft"></div></div>
+      <div class="spec-row"><span class="spec-k" style="color:var(--g0)">VERIFIER (1 pass)</span><div class="pills" id="sd-ver"></div></div>
+      <div class="spec-row"><span class="spec-k">KEPT THIS ROUND</span><div class="pills" id="sd-out"></div></div>
+    </div>
+    <div class="note" id="sd-note"></div>
+    <div class="stats" id="sd-stats"></div>
+  </div>
+</section>
+
+<div class="part"><span>PART III</span><h3>Deeper dive</h3><p class="cap">Optional. Why the architecture looks the way it does (training), and what current LLMs change.</p></div>
+<section id="backward">
+  <div class="sh"><span class="n">A1</span><h2>Backward pass &amp; training memory</h2></div>
+  <p class="cap">Inference only ever runs forward. Training runs the gradient back through every stage, and that is where the activation memory in §04 comes from.</p>
+  <div class="fig">
+    <div class="controls"><button class="btn solid" id="bw-prev" type="button">◀ Prev</button><button class="btn solid" id="bw-next" type="button">Next ▶</button><button class="btn solid" id="bw-play" type="button">Play all</button>
+      <span id="bw-extra" style="display:none"><span class="seg" id="bw-rc"></span></span></div>
+    <div class="chips" id="bw-chips"></div>
+    <div class="note" id="bw-note" style="margin:10px 0"></div>
+    <div class="svgbox"><svg id="bw-svg" viewBox="0 0 760 310" role="img" aria-label="Backward pass stage by stage"></svg></div>
+  </div>
+</section>
+
+<section id="modern">
+  <div class="sh"><span class="n">A2</span><h2>What modern LLMs change</h2></div>
+  <p class="cap">The forward pass in §00 is the 2017 Transformer plus RoPE. Llama, Mistral, Qwen, DeepSeek and others change these five pieces.</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="md-seg"></div><span id="md-ctl" style="display:inline-flex;gap:12px;align-items:center"></span></div>
+    <div class="note" id="md-note" style="margin:0 0 10px"></div>
+    <div class="svgbox"><svg id="md-svg" viewBox="0 0 760 300" role="img" aria-label="Modern LLM architecture changes"></svg></div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<footer>Source: <a href="https://developer.nvidia.com/blog/mastering-llm-techniques-inference-optimization/">NVIDIA Technical Blog — Mastering LLM Techniques: Inference Optimization</a>. Shapes and formulas follow the article. Grid sizes are scaled down for drawing, and utilisation bars are illustrative. Go deeper with the runnable notebooks in this repo: <a href="../attention-transformer/">attention</a> · <a href="../rope/">RoPE</a> · <a href="../nanogpt-from-scratch/">nanoGPT + backprop</a> · <a href="../kv-cache/">KV cache</a> · <a href="../continuous-batching/">continuous batching</a> · <a href="../inference-engine/">paged KV + speculative decoding</a> · <a href="../vllm-memory/">vLLM memory</a>.</footer>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+const $=q=>document.querySelector(q);
+function S(tag,a,p){const e=document.createElementNS(NS,tag);if(a)for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+function T(p,x,y,str,a){const t=S('text',Object.assign({x,y},a||{}),p);t.textContent=str;return t;}
+function R(p,x,y,w,h,style,extra){return S('rect',Object.assign({x,y,width:Math.max(0,w),height:Math.max(0,h),style},extra||{}),p);}
+function clear(e){while(e.firstChild)e.removeChild(e.firstChild);}
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const G=i=>`var(--g${i})`;
+const PAL=i=>`hsl(${(i*47+205)%360} 70% 55%)`;
+function seg(box,opts,init,cb){box.innerHTML='';opts.forEach(o=>{const b=document.createElement('button');b.type='button';b.className='btn';b.textContent=o.l;b.setAttribute('aria-pressed',String(o.v===init));b.onclick=()=>{[...box.children].forEach(c=>c.setAttribute('aria-pressed','false'));b.setAttribute('aria-pressed','true');cb(o.v);};box.appendChild(b);});}
+function stats(box,arr){box.innerHTML=arr.map(s=>`<div class="stat ${s.c||''}"><b>${s.v}</b><span>${s.l}</span></div>`).join('');}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});}
+
+/* ---------- 00 anatomy of a forward pass ---------- */
+(function(){
+  const svg=$('#an-svg'),c30=Math.cos(Math.PI/6);
+  const MODES={toy:{b:2,s:6,h:8,nh:4,dh:2,L:8,V:12,f:32},llama:{b:4,s:4096,h:4096,nh:32,dh:128,L:32,V:32000,f:11008}};
+  let mode='toy',k=0,timer=null;const M=()=>MODES[mode];
+  const NM={b:'b',s:'s',h:'h',nh:'n_heads',dh:'d_head',V:'V',f:'ffn'};
+  const shp=a=>`[${a.map(x=>NM[x]).join(', ')}] = [${a.map(x=>M()[x].toLocaleString()).join(', ')}]`;
+  const A=d=>RM?'':`animation:pdIn .6s cubic-bezier(.2,.8,.2,1) ${d}s both;transform-box:fill-box;transform-origin:center;`;
+  const HC=i=>`hsl(${[215,330,160,38][i%4]} 72% 55%)`;
+  function iso(ox,oy,X,Y,Z,u,col,o){o=o||{};
+    const P=(x,y,z)=>[ox+(x-y)*c30*u,oy+(x+y)*.5*u-z*u];
+    const pts=a=>a.map(p=>P(...p).map(v=>v.toFixed(1)).join(',')).join(' ');
+    const g=S('g',{style:o.an||''},svg);const segs=o.segs||[{x0:0,x1:X,col}];
+    segs.forEach(sg=>[[[sg.x0,0,Z],[sg.x1,0,Z],[sg.x1,Y,Z],[sg.x0,Y,Z],.95],[[sg.x0,Y,0],[sg.x1,Y,0],[sg.x1,Y,Z],[sg.x0,Y,Z],.72]].forEach(f=>S('polygon',{points:pts(f.slice(0,4)),style:`fill:${sg.col};fill-opacity:${f[4]};stroke:${sg.col}`},g)));
+    const lc=segs[segs.length-1].col;S('polygon',{points:pts([[X,0,0],[X,Y,0],[X,Y,Z],[X,0,Z]]),style:`fill:${lc};fill-opacity:.5;stroke:${lc}`},g);
+    const Ln=(a,b)=>{const p=P(...a),q=P(...b);S('line',{x1:p[0],y1:p[1],x2:q[0],y2:q[1],style:'stroke:var(--surface);stroke-width:1;opacity:.8'},g);};
+    for(let i=1;i<X;i++){Ln([i,0,Z],[i,Y,Z]);Ln([i,Y,0],[i,Y,Z]);}
+    for(let j=1;j<Y;j++){Ln([0,j,Z],[X,j,Z]);Ln([X,j,0],[X,j,Z]);}
+    for(let z=1;z<Z;z++){Ln([0,Y,z],[X,Y,z]);Ln([X,0,z],[X,Y,z]);}
+    if(o.hl!=null)S('polygon',{points:pts([[0,o.hl,Z],[X,o.hl,Z],[X,o.hl+1,Z],[0,o.hl+1,Z]]),style:'fill:var(--ink);fill-opacity:.8'},g);
+    if(o.lab!==false){const a=P(X/2,Y,0),b=P(X,Y/2,0),c=P(X,0,Z/2),l=o.lab||{x:'h',y:'s',z:'b'};
+      T(g,a[0]-6,a[1]+18,l.x,{'text-anchor':'end',style:'font-weight:700;fill:var(--muted)'});
+      T(g,b[0]+6,b[1]+18,l.y,{style:'font-weight:700;fill:var(--muted)'});
+      T(g,c[0]+8,c[1]+4,l.z,{style:'font-weight:700;fill:var(--muted)'});}
+    if(o.title)T(g,ox+(X-Y)*c30*u/2,oy-Z*u-12,o.title,{'text-anchor':'middle',style:'font-weight:700'});
+    return g;}
+  function arrow(x1,y1,x2,y2,lab,d){const g=S('g',{style:A(d||0)},svg);
+    S('line',{x1,y1,x2,y2,'marker-end':'url(#arr)',style:'stroke:var(--muted);stroke-width:1.8'},g);
+    if(lab)T(g,(x1+x2)/2,(y1+y2)/2-8,lab,{'text-anchor':'middle',style:'font-size:12px;font-weight:600;fill:var(--accent)'});}
+  function heat(x,y,n,cs,seed,soft,col,d){const r=mulberry32(seed),g=S('g',{style:A(d||0)},svg);
+    for(let i=0;i<n;i++){const row=[];for(let j=0;j<=i;j++)row.push(r());const sum=row.reduce((a,b)=>a+b,0);
+      for(let j=0;j<n;j++){const m=j>i;R(g,x+j*cs,y+i*cs,cs-1,cs-1,m?'fill:url(#hatch)':`fill:${col};opacity:${soft?(.15+.85*row[j]/sum*Math.min(i+1,3)):(.25+.75*row[j])}`);}}
+    return g;}
+  function slab2(x,y,rows,cols,cs,col,d){const g=S('g',{style:A(d||0)},svg);for(let i=0;i<rows;i++)for(let j=0;j<cols;j++)R(g,x+j*cs,y+i*cs,cs-1,cs-1,`fill:${col}`);return g;}
+  const big=(x,y,t)=>T(svg,x,y,t,{class:'big'});
+  const ST=[
+   {n:'Tokens',f:'text → tokenizer → integer IDs',c:'Text is split into tokens, and each token becomes an integer ID. A batch of <b>b</b> sequences, each <b>s</b> tokens long, gives a [b, s] grid of integers.',
+    d(){const W=[['The','cat','sat','on','the','mat'],['I','saw','a','dog','ride','in']],I=[[464,3797,3290,319,278,1775],[306,4446,263,11203,22977,297]];
+      T(svg,100,30,'s  (sequence length) →',{class:'lbl'});
+      W.forEach((row,bi)=>{const y=56+bi*92;T(svg,30,y+20,'b='+bi,{style:'font-weight:700;fill:var(--muted)'});
+        row.forEach((w,j)=>{const x=100+j*102,g=S('g',{style:A(bi*.35+j*.08)},svg);
+          R(g,x,y,90,28,'fill:var(--accent-soft);stroke:var(--accent)',{rx:7});T(g,x+45,y+19,w,{'text-anchor':'middle',style:'font-weight:600'});
+          R(g,x,y+34,90,24,'fill:var(--surface-2)',{rx:5});T(g,x+45,y+51,'id '+I[bi][j],{'text-anchor':'middle',style:'font-size:11.5px;fill:var(--muted)'});});});
+      T(svg,30,44,'b ↓',{class:'lbl'});big(30,280,'token IDs  '+shp(['b','s']));}},
+   {n:'Embedding',f:'X = E[ids]      E ∈ ℝ^(V × h)',c:'Each ID selects one row of the embedding table. Every token becomes a vector of <b>h</b> numbers, called the hidden size or d_model. The result is the activation tensor <b>X [b, s, h]</b>, which flows through the whole model.',
+    d(){const tx=40,ty=56,cs=14,used=[1,3,5,6,8,10];big(tx,ty-14,'E  [V × h]');
+      for(let r=0;r<12;r++)for(let c=0;c<8;c++)R(svg,tx+c*cs,ty+r*cs,cs-1,cs-1,used.includes(r)?A(.1+used.indexOf(r)*.1)+'fill:var(--accent)':'fill:var(--g0);opacity:.2');
+      T(svg,tx,ty+12*cs+18,`V = ${M().V.toLocaleString()} rows, h = ${M().h.toLocaleString()} cols`,{class:'lbl'});
+      used.forEach((r,i)=>arrow(tx+8*cs+6,ty+r*cs+7,470,96+i*12,null,.2+i*.08));
+      iso(560,110,8,6,2,12,'var(--accent)',{an:A(.9),title:'X'});big(440,280,'X  '+shp(['b','s','h']));}},
+   {n:'Positions',f:'RoPE:  q_m ← R(m·θ)·q_m,   k_n ← R(n·θ)·k_n     ⇒     q_m · k_n depends only on (m − n)',c:'Attention only compares token contents, so on its own "dog bites man" looks the same as "man bites dog". The original Transformer <b>added</b> a sinusoidal position vector [s, h] to X. Modern LLMs use <b>RoPE</b> instead: inside attention, Q and K are <b>rotated</b> by an angle proportional to their position (each pair of dims at its own frequency). Rotation doesn\'t change a vector\'s length, and the angle between q and k depends only on <b>how far apart</b> the two tokens are. Shapes don\'t change.',
+    d(){const th=Math.PI/7,cx=170,cy=150,r=92;
+      S('circle',{cx,cy,r,style:'fill:none;stroke:var(--line);stroke-dasharray:3 3'},svg);T(svg,cx,40,'one q vector, rotated at positions 0…5',{'text-anchor':'middle',class:'lbl'});
+      for(let m=0;m<6;m++){const a=.25-m*th,g=S('g',{style:A(m*.22)},svg);
+        S('line',{x1:cx,y1:cy,x2:cx+r*Math.cos(a),y2:cy-r*Math.sin(a),style:`stroke:${HC(m%4)};stroke-width:3`},g);
+        S('circle',{cx:cx+r*Math.cos(a),cy:cy-r*Math.sin(a),r:4,style:`fill:${HC(m%4)}`},g);
+        T(g,cx+(r+18)*Math.cos(a),cy-(r+18)*Math.sin(a)+4,'m='+m,{'text-anchor':'middle',style:'font-size:11px;font-weight:700'});}
+      [[2,0,450],[5,3,640]].forEach(([m,n,x],i)=>{const g=S('g',{style:A(1.4+i*.4)},svg),y=150,rr=68,aq=.25-m*th,ak=.25-n*th;
+        S('circle',{cx:x,cy:y,r:rr,style:'fill:none;stroke:var(--line);stroke-dasharray:3 3'},g);
+        S('line',{x1:x,y1:y,x2:x+rr*Math.cos(ak),y2:y-rr*Math.sin(ak),style:'stroke:var(--g3);stroke-width:3'},g);
+        S('line',{x1:x,y1:y,x2:x+rr*Math.cos(aq),y2:y-rr*Math.sin(aq),style:'stroke:var(--g0);stroke-width:3'},g);
+        const pts=[];for(let t=0;t<=20;t++){const a=ak+(aq-ak)*t/20;pts.push((x+30*Math.cos(a)).toFixed(1)+','+(y-30*Math.sin(a)).toFixed(1));}
+        S('polyline',{points:pts.join(' '),style:'fill:none;stroke:var(--bad);stroke-width:2.5'},g);
+        T(g,x,y-rr-12,`q at ${m},  k at ${n}`,{'text-anchor':'middle',style:'font-weight:700'});T(g,x,y+rr+20,'angle gap = 2θ',{'text-anchor':'middle',style:'fill:var(--bad);font-weight:700'});});
+      T(svg,545,262,'same gap → same score q·k',{'text-anchor':'middle',style:'font-weight:700'});
+      big(40,296,'applied to Q, K  '+shp(['b','nh','s','dh'])+'  shape unchanged');}},
+   {n:'LayerNorm',f:'LN(x) = γ ⊙ (x − μ) / √(σ² + ε) + β        μ, σ² taken over h',c:'LayerNorm normalises each token\'s h-vector on its own (the dark row), so it is <b>independent across tokens</b>. That is why §04 can split it along s. The shape does not change.',
+    d(){iso(300,86,8,6,2,17,'var(--accent)',{hl:2,an:A(0),title:'X  [b, s, h]'});
+      const g=S('g',{style:A(.4)},svg);T(g,500,120,'one token = one h-vector',{style:'font-weight:700'});T(g,500,142,'normalise across its h values',{style:'fill:var(--muted)'});T(g,500,164,'every token on its own',{style:'fill:var(--muted)'});
+      big(40,290,'in & out  '+shp(['b','s','h']));}},
+   {n:'Q, K, V',f:'Q = X·W_Q    K = X·W_K    V = X·W_V        W ∈ ℝ^(h × h)',c:'Three learned weight matrices project X into <b>queries</b> (what this token looks for), <b>keys</b> (what it offers) and <b>values</b> (what it passes on). All three keep the shape [b, s, h].',
+    d(){iso(110,110,8,6,2,12,'var(--accent)',{title:'X'});
+      [['Q','var(--g0)','·W_Q'],['K','var(--g3)','·W_K'],['V','var(--g1)','·W_V']].forEach((q,i)=>{const ox=400+i*130;arrow(205,140,ox-50,100,null,.15+i*.2);
+        iso(ox,95,8,6,2,8,q[1],{an:A(.3+i*.2),title:q[0]+'  '+q[2],lab:false});});
+      big(40,290,'Q, K, V  each  '+shp(['b','s','h']));}},
+   {n:'Split heads',f:'h = n_heads × d_head      [b, s, h] → [b, n_heads, s, d_head]',c:'Q is cut along h into <b>n_heads</b> slices of width <b>d_head</b>, and K and V are cut the same way. Each head attends on its own. These are the same slices that tensor parallelism hands out to different GPUs.',
+    d(){iso(110,110,8,6,2,12,'var(--g0)',{title:'Q  [b, s, h]',segs:[0,1,2,3].map(i=>({x0:i*2,x1:i*2+2,col:HC(i)}))});
+      arrow(205,150,290,150,'reshape',.2);
+      for(let i=0;i<4;i++)iso(370+i*100,110,2,6,2,12,HC(i),{an:A(.4+i*.15),title:'head '+i,lab:i===3?{x:'d_head',y:'s',z:'b'}:false});
+      big(40,290,shp(['b','nh','s','dh']));}},
+   {n:'Scores',f:'S = Q·Kᵀ / √d_head  + causal mask      → [b, n_heads, s, s]',c:'In each head, every token scores every earlier token. The upper triangle is masked because a token can\'t see the future. This <b>s × s</b> matrix is why attention cost grows with s², and it is the matrix FlashAttention (§06) never writes to HBM.',
+    d(){const tk=['The','cat','sat','on','the','mat'];
+      for(let i=0;i<4;i++){const x=60+i*175,y=70;T(svg,x,y-14,'head '+i,{style:`font-weight:700;fill:${HC(i)}`});heat(x+30,y,6,16,i+3,false,HC(i),i*.2);
+        if(i===0){tk.forEach((t,j)=>T(svg,x+24,y+j*16+12,t,{'text-anchor':'end',style:'font-size:10px;fill:var(--muted)'}));T(svg,x+30,y+6*16+16,'keys →',{class:'lbl'});}}
+      big(40,290,'S  '+shp(['b','nh','s','s']).replace('s, s] = ['+M().s.toLocaleString()+', '+M().s.toLocaleString(),'s, s] = ['+M().s.toLocaleString()+', '+M().s.toLocaleString()));}},
+   {n:'Softmax · V',f:'O_i = softmax(S_i) · V_i    → concat heads → [b, s, h] → ·W_O',c:'Each row of S becomes weights that sum to 1. Each head mixes its V vectors with those weights, giving one [s, d_head] output. The heads are then concatenated back into [b, s, h] and mixed by W_O.',
+    d(){T(svg,40,30,'softmax(S_i)',{class:'lbl'});T(svg,150,30,'V_i',{class:'lbl'});T(svg,220,30,'O_i',{class:'lbl'});
+      for(let i=0;i<4;i++){const y=40+i*62;heat(40,y,6,8,i+3,true,HC(i),i*.15);T(svg,100,y+30,'·',{class:'big'});slab2(150,y,6,2,8,'var(--g1)',i*.15+.1);
+        T(svg,180,y+30,'=',{class:'big'});slab2(220,y,6,2,8,HC(i),i*.15+.2);arrow(245,y+24,440,140+i*8,null,.6+i*.1);}
+      iso(560,110,8,6,2,12,'',{an:A(1.1),title:'concat',segs:[0,1,2,3].map(i=>({x0:i*2,x1:i*2+2,col:HC(i)}))});
+      T(svg,500,250,'then ·W_O  [h × h]  mixes the heads',{style:'fill:var(--muted)'});big(40,300,'out  '+shp(['b','s','h']));}},
+   {n:'Residual add',f:'X ← X + Attention(LN(X))',c:'The attention output is <b>added</b> back onto the input. This running sum, the residual stream, stays [b, s, h] the whole way through the model.',
+    d(){iso(130,110,8,6,2,11,'var(--accent)',{title:'X'});big(255,160,'+');
+      iso(370,110,8,6,2,11,'',{title:'Attention(LN(X))',an:A(.2),segs:[0,1,2,3].map(i=>({x0:i*2,x1:i*2+2,col:HC(i)}))});big(495,160,'=');
+      iso(610,110,8,6,2,11,'var(--accent)',{title:'X (updated)',an:A(.5)});big(40,290,shp(['b','s','h'])+'  in and out');}},
+   {n:'MLP',f:'X ← X + W₂ · act(W₁ · LN(X))      W₁ ∈ ℝ^(h × ffn),  W₂ ∈ ℝ^(ffn × h)',c:'A per-token MLP <b>expands</b> each vector to ffn (classically 4h; 11,008 in Llama 2 7B, which uses SwiGLU), applies a nonlinearity, then <b>projects back</b> to h. Tensor parallelism splits W₁ by columns and W₂ by rows.',
+    d(){iso(100,120,8,6,2,10,'var(--accent)',{title:'[b, s, h]'});arrow(180,150,265,150,'·W₁',.1);
+      iso(330,120,20,6,2,10,'var(--g3)',{an:A(.3),title:'[b, s, ffn]',lab:{x:'ffn',y:'s',z:'b'}});arrow(515,150,590,150,'act · W₂',.6);
+      iso(660,120,8,6,2,10,'var(--accent)',{an:A(.8),title:'[b, s, h]'});big(40,290,shp(['b','s','f'])+'  inside the MLP');}},
+   {n:'× L layers',f:'block(X) = X + MLP(LN(X + Attn(LN(X))))      repeated L times',c:'One block is attention plus MLP, and the model stacks <b>L</b> of them. The shape is [b, s, h] at every layer boundary. The colours show how pipeline parallelism (§04) would cut this stack into 4 stages.',
+    d(){const n=8;for(let i=0;i<n;i++){const y=262-i*27,g=S('g',{style:A(i*.12)},svg);R(g,300,y,230,22,`fill:${G(i>>1)};opacity:.85`,{rx:6});
+        T(g,415,y+15,i===n-1?'layer L':i===n-2?'⋮':'layer '+(i+1),{'text-anchor':'middle',style:'fill:#fff;font-weight:700;font-size:11.5px'});}
+      iso(150,215,8,6,2,8,'var(--accent)',{title:'X in',lab:false});arrow(210,240,292,272,null,0);
+      iso(640,60,8,6,2,8,'var(--accent)',{title:'X out',an:A(1.1),lab:false});arrow(538,70,600,70,null,1);
+      big(560,200,'L = '+M().L);T(svg,560,222,shp(['b','s','h']),{style:'fill:var(--muted)'});T(svg,560,242,'at every boundary',{style:'fill:var(--muted)'});}},
+   {n:'LM head',f:'logits = LN(X) · W_U      W_U ∈ ℝ^(h × V)      → softmax over V at the last position',c:'A final projection turns each h-vector into <b>V</b> logits, one per vocabulary entry. During generation only the <b>last position</b> (dark row) matters. Its softmax picks the next token, and that token\'s KV cache entry (§02) is saved for the next decode step.',
+    d(){iso(90,120,8,6,2,10,'var(--accent)',{title:'X'});arrow(165,150,235,150,'·W_U',.1);
+      iso(300,110,24,6,2,9,'var(--g2)',{an:A(.3),hl:5,title:'logits  [b, s, V]',lab:{x:'V',y:'s',z:'b'}});
+      const cand=[['the',.62],['a',.18],['his',.09],['her',.06],['bed',.05]],g=S('g',{style:A(.9)},svg);
+      T(g,560,48,'last position, softmax',{class:'lbl'});
+      cand.forEach((c,i)=>{const y=62+i*30;T(g,600,y+15,c[0],{'text-anchor':'end',style:'font-weight:600'});R(g,610,y,95*c[1]/.62,20,`fill:${i?'var(--idle)':'var(--g3)'}`,{rx:4});T(g,616+95*c[1]/.62,y+15,Math.round(c[1]*100)+'%',{style:'font-size:11px'});});
+      T(g,560,240,'"I saw a dog ride in" → "the"',{style:'font-weight:700'});big(40,290,'logits  '+shp(['b','s','V']));}}];
+  function render(){clear(svg);const st=ST[k];st.d();
+    $('#an-note').innerHTML=`<b class="mono" style="color:var(--accent)">${k+1}/${ST.length} · ${st.n}</b><div class="formula" style="margin:6px 0">${st.f}</div>${st.c}`;
+    const ch=$('#an-chips');ch.innerHTML='';ST.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=(i+1)+' '+s.n;b.setAttribute('aria-pressed',String(i===k));b.onclick=()=>{stop();k=i;render();};ch.appendChild(b);});
+    $('#an-prev').disabled=k===0;$('#an-next').disabled=k===ST.length-1;
+    const m=M();$('#an-gloss').innerHTML=[['b','batch: sequences processed together',m.b],['s','sequence length: tokens per sequence',m.s],['h','hidden size (d_model): numbers per token',m.h],['n_heads','attention heads',m.nh],['d_head','h / n_heads: width of one head',m.dh],['L','transformer layers',m.L],['V','vocabulary size',m.V],['ffn','MLP inner width: a hyperparameter, ≈4h classic, ≈8h/3 with SwiGLU',m.f]]
+      .map(g=>`<div class="stat"><b>${g[0]} = ${g[2].toLocaleString()}</b><span>${g[1]}</span></div>`).join('');}
+  function stop(){clearInterval(timer);timer=null;$('#an-play').textContent='Play all';}
+  $('#an-prev').onclick=()=>{stop();if(k>0){k--;render();}};
+  $('#an-next').onclick=()=>{stop();if(k<ST.length-1){k++;render();}};
+  $('#an-play').onclick=()=>{if(timer){stop();return;}if(k>=ST.length-1)k=0;else k++;render();$('#an-play').textContent='Pause';
+    timer=setInterval(()=>{if(k>=ST.length-1){stop();return;}k++;render();},RM?400:4200);};
+  seg($('#an-mode'),[{l:'Toy sizes',v:'toy'},{l:'Llama 2 7B',v:'llama'}],'toy',v=>{mode=v;render();});
+  render();
+})();
+
+/* ---------- 01 prefill / decode ---------- */
+(function(){
+  const svg=$('#pd-svg'),box=$('#pd-stats'),note=$('#pd-note'),nextB=$('#pd-next'),playB=$('#pd-play');
+  const prompt=['I','saw','a','dog','ride'],gen=['in','the','car','and','barked'];
+  const NAMES=['tokens in','build X','stream W','compute Y','write KV','emit token'];
+  const MAX=gen.length;let step=0,sub=5,timer=null,speed=2600;
+  const done=()=>step===MAX&&sub===5;
+  const op=i=>step===0?1:i===sub?1:i<sub?(sub===5?.95:.28):.05;
+  const anim=(i,d)=>(step>0&&i===sub&&!RM)?`animation:pdIn .6s cubic-bezier(.2,.8,.2,1) ${d}s both;transform-box:fill-box;transform-origin:center;`:'';
+  function cap(){
+    if(step===0)return['READY','Press <b>Run prefill</b>. Each step plays in 6 short stages, and the current stage is highlighted while the rest dims.'];
+    const pre=step===1,tk=pre?'':gen[step-2],out=gen[step-1],N=4+step;
+    const P=['All 5 prompt tokens go in <b>together</b>.','They stack into X: <b>5 rows × d</b>. One matrix, not 5 vectors.','Every weight in W streams in from HBM, <b>once</b> for all 5 rows.','One GEMM produces Y with all 5 rows at once. The compute units are <b>busy</b>.','K and V for all 5 tokens are written to the KV cache.',`The last row predicts the first new token: <b>"${out}"</b>.`];
+    const D=[`Only the newest token <b>"${tk}"</b> goes in. Older tokens are already cached.`,'X is now <b>1 row × d</b>, a single vector.','W still streams in from HBM <b>in full</b>, for just 1 row. That is why decode is memory-bound.','GEMV: 1 output row, so most compute units sit <b>idle</b>.',`Its K and V are appended. Attention reads all <b>${N}</b> cached entries.`,`Next token: <b>"${out}"</b>.`];
+    return[`${pre?'PREFILL':'DECODE '+(step-1)} · ${sub+1}/6 · ${NAMES[sub]}`,(pre?P:D)[sub]];}
+  function grid(par,x,y,rows,cols,cs,style,ghost,delayFn){
+    for(let r=0;r<(ghost||rows);r++)for(let c=0;c<cols;c++){const on=r<rows;
+      R(par,x+c*cs,y+r*cs,cs-1.5,cs-1.5,on?(delayFn?delayFn(r,c):'')+style:'fill:none;stroke:var(--line);stroke-dasharray:2 2');}}
+  function render(){
+    clear(svg);const pre=step===1,n=step===0?0:pre?5:1;
+    const toks=step===0?prompt.slice():prompt.concat(gen.slice(0,step-1+(sub>=5?1:0)));
+    const rows=step===0?[]:pre?[0,1,2,3,4]:[prompt.length+step-2];
+    const newI=(step>0&&sub>=5)?prompt.length+step-1:-1;
+    const g=[0,1,2,3,4,5].map(i=>S('g',{style:`opacity:${op(i)};transition:opacity .5s`},svg));
+    T(g[0],20,18,'TOKEN SEQUENCE',{class:'lbl'});
+    let x=20;toks.forEach((tk,i)=>{const w=18+tk.length*8.5,isGen=i>=prompt.length,proc=rows.includes(i),isNew=i===newI;
+      const pg=S('g',{style:isNew?anim(5,.1):proc?anim(0,0):''},isNew?g[5]:g[0]);
+      R(pg,x,26,w,26,`fill:${isNew?'var(--g3)':isGen?'var(--accent-soft)':'var(--surface-2)'};stroke:${proc?'var(--accent)':'var(--line)'};stroke-width:${proc?2.5:1}`,{rx:6});
+      T(pg,x+w/2,44,tk,{'text-anchor':'middle',style:`fill:${isNew?'#fff':'var(--ink)'};font-weight:600`});x+=w+6;});
+    const cs=13,y0=96;
+    T(g[1],20,y0-12,`X  [${n||'n'} × d]`,{class:'big'});
+    grid(S('g',{style:anim(1,0)},g[1]),20,y0,n,8,cs,'fill:var(--accent)',5);
+    T(g[2],135,y0+52,'×',{class:'big'});T(g[2],160,y0-12,'W  [d × d]',{class:'big'});
+    grid(g[2],160,y0,8,8,cs,'fill:var(--g0);opacity:.55',0,(r,c)=>anim(2,c*.09+r*.02));
+    T(g[2],160,y0+122,'streamed from HBM every step',{class:'lbl'});
+    T(g[3],275,y0+52,'=',{class:'big'});T(g[3],300,y0-12,`Y  [${n||'n'} × d]`,{class:'big'});
+    grid(S('g',{style:anim(3,.1)},g[3]),300,y0,n,8,cs,'fill:var(--g3)',5);
+    const kx=470;T(g[4],kx,y0-12,'KV CACHE  [tokens × 2 × d]',{class:'lbl'});
+    const filled=step===0?0:sub>=4?4+step:(pre?0:3+step),prev=pre?0:3+step;
+    for(let i=0;i<10;i++){const yy=y0+i*15,on=i<filled,fresh=on&&i>=prev&&sub>=4,a=fresh?anim(4,(i-prev)*.12):'';
+      const dash='fill:none;stroke:var(--line);stroke-dasharray:2 2';
+      R(g[4],kx,yy,120,12,on?`${a}fill:var(--g2);opacity:${fresh?1:.45}`:dash);
+      R(g[4],kx+124,yy,120,12,on?`${a}fill:var(--g1);opacity:${fresh?1:.45}`:dash);
+      if(on)T(g[4],kx+252,yy+10,(prompt.concat(gen))[i],{style:'font-size:10.5px;fill:var(--muted)'});}
+    T(g[4],kx+40,y0+162,'K',{class:'lbl'});T(g[4],kx+170,y0+162,'V',{class:'lbl'});
+    const u=step===0?0:pre?.86:.12;
+    T(g[3],20,262,'COMPUTE UTILISATION (illustrative)',{class:'lbl'});
+    R(g[3],20,270,400,14,'fill:var(--surface-2)',{rx:7});
+    R(g[3],20,270,400*u,14,`fill:${pre?'var(--ok)':'var(--bad)'};transition:width .8s`,{rx:7});
+    T(g[3],430,282,step===0?'—':pre?'GEMM · compute-bound':'GEMV · memory-bound',{style:'font-weight:600'});
+    const [h,t]=cap();note.innerHTML=`<b class="mono" style="color:var(--accent)">${h}</b><br>${t}`;
+    nextB.textContent=step===0?'Run prefill':done()?'Done':sub===5?'Next: decode step':'Next: '+NAMES[sub+1];
+    nextB.disabled=done();$('#pd-skip').disabled=done()||step===0;
+    stats(box,[{v:step===0?'—':pre?'Prefill':'Decode '+(step-1),l:'phase'},{v:n||'—',l:'token rows in this matmul'},
+      {v:step===0?0:step-(sub>=2?0:1),l:'full weight reads so far'},{v:filled,l:'KV entries cached'},{v:step===0?0:step-1+(sub>=5?1:0),l:'tokens generated'}]);}
+  function adv(){if(step===0){step=1;sub=0;}else if(sub<5)sub++;else if(step<MAX){step++;sub=0;}render();}
+  function stop(){clearInterval(timer);timer=null;playB.textContent='Auto-play';}
+  function start(){stop();playB.textContent='Pause';timer=setInterval(()=>{if(done()){stop();return;}adv();},RM?300:speed);}
+  nextB.onclick=()=>{stop();adv();};
+  $('#pd-skip').onclick=()=>{stop();sub=5;render();};
+  $('#pd-reset').onclick=()=>{stop();step=0;sub=5;render();};
+  playB.onclick=()=>{if(timer){stop();return;}if(done()){step=0;sub=5;}if(step===0)adv();start();};
+  seg($('#pd-speed'),[{l:'Slow',v:4000},{l:'Normal',v:2600},{l:'Fast',v:1200}],2600,v=>{speed=v;if(timer)start();});
+  render();
+})();
+
+/* ---------- 02 KV cache ---------- */
+(function(){
+  const P={l7:{p:7,L:32,h:4096,H:32,kv:32},l13:{p:13,L:40,h:5120,H:40,kv:40},l70:{p:70,L:80,h:8192,H:64,kv:8}};
+  const seqs=[512,1024,2048,4096,8192,16384,32768,65536,131072],bs=[1,2,4,8,16,32,64,128];
+  const ids=['kv-preset','kv-seq','kv-batch','kv-kvp','kv-wp','kv-gpu'];
+  const svg=$('#kv-svg');
+  function upd(){
+    const p=P[$('#kv-preset').value],seq=seqs[+$('#kv-seq').value],b=bs[+$('#kv-batch').value];
+    const kb=+$('#kv-kvp').value,wb=+$('#kv-wp').value,cap=+$('#kv-gpu').value;
+    const hd=p.h/p.H,perTok=2*p.L*p.kv*hd*kb,kv=b*seq*perTok/1e9,w=p.p*wb,tot=kv+w;
+    $('#kv-seq-out').textContent=seq.toLocaleString();$('#kv-batch-out').textContent=b;
+    clear(svg);
+    // 3D-ish tensor block: batch × seq × (2·layers·kv·hd)
+    T(svg,20,18,'KV CACHE TENSOR SHAPE',{class:'lbl'});
+    const dims=[['batch',b],['seq',seq.toLocaleString()],['K,V',2],['layers',p.L],['kv_heads',p.kv],['head_dim',hd]];
+    let x=20;dims.forEach((d,i)=>{const w=104;R(svg,x,28,w,44,`fill:${i===4?'var(--g2)':'var(--surface-2)'};stroke:var(--line)`,{rx:8});
+      T(svg,x+w/2,46,d[0],{'text-anchor':'middle',class:'lbl',style:i===4?'fill:#fff':''});
+      T(svg,x+w/2,64,String(d[1]),{'text-anchor':'middle',style:`font-weight:700;${i===4?'fill:#fff':''}`});
+      if(i<5)T(svg,x+w+4,55,'×',{style:'fill:var(--muted)'});x+=w+16;});
+    // memory bar
+    const X0=20,W=720,scale=W/Math.max(cap,tot)*0.98;
+    T(svg,20,112,'GPU MEMORY',{class:'lbl'});
+    R(svg,X0,122,cap*scale,46,'fill:var(--surface-2);stroke:var(--line)',{rx:8});
+    R(svg,X0,122,w*scale,46,'fill:var(--g0)',{rx:6});
+    const kvx=X0+w*scale;
+    R(svg,kvx,122,kv*scale,46,tot>cap?'fill:var(--g2)':'fill:var(--g2)');
+    if(tot>cap)R(svg,X0+cap*scale,122,(tot-cap)*scale,46,'fill:url(#hatchBad);opacity:.8');
+    if(w*scale>70)T(svg,X0+8,150,`weights ${fmt(w,1)} GB`,{style:'fill:#fff;font-weight:600'});
+    if(kv*scale>70)T(svg,kvx+8,150,`KV ${fmt(kv,2)} GB`,{style:'fill:#fff;font-weight:600'});
+    const cx=X0+cap*scale;S('line',{x1:cx,x2:cx,y1:114,y2:178,style:'stroke:var(--ink);stroke-width:2'},svg);
+    T(svg,cx,192,`${cap} GB capacity`,{'text-anchor':cx>600?'end':'middle',style:'font-weight:600'});
+    T(svg,20,228,tot>cap?`Does not fit: ${fmt(tot-cap,1)} GB over`:`Free: ${fmt(cap-tot,1)} GB`,{style:`font-weight:700;fill:${tot>cap?'var(--bad)':'var(--ok)'}`});
+    $('#kv-formula').innerHTML=`KV = batch × seq × 2 × layers × (kv_heads × head_dim) × bytes = ${b} × ${seq.toLocaleString()} × 2 × ${p.L} × (${p.kv} × ${hd}) × ${kb} = <b>${fmt(kv,2)} GB</b>`;
+    const mb=Math.floor((cap-w)*1e9/(seq*perTok));
+    stats($('#kv-stats'),[
+      {v:fmt(perTok/1024,0)+' KB',l:'KV per token'},
+      {v:fmt(kv,2)+' GB',l:'KV cache'},
+      {v:fmt(w,1)+' GB',l:`weights (${p.p}B × ${wb} B)`},
+      {v:mb>0?mb:'0',l:`max batch at ${seq.toLocaleString()} tokens`,c:mb>0?'good':'warn'}]);
+  }
+  ids.forEach(i=>$('#'+i).addEventListener('input',upd));upd();
+})();
+
+/* ---------- 03 batching ---------- */
+(function(){
+  const L=[5,12,3,8,6,4,10,3,7,5,2,9],N=4,svg=$('#bt-svg');let timer=null;
+  function st(){const g=[...Array(N)].map(()=>[]);let t=0;for(let i=0;i<L.length;i+=N){const grp=L.slice(i,i+N),m=Math.max(...grp);
+    for(let s=0;s<N;s++)for(let k=0;k<m;k++)g[s][t+k]=(s<grp.length&&k<grp[s])?i+s:-1;t+=m;}return{g,T:t};}
+  function inf(){const g=[...Array(N)].map(()=>[]),rem=Array(N).fill(0),cur=Array(N).fill(-1);let nx=0,t=0;
+    for(;;){for(let s=0;s<N;s++)if(rem[s]===0&&nx<L.length){cur[s]=nx;rem[s]=L[nx];nx++;}
+      if(rem.every(r=>r===0))break;for(let s=0;s<N;s++){if(rem[s]>0){g[s][t]=cur[s];rem[s]--;}else g[s][t]=-1;}t++;}return{g,T:t};}
+  const A=st(),B=inf(),TM=A.T,x0=80,cw=(740-x0)/TM,rh=22;
+  const sum=L.reduce((a,b)=>a+b,0);
+  function draw(sched,y,title,upto){
+    T(svg,20,y-10,title,{class:'lbl'});
+    for(let s=0;s<N;s++){T(svg,20,y+s*rh+15,'slot '+(s+1),{style:'font-size:11px;fill:var(--muted)'});
+      for(let t=0;t<TM;t++){const r=sched.g[s][t],vis=t<upto;
+        if(t>=sched.T){continue;}
+        const st=r>=0?`fill:${PAL(r)};opacity:${vis?1:.08}`:`fill:url(#hatch);opacity:${vis?1:.1}`;
+        R(svg,x0+t*cw,y+s*rh,cw-1.5,rh-3,st,{rx:3});
+        if(r>=0&&vis&&(t===0||sched.g[s][t-1]!==r))T(svg,x0+t*cw+cw/2,y+s*rh+14,String.fromCharCode(65+r),{'text-anchor':'middle',style:'fill:#fff;font-weight:700;font-size:11px'});}}
+    const ex=x0+sched.T*cw;S('line',{x1:ex,x2:ex,y1:y-4,y2:y+N*rh,style:'stroke:var(--ink);stroke-width:1.5;stroke-dasharray:3 3'},svg);
+    T(svg,ex+4,y+N*rh+12,`${sched.T} steps`,{style:'font-weight:700;font-size:11px'});
+  }
+  function render(upto){clear(svg);
+    draw(A,30,'STATIC BATCHING: a batch runs until its longest request finishes',upto);
+    draw(B,175,'IN-FLIGHT BATCHING: a finished slot is refilled on the next step',upto);
+    S('line',{x1:x0+upto*cw,x2:x0+upto*cw,y1:16,y2:290,style:'stroke:var(--accent);stroke-width:2'},svg);
+    T(svg,x0,292,'time (decode steps) →',{class:'lbl'});
+  }
+  stats($('#bt-stats'),[
+    {v:A.T,l:'static: steps to finish'},{v:Math.round(100*sum/(N*A.T))+'%',l:'static: slots busy',c:'warn'},
+    {v:B.T,l:'in-flight: steps to finish'},{v:Math.round(100*sum/(N*B.T))+'%',l:'in-flight: slots busy',c:'good'}]);
+  function play(){clearInterval(timer);let u=0;if(RM){render(TM);return;}timer=setInterval(()=>{render(u);if(++u>TM)clearInterval(timer);},90);}
+  $('#bt-play').onclick=play;render(TM);
+})();
+
+/* ---------- 04 parallelism ---------- */
+(function(){
+  /* pipeline */
+  const pp=$('#pp-svg');
+  function pipe(m){clear(pp);const p=4;
+    T(pp,20,18,'MODEL: 32 LAYERS → 4 STAGES (each GPU holds ¼ of the weights)',{class:'lbl'});
+    for(let l=0;l<32;l++)R(pp,80+l*20,28,17,30,`fill:${G(l>>3)}`,{rx:3});
+    for(let g=0;g<4;g++)T(pp,80+g*160+78,74,`GPU ${g} · L${g*8}–${g*8+7}`,{'text-anchor':'middle',style:'font-size:11px'});
+    const x0=80,unit=160,w=unit/m,tot=(m+p-1)*w;
+    T(pp,20,106,`SCHEDULE: batch split into ${m} microbatch${m>1?'es':''}`,{class:'lbl'});
+    for(let i=0;i<p;i++){const y=118+i*42;T(pp,20,y+21,'GPU '+i,{style:'font-weight:600'});
+      R(pp,x0,y,tot,32,'fill:url(#hatch)',{rx:4});
+      for(let j=0;j<m;j++){R(pp,x0+(i+j)*w,y,w-1.5,32,`fill:${G(i)};opacity:${j%2?.75:1}`,{rx:3});
+        if(w>=20)T(pp,x0+(i+j)*w+w/2,y+21,String(j+1),{'text-anchor':'middle',style:'fill:#fff;font-weight:700'});}}
+    S('line',{x1:x0+tot,x2:x0+tot,y1:112,y2:290,style:'stroke:var(--ink);stroke-width:1.5;stroke-dasharray:3 3'},pp);
+    T(pp,x0+tot+4,302,'done',{style:'font-weight:700'});
+    T(pp,x0,302,'time →  (hatched = pipeline bubble, GPU idle)',{class:'lbl'});
+    const bub=(p-1)/(m+p-1);
+    stats($('#pp-stats'),[{v:'1/4',l:'weights per GPU'},{v:Math.round(bub*100)+'%',l:'bubble (idle) fraction',c:bub>.4?'warn':'good'},
+      {v:fmt((m+p-1)/m,2)+'×',l:'latency vs. one stage'}]);}
+  seg($('#pp-m'),[1,2,4,8].map(v=>({l:String(v),v})),1,pipe);pipe(1);
+
+  /* tensor / sequence */
+  const svg=$('#tp-svg');
+  const full={W:8,r:[0,8],c:[0,8]};
+  const hs=g=>({W:8,r:[0,8],c:[g*4,g*4+4]});
+  const ms=g=>({W:32,r:[0,8],c:[g*16,g*16+16]});
+  const sq=g=>({W:8,r:[g*4,g*4+4],c:[0,8]});
+  const dup=()=>Object.assign({dup:1},full);
+  const part=()=>Object.assign({partial:1},full);
+  const TP=[
+    {n:'Input X',t:dup,sh:'[s, h]',note:'Both GPUs hold the full input [s, h], so the memory is duplicated.'},
+    {n:'LayerNorm',t:dup,sh:'[s, h]',note:'LayerNorm needs a whole hidden vector per token, so it can\'t split along h. Each GPU stores a full copy.'},
+    {n:'Attention',t:hs,sh:'[s, h/2]',w:{k:'col',l:'W_QKV column-split'},note:'Heads are split: GPU 0 runs heads 0–3 and GPU 1 runs heads 4–7. Each holds [s, h/2], with no duplication.'},
+    {n:'Out-proj',t:part,sh:'[s, h] partial',w:{k:'row',l:'W_O row-split'},comm:'All-Reduce',note:'A row-split W_O gives each GPU a partial sum of the full [s, h]. All-Reduce adds them, leaving a full copy on every GPU.'},
+    {n:'Dropout + add',t:dup,sh:'[s, h]',note:'Dropout and residual run on the full [s, h], duplicated on both GPUs.'},
+    {n:'LayerNorm',t:dup,sh:'[s, h]',note:'Full copy again on each GPU.'},
+    {n:'MLP up',t:ms,sh:'[s, 4h/2]',w:{k:'col',l:'A column-split'},note:'GeLU(X·A) with A split by columns. Each GPU holds half of the 4h-wide hidden layer, [s, 2h].'},
+    {n:'MLP down',t:part,sh:'[s, h] partial',w:{k:'row',l:'B row-split'},comm:'All-Reduce',note:'A row-split B gives partial sums, and All-Reduce makes them a full [s, h] on both GPUs.'},
+    {n:'Dropout + add',t:dup,sh:'[s, h]',note:'Duplicated again. 5 of these 9 activations are full copies on every GPU.'}];
+  const SP=[
+    {n:'Input X',t:sq,sh:'[s/2, h]',note:'The sequence is split: GPU 0 holds tokens 0–3 and GPU 1 holds tokens 4–7.'},
+    {n:'LayerNorm',t:sq,sh:'[s/2, h]',note:'LayerNorm is per token, so each GPU normalises only its own tokens. Nothing is duplicated.'},
+    {n:'Attention',t:hs,sh:'[s, h/2]',w:{k:'col',l:'W_QKV column-split'},comm:'All-Gather',note:'All-Gather rebuilds the full sequence, then the heads split as in plain TP.'},
+    {n:'Out-proj',t:sq,sh:'[s/2, h]',w:{k:'row',l:'W_O row-split'},comm:'Reduce-Scatter',note:'Reduce-Scatter sums the partials and leaves each GPU only its own token slice.'},
+    {n:'Dropout + add',t:sq,sh:'[s/2, h]',note:'Dropout runs on [s/2, h] per GPU.'},
+    {n:'LayerNorm',t:sq,sh:'[s/2, h]',note:'Still sharded by sequence.'},
+    {n:'MLP up',t:ms,sh:'[s, 4h/2]',w:{k:'col',l:'A column-split'},comm:'All-Gather',note:'All-Gather the tokens, then split A by columns.'},
+    {n:'MLP down',t:sq,sh:'[s/2, h]',w:{k:'row',l:'B row-split'},comm:'Reduce-Scatter',note:'Reduce-Scatter, so each GPU holds its token slice. All-Reduce = Reduce-Scatter + All-Gather, so communication volume stays the same.'},
+    {n:'Dropout + add',t:sq,sh:'[s/2, h]',note:'Every activation is now either head-split or token-split. Nothing is duplicated.'}];
+  const units=sp=>(sp.r[1]-sp.r[0])*(sp.c[1]-sp.c[0])/64;
+  const total=arr=>arr.reduce((a,s)=>a+units(s.t(0)),0);
+  let mode='tp',k=0,timer=null;
+  const tabs=[{l:'Pipeline',v:'pipe'},{l:'Tensor (TP=2)',v:'tp'},{l:'Tensor + Sequence (TP=2)',v:'sp'},{l:'Single GPU',v:'one'}];
+  const ONE=TP.map(s=>Object.assign({},s,{t:()=>Object.assign({},s.t(0).W===32?{W:32,r:[0,8],c:[0,32]}:full),comm:null,w:s.w?{k:'all',l:s.w.l.replace(/ (column|row)-split.*/,' (whole)')}:null,sh:s.t(0).W===32?'[s, 4h]':'[s, h]',note:'One GPU holds every activation and every weight in full. Memory is the limit.'}));
+  const stages=()=>mode==='sp'?SP:mode==='one'?ONE:TP;
+  function drawTensor(px,g,spec,stg,gpus){
+    const gx=px+34,gy=86,gw=290,rh=15,cw=gw/spec.W;
+    T(svg,gx,gy-8,spec.W===32?'← 4h →':'← h →',{class:'lbl'});
+    for(let r=0;r<8;r++){T(svg,px,gy+r*rh+11,'t'+r,{style:'font-size:10px;fill:var(--muted)'});
+      for(let c=0;c<spec.W;c++){const own=r>=spec.r[0]&&r<spec.r[1]&&c>=spec.c[0]&&c<spec.c[1];
+        const st=own?(spec.partial?`fill:url(#part${g})`:`fill:${gpus===1?'var(--accent)':G(g)}`):'fill:var(--surface-2)';
+        R(svg,gx+c*cw,gy+r*rh,cw-1,rh-1,st);}}
+    if(spec.dup&&gpus>1){R(svg,gx-2,gy-2,gw+3,8*rh+3,'fill:none;stroke:var(--bad);stroke-width:2;stroke-dasharray:5 3',{rx:3});}
+    const y2=gy+8*rh;
+    T(svg,gx,y2+18,stg.sh,{class:'big'});
+    if(spec.dup&&gpus>1)T(svg,gx+gw,y2+18,'DUPLICATE',{'text-anchor':'end',style:'fill:var(--bad);font-weight:700;font-size:11px'});
+    if(spec.partial)T(svg,gx+gw,y2+18,'PARTIAL SUM',{'text-anchor':'end',style:'fill:var(--muted);font-weight:700;font-size:11px'});
+    // weight glyph
+    if(stg.w){const wx=gx,wy=y2+34,ws=44;T(svg,wx+ws+10,wy+16,stg.w.l,{style:'font-size:11px'});
+      T(svg,wx+ws+10,wy+32,stg.w.k==='col'?'this GPU: columns '+(g?'right':'left')+' half':stg.w.k==='row'?'this GPU: rows '+(g?'bottom':'top')+' half':'this GPU: all of it',{style:'font-size:11px;fill:var(--muted)'});
+      R(svg,wx,wy,ws,ws,'fill:var(--surface-2);stroke:var(--line)');
+      const col=gpus===1?'var(--accent)':G(g);
+      if(stg.w.k==='col')R(svg,wx+(g?ws/2:0),wy,ws/2,ws,`fill:${col}`);
+      else if(stg.w.k==='row')R(svg,wx,wy+(g?ws/2:0),ws,ws/2,`fill:${col}`);
+      else R(svg,wx,wy,ws,ws,`fill:${col}`);}
+    // cumulative memory
+    const arr=stages();let cum=0;for(let i=0;i<=k;i++)cum+=units(arr[i].t(g));
+    const by=328,max=13;
+    T(svg,px,by-6,'ACTIVATIONS HELD SO FAR (1 unit = s×h)',{class:'lbl'});
+    R(svg,px,by,gw+34,12,'fill:var(--surface-2)',{rx:6});
+    R(svg,px,by,(gw+34)*cum/max,12,`fill:${gpus===1?'var(--accent)':G(g)}`,{rx:6});
+    T(svg,px,by+28,fmt(cum,1)+' units',{style:'font-weight:700'});
+  }
+  function render(){
+    if(mode==='pipe'){$('#par-pipe').style.display='';$('#par-tp').style.display='none';return;}
+    $('#par-pipe').style.display='none';$('#par-tp').style.display='';
+    const arr=stages(),stg=arr[k],gpus=mode==='one'?1:2;
+    const chips=$('#tp-chips');chips.innerHTML='';
+    arr.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=(i+1)+' '+s.n+(s.comm?' ⇄':'');
+      b.setAttribute('aria-pressed',String(i===k));b.onclick=()=>{k=i;render();};chips.appendChild(b);});
+    clear(svg);
+    for(let g=0;g<gpus;g++){const px=g?400:20;
+      R(svg,px,8,14,14,`fill:${gpus===1?'var(--accent)':G(g)}`,{rx:3});
+      T(svg,px+20,20,gpus===1?'SINGLE GPU':'GPU '+g,{style:'font-weight:700'});
+      T(svg,px+20,40,`step ${k+1}: ${stg.n}`,{style:'fill:var(--muted)'});
+      drawTensor(px,g,stg.t(g),stg,gpus);}
+    if(stg.comm&&gpus>1){R(svg,280,50,200,26,'fill:var(--accent)',{rx:13});
+      T(svg,380,68,'⇄ '+stg.comm,{'text-anchor':'middle',style:'fill:#fff;font-weight:700'});}
+    $('#tp-note').textContent=stg.note;
+    $('#tp-prev').disabled=k===0;$('#tp-next').disabled=k===arr.length-1;
+    stats($('#tp-stats'),[
+      {v:fmt(total(ONE),1),l:'single GPU: units per layer'},
+      {v:fmt(total(TP),1),l:'TP=2: units per GPU',c:mode==='tp'?'warn':''},
+      {v:fmt(total(SP),1),l:'TP+SP=2: units per GPU',c:mode==='sp'?'good':''},
+      {v:'s×h',l:'unique data: identical in all 3'}]);
+  }
+  function stop(){clearInterval(timer);timer=null;$('#tp-play').textContent='Play layer';}
+  seg($('#par-tabs'),tabs,'tp',v=>{stop();mode=v;k=Math.min(k,8);render();});
+  $('#tp-prev').onclick=()=>{if(k>0){k--;render();}};
+  $('#tp-next').onclick=()=>{if(k<8){k++;render();}};
+  $('#tp-play').onclick=()=>{if(timer){stop();return;}k=0;render();$('#tp-play').textContent='Pause';
+    timer=setInterval(()=>{if(k>=8){stop();return;}k++;render();},RM?60:1400);};
+  render();
+})();
+
+/* ---------- 04a isometric tensor cut ---------- */
+(function(){
+  const svg=$('#cube-svg'),u=12,c30=Math.cos(Math.PI/6),OX=380,OY=92;
+  const P=(x,y,z)=>[(x-y)*c30*u,(x+y)*.5*u-z*u];
+  const pts=a=>a.map(p=>P(...p).map(v=>v.toFixed(1)).join(',')).join(' ');
+  function box(g,x0,y0,z0,dx,dy,dz,col,ghost){
+    const x1=x0+dx,y1=y0+dy,z1=z0+dz,ln=ghost?'stroke:var(--muted);stroke-dasharray:3 3;fill:none':'';
+    const faces=[[[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1],.95],[[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1],.72],[[x1,y0,z0],[x1,y1,z0],[x1,y1,z1],[x1,y0,z1],.5]];
+    faces.forEach(f=>S('polygon',{points:pts(f.slice(0,4)),style:ghost?ln:`fill:${col};fill-opacity:${f[4]};stroke:${col};stroke-width:1`},g));
+    if(ghost)return;
+    const L=(a,b)=>{const p=P(...a),q=P(...b);S('line',{x1:p[0],y1:p[1],x2:q[0],y2:q[1],style:'stroke:var(--surface);stroke-width:1;opacity:.85'},g);};
+    for(let i=x0+1;i<x1;i++){L([i,y0,z1],[i,y1,z1]);L([i,y1,z0],[i,y1,z1]);}
+    for(let j=y0+1;j<y1;j++){L([x0,j,z1],[x1,j,z1]);L([x1,j,z0],[x1,j,z1]);}
+    for(let k=z0+1;k<z1;k++){L([x0,y1,k],[x1,y1,k]);L([x1,y0,k],[x1,y1,k]);}
+  }
+  const MODES={
+    one:{note:'One GPU holds the whole [b, s, h] tensor.',pieces:[{b:[0,0,0,8,8,3],c:'var(--accent)',dx:0,lab:'[b, s, h]',mem:'100%'}]},
+    rep:{note:'TP outside attention/MLP (LayerNorm, Dropout): both GPUs keep a full copy. Unique data stays the same, but memory doubles.',pieces:[{b:[0,0,0,8,8,3],c:G(0),dx:-200,lab:'GPU 0  [b, s, h]',mem:'100%',dup:1},{b:[0,0,0,8,8,3],c:G(1),dx:200,lab:'GPU 1  [b, s, h]',mem:'100%',dup:1}]},
+    tph:{note:'TP inside attention/MLP: cut along h (heads or MLP columns). Each GPU holds half, with no copies.',pieces:[{b:[0,0,0,4,8,3],c:G(0),dx:-190,lab:'GPU 0  [b, s, h/2]',mem:'50%'},{b:[4,0,0,4,8,3],c:G(1),dx:190,lab:'GPU 1  [b, s, h/2]',mem:'50%'}]},
+    sps:{note:'Sequence parallelism for LayerNorm/Dropout: those ops are per-token, so cut along s instead. Half each, no copies.',pieces:[{b:[0,4,0,8,4,3],c:G(0),dx:-190,lab:'GPU 0  [b, s/2, h]  tokens 0–3',mem:'50%'},{b:[0,0,0,8,4,3],c:G(1),dx:190,lab:'GPU 1  [b, s/2, h]  tokens 4–7',mem:'50%'}]}};
+  let mode='tph';
+  function render(){clear(svg);const m=MODES[mode];$('#cube-note').textContent=m.note;
+    // ghost of the original tensor
+    const gg=S('g',{transform:`translate(${OX},${OY})`},svg);if(mode!=='one')box(gg,0,0,0,8,8,3,null,true);
+    // axis labels on the ghost / tensor
+    const ax=S('g',{transform:`translate(${OX},${OY})`},svg);
+    const a1=P(4,8.9,0),a2=P(8.9,4,0),a3=P(-0.6,8,1.5);
+    T(ax,a2[0]+6,a2[1]+14,'h →',{style:'font-weight:700;fill:var(--muted)'});
+    T(ax,a1[0]-40,a1[1]+18,'← s',{style:'font-weight:700;fill:var(--muted)'});
+    T(ax,a3[0]-26,a3[1],'b',{style:'font-weight:700;fill:var(--muted)'});
+    const groups=m.pieces.map(p=>{const g=S('g',{transform:`translate(${OX},${OY})`},svg);const inner=S('g',{style:'transition:transform 1s cubic-bezier(.65,0,.35,1)'},g);
+      box(inner,...p.b,p.c);const lab=S('g',{style:'opacity:0;transition:opacity .5s .7s'},inner);
+      const ctr=P(p.b[0]+p.b[3]/2,p.b[1]+p.b[4]/2,0);
+      T(lab,ctr[0],150,p.lab,{'text-anchor':'middle',style:'font-weight:700'});
+      R(lab,ctr[0]-70,162,140,10,'fill:var(--surface-2)',{rx:5});R(lab,ctr[0]-70,162,140*parseFloat(p.mem)/100,10,`fill:${p.c}`,{rx:5});
+      T(lab,ctr[0],190,'activation memory '+p.mem,{'text-anchor':'middle',style:'font-size:11px;fill:var(--muted)'});
+      if(p.dup)T(lab,ctr[0],-58,'DUPLICATE',{'text-anchor':'middle',style:'fill:var(--bad);font-weight:700'});
+      return {inner,lab,dx:p.dx};});
+    const go=()=>groups.forEach(o=>{o.inner.style.transform=`translate(${o.dx}px,0px)`;o.lab.style.opacity=1;});
+    if(RM)go();else requestAnimationFrame(()=>requestAnimationFrame(go));}
+  seg($('#cube-seg'),[{l:'One GPU',v:'one'},{l:'TP · replicated ops',v:'rep'},{l:'TP · split h',v:'tph'},{l:'SP · split s',v:'sps'}],'tph',v=>{mode=v;render();});
+  $('#cube-replay').onclick=render;render();
+})();
+
+/* ---------- 05 attention variants ---------- */
+(function(){
+  const svg=$('#at-svg');
+  function render(kv){clear(svg);const H=8,gs=H/kv,x0=60,step=85;
+    T(svg,20,22,`QUERY HEADS (8)  each Q_i: [s, d_head]`,{class:'lbl'});
+    for(let i=0;i<H;i++){const grp=Math.floor(i/gs),cx=x0+i*step+20;
+      R(svg,cx-20,34,40,56,`fill:${PAL(grp)}`,{rx:6});T(svg,cx,67,'Q'+i,{'text-anchor':'middle',style:'fill:#fff;font-weight:700'});}
+    T(svg,20,286,`KV HEADS (${kv})  each K_j, V_j: [s, d_head]  ← cached`,{class:'lbl'});
+    for(let j=0;j<kv;j++){const xa=x0+j*gs*step,xb=x0+(j+1)*gs*step-step+40,cx=(xa+xb)/2;
+      for(let i=j*gs;i<(j+1)*gs;i++){const qx=x0+i*step+20;S('path',{d:`M${qx} 90 C ${qx} 140, ${cx} 140, ${cx} 210`,style:`fill:none;stroke:${PAL(j)};stroke-width:2;opacity:.75`},svg);}
+      const w=Math.max(40,xb-xa);R(svg,cx-w/2,212,w,28,`fill:${PAL(j)}`,{rx:6});R(svg,cx-w/2,244,w,28,`fill:${PAL(j)};opacity:.7`,{rx:6});
+      T(svg,cx,231,kv===1?'K (shared by all)':'K'+j,{'text-anchor':'middle',style:'fill:#fff;font-weight:700'});
+      T(svg,cx,263,kv===1?'V (shared by all)':'V'+j,{'text-anchor':'middle',style:'fill:#fff;font-weight:700'});}
+    const name=kv===8?'MHA':kv===1?'MQA':'GQA';
+    stats($('#at-stats'),[{v:name,l:'variant'},{v:`${kv} × [s, d_head] × 2`,l:'KV cached per layer'},
+      {v:Math.round(kv/8*1000)/10+'%',l:'KV cache vs MHA',c:kv<8?'good':''},{v:gs,l:'query heads per KV head'},
+      {v:'12.5%',l:'Llama 2 70B: 64 Q → 8 KV'}]);}
+  seg($('#at-seg'),[{l:'MHA · 8 KV',v:8},{l:'GQA · 4 KV',v:4},{l:'GQA · 2 KV',v:2},{l:'MQA · 1 KV',v:1}],8,render);render(8);
+})();
+
+/* ---------- 06 flash attention ---------- */
+(function(){
+  const svg=$('#fa-svg');let mode='std',k=0,timer=null;
+  const n=8,ts=20,SX=180,SY=70;
+  function bar(x,label,hl,col){T(svg,x+12,SY-8,label,{'text-anchor':'middle',style:'font-weight:700'});
+    for(let i=0;i<n;i++)R(svg,x,SY+i*ts,24,ts-2,`fill:${col};opacity:${hl===i?1:.35}`,{rx:2});}
+  function render(){clear(svg);
+    R(svg,20,26,420,250,'fill:none;stroke:var(--line);stroke-width:1.5',{rx:12});
+    T(svg,32,44,'HBM: big, slow',{class:'lbl'});
+    R(svg,470,26,270,170,'fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5',{rx:12});
+    T(svg,482,44,'SRAM (on-chip): tiny, fast',{class:'lbl'});
+    let qi=-1,kj=-1,traffic=0,orow=-1,ofrac=0,mat=false;
+    if(mode==='std'){const ph=Math.floor(k/64),idx=k%64;mat=k>0;
+      qi=Math.floor(idx/8);kj=idx%8;
+      traffic=ph===0?idx+1:ph===1?64+2*(idx+1):ph===2?192+idx+1:256;if(k>=192)traffic=Math.min(256,192+(k-192)+1);
+      for(let r=0;r<n;r++)for(let c=0;c<n;c++){const t=r*8+c;let st='fill:var(--surface-2)';
+        if(ph===0&&t<=idx)st='fill:var(--g2)';else if(ph>=1){st='fill:var(--g2)';if(ph===1&&t<=idx||ph>=2)st='fill:var(--g1)';}
+        R(svg,SX+c*ts,SY+r*ts,ts-2,ts-2,st,{rx:2});}
+      T(svg,SX,SY+n*ts+18,ph===0?'writing S = QKᵀ':ph===1?'read S → softmax → write P':'read P → O = PV',{style:'font-weight:600;font-size:11px'});
+      if(ph>=2){orow=qi;ofrac=1;}
+      R(svg,SX+kj*ts-1,SY+qi*ts-1,ts,ts,'fill:none;stroke:var(--ink);stroke-width:2');
+    }else{qi=Math.floor(k/8);kj=k%8;orow=qi;ofrac=(kj+1)/8;
+      for(let r=0;r<n;r++)for(let c=0;c<n;c++)R(svg,SX+c*ts,SY+r*ts,ts-2,ts-2,'fill:none;stroke:var(--line);stroke-dasharray:2 2',{rx:2});
+      R(svg,SX+kj*ts-1,SY+qi*ts-1,ts,ts,'fill:var(--g2);stroke:var(--ink);stroke-width:2');
+      T(svg,SX,SY+n*ts+18,'S never stored: only this tile exists, in SRAM',{style:'font-weight:600;font-size:11px'});}
+    T(svg,SX+80,SY-8,'S  [N × N]',{'text-anchor':'middle',style:'font-weight:700'});
+    bar(40,'Q',qi,'var(--g0)');bar(76,'K',kj,'var(--g3)');bar(112,'V',kj,'var(--g3)');
+    T(svg,392,SY-8,'O',{'text-anchor':'middle',style:'font-weight:700'});
+    for(let i=0;i<n;i++){const done=mode==='flash'?(i<orow||(i===orow&&k===63)):(k>=192&&i<=orow)||k>=255;const cur=i===orow&&!done;
+      R(svg,380,SY+i*ts,24,ts-2,`fill:var(--accent);opacity:${done?1:cur?.25+.6*ofrac:.12}`,{rx:2});}
+    // SRAM contents
+    const sx=500,sy=66;
+    if(k>=0){R(svg,sx,sy,26,26,'fill:var(--g0)',{rx:3});T(svg,sx+13,sy+42,`Q${qi}`,{'text-anchor':'middle',style:'font-size:11px'});
+      R(svg,sx+40,sy,26,26,'fill:var(--g3)',{rx:3});T(svg,sx+53,sy+42,`K${kj}`,{'text-anchor':'middle',style:'font-size:11px'});
+      R(svg,sx+80,sy,26,26,'fill:var(--g3);opacity:.7',{rx:3});T(svg,sx+93,sy+42,`V${kj}`,{'text-anchor':'middle',style:'font-size:11px'});
+      R(svg,sx+130,sy,26,26,'fill:var(--g2)',{rx:3});T(svg,sx+143,sy+42,`S${qi},${kj}`,{'text-anchor':'middle',style:'font-size:11px'});
+      T(svg,sx,sy+76,mode==='flash'?'online softmax: running max m, sum ℓ':'tile passes through → back to HBM',{style:'font-size:11px;fill:var(--muted)'});
+      T(svg,sx,sy+96,mode==='flash'?`accumulating O row block ${qi}`:'',{style:'font-size:11px;fill:var(--muted)'});}
+    T(svg,470,228,`score traffic via HBM: ${mode==='std'?traffic:0} tiles`,{style:`font-weight:700;fill:${mode==='std'?'var(--bad)':'var(--ok)'}`});
+    T(svg,470,250,`N×N matrix in HBM: ${mode==='std'?(mat?'yes':'—'):'never'}`,{style:'font-weight:700'});
+    stats($('#fa-stats'),[{v:mode==='std'?'4N²':'0',l:'score-matrix HBM reads+writes',c:mode==='std'?'warn':'good'},
+      {v:'O(N²)',l:mode==='std'?'extra HBM memory':'compute (unchanged)'},{v:'exact',l:'output vs standard'}]);}
+  function stop(){clearInterval(timer);timer=null;$('#fa-play').textContent='Play';}
+  function play(){if(timer){stop();return;}const end=mode==='std'?255:63;if(RM){k=end;render();return;}k=0;$('#fa-play').textContent='Pause';
+    timer=setInterval(()=>{k++;if(k>=end){k=end;render();stop();return;}render();},mode==='std'?35:110);}
+  seg($('#fa-seg'),[{l:'Standard attention',v:'std'},{l:'FlashAttention',v:'flash'}],'std',v=>{stop();mode=v;k=mode==='std'?255:63;render();});
+  $('#fa-play').onclick=play;k=255;render();
+})();
+
+/* ---------- 07 paged attention ---------- */
+(function(){
+  const L=[37,9,60,21,14,45,30,12,26,18],svg=$('#pg-svg');
+  const x0=40,y0=30,cw=21,rh=22,COLS=32,ROWS=8,BS=8;
+  const rnd=mulberry32(11),perm=[...Array(32).keys()];for(let i=31;i>0;i--){const j=Math.floor(rnd()*(i+1));[perm[i],perm[j]]=[perm[j],perm[i]];}
+  let mode='contig',sel=2;
+  function layout(){const cells=Array(256).fill(null);let run=[];
+    if(mode==='contig'){for(let i=0;i<L.length&&(i+1)*64<=256;i++){run.push(i);for(let k=0;k<64;k++)cells[i*64+k]={r:i,used:k<L[i]};}}
+    else{let p=0;const tables={};for(let i=0;i<L.length;i++){const nb=Math.ceil(L[i]/BS);if(p+nb>32)break;run.push(i);tables[i]=[];
+      for(let b=0;b<nb;b++){const phys=perm[p++];tables[i].push(phys);for(let t=0;t<BS;t++){const tok=b*BS+t;cells[phys*BS+t]={r:i,used:tok<L[i]};}}}
+      return{cells,run,tables};}
+    return{cells,run,tables:null};}
+  function render(){clear(svg);const {cells,run,tables}=layout();
+    if(!run.includes(sel))sel=run[0];
+    T(svg,x0,y0-10,'KV MEMORY: 8 rows × 32 token slots'+(mode==='paged'?' · 32 physical blocks of 8':''),{class:'lbl'});
+    for(let s=0;s<256;s++){const r=Math.floor(s/COLS),c=s%COLS,cell=cells[s],x=x0+c*cw,y=y0+r*rh;
+      let st='fill:var(--surface-2)';
+      if(cell){const dim=mode==='paged'&&cell.r!==sel?.35:1;st=cell.used?`fill:${PAL(cell.r)};opacity:${dim}`:`fill:url(#hatchBad);opacity:${.55*dim}`;}
+      R(svg,x,y,cw-1.5,rh-2,st,{rx:2});}
+    if(mode==='paged'){for(let b=0;b<32;b++){const r=Math.floor(b/4),c=(b%4)*8;R(svg,x0+c*cw-1,y0+r*rh-1,8*cw,rh,'fill:none;stroke:var(--ink);stroke-width:1;opacity:.35');
+      T(svg,x0+c*cw+2,y0+r*rh+rh-6,String(b),{style:'font-size:8.5px;fill:var(--ink);opacity:.6'});}}
+    else{run.forEach(i=>{R(svg,x0-1,y0+i*2*rh-1,COLS*cw,2*rh,'fill:none;stroke:var(--ink);stroke-width:1.5;opacity:.5',{rx:3});});}
+    T(svg,x0,y0+ROWS*rh+22,'hatched red = reserved but unused (fragmentation)',{class:'lbl'});
+    const chips=$('#pg-chips');chips.innerHTML='';
+    L.forEach((len,i)=>{const b=document.createElement('button');b.type='button';b.className='chip'+(run.includes(i)?'':' q');
+      b.style.borderColor=PAL(i);b.textContent=`${String.fromCharCode(65+i)} · ${len} tok${run.includes(i)?'':' · queued'}`;
+      b.setAttribute('aria-pressed',String(mode==='paged'&&i===sel));b.onclick=()=>{if(run.includes(i)){sel=i;render();}};chips.appendChild(b);});
+    const used=run.reduce((a,i)=>a+L[i],0);
+    $('#pg-table').innerHTML=mode==='paged'?`block table ${String.fromCharCode(65+sel)}: `+tables[sel].map((p,l)=>`logical ${l} → phys <b>${p}</b>`).join(' · '):
+      `each request reserves 64 contiguous slots = 2 full rows, whatever its real length`;
+    stats($('#pg-stats'),[{v:run.length+' / '+L.length,l:'requests running'},
+      {v:Math.round(used/256*100)+'%',l:'memory holding real tokens',c:mode==='paged'?'good':'warn'},
+      {v:256-used,l:'slots wasted or free'}]);}
+  seg($('#pg-seg'),[{l:'Contiguous (max length)',v:'contig'},{l:'Paged (8-token blocks)',v:'paged'}],'contig',v=>{mode=v;render();});render();
+})();
+
+/* ---------- 08 quantization ---------- */
+(function(){
+  const svg=$('#q-svg'),rnd=mulberry32(7);const vals=[];
+  for(let i=0;i<48;i++){const u=rnd()||1e-9,v=rnd();vals.push(Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)*1.1);}
+  const OUT=7.4;let bits=4,outl=false,mode='absmax';
+  const X=v=>40+(v+8)/16*680;
+  function render(){clear(svg);const all=outl?vals.concat([OUT]):vals.slice();
+    const Lv=2**(bits-1)-1,maxAbs=mode==='clip'?3.3:Math.max(...all.map(Math.abs)),sc=maxAbs/Lv;
+    const q=x=>bits===16?x:Math.round(Math.max(-maxAbs,Math.min(maxAbs,x))/sc)*sc;
+    T(svg,20,26,'ORIGINAL (FP16)',{class:'lbl'});T(svg,20,170,bits===16?'FP16 (unchanged)':`INT${bits}: ${2*Lv+1} levels, step ${fmt(sc,3)}`,{class:'lbl'});
+    S('line',{x1:40,x2:720,y1:50,y2:50,style:'stroke:var(--line)'},svg);S('line',{x1:40,x2:720,y1:140,y2:140,style:'stroke:var(--line)'},svg);
+    if(bits!==16){if(2*Lv+1<=31){for(let k=-Lv;k<=Lv;k++)S('line',{x1:X(k*sc),x2:X(k*sc),y1:128,y2:152,style:'stroke:var(--accent);stroke-width:1.2;opacity:.7'},svg);}
+      else R(svg,X(-maxAbs),130,X(maxAbs)-X(-maxAbs),20,'fill:var(--accent);opacity:.12');
+      R(svg,X(-maxAbs),150,X(maxAbs)-X(-maxAbs),4,'fill:var(--accent)');}
+    all.forEach((v,i)=>{const isO=outl&&i===all.length-1,qv=q(v),col=isO?'var(--bad)':'var(--g0)';
+      S('line',{x1:X(v),y1:50,x2:X(qv),y2:140,style:`stroke:${col};opacity:.35`},svg);
+      S('circle',{cx:X(v),cy:50,r:isO?6:4,style:`fill:${col}`},svg);S('circle',{cx:X(qv),cy:140,r:isO?6:4,style:`fill:${col}`},svg);});
+    for(let v=-8;v<=8;v+=2)T(svg,X(v),200,String(v),{'text-anchor':'middle',style:'font-size:10px;fill:var(--muted)'});
+    const err=vals.reduce((a,v)=>a+Math.abs(v-q(v)),0)/vals.length;const lvls=new Set(vals.map(v=>q(v).toFixed(5))).size;
+    stats($('#q-stats'),[{v:fmt(err,3),l:'mean |error|, normal weights',c:err>.2?'warn':'good'},
+      {v:bits===16?'all':lvls,l:'distinct levels used'},
+      {v:outl?fmt(Math.abs(OUT-q(OUT)),2):'—',l:'outlier error'},
+      {v:fmt(7*bits/8,2)+' GB',l:'7B model weights at this precision'}]);}
+  seg($('#q-bits'),[{l:'FP16',v:16},{l:'INT8',v:8},{l:'INT4',v:4},{l:'INT3',v:3}],4,v=>{bits=v;render();});
+  seg($('#q-out'),[{l:'No outlier',v:false},{l:'Add outlier',v:true}],false,v=>{outl=v;render();});
+  seg($('#q-mode'),[{l:'Scale to max |w|',v:'absmax'},{l:'Clip at ±3.3',v:'clip'}],'absmax',v=>{mode=v;render();});render();
+})();
+
+/* ---------- 09 sparsity ---------- */
+(function(){
+  const svg=$('#sp-svg'),rnd=mulberry32(3);const W=[...Array(4)].map(()=>[...Array(16)].map(()=>Math.round((rnd()*2-1)*90)/100));
+  const keep=W.map(row=>{const k=[];for(let g=0;g<4;g++){const idx=[0,1,2,3].map(i=>g*4+i).sort((a,b)=>Math.abs(row[b])-Math.abs(row[a])).slice(0,2).sort((a,b)=>a-b);k.push(...idx);}return k;});
+  function cell(x,y,w,h,v,zero){const a=Math.min(1,Math.abs(v)/.9);
+    R(svg,x,y,w-2,h-2,zero?'fill:url(#hatch)':`fill:${v>=0?'var(--g0)':'var(--g2)'};opacity:${.25+.75*a}`,{rx:3});
+    T(svg,x+w/2-1,y+h/2+4,zero?'0':v.toFixed(2),{'text-anchor':'middle',style:`font-size:10.5px;${zero?'fill:var(--muted)':a<.5?'fill:var(--ink);font-weight:600':'fill:#fff;font-weight:600'}`});}
+  function render(st){clear(svg);
+    if(st!=='comp'){T(svg,20,20,st==='dense'?'DENSE W  [4 × 16]':'PRUNED 2:4: two zeros in every group of 4',{class:'lbl'});
+      for(let r=0;r<4;r++)for(let c=0;c<16;c++){const z=st==='prune'&&!keep[r].includes(c);cell(20+c*44,32+r*38,44,38,W[r][c],z);}
+      for(let g=1;g<4;g++)S('line',{x1:20+g*176-1,x2:20+g*176-1,y1:28,y2:186,style:'stroke:var(--ink);stroke-width:2'},svg);}
+    else{T(svg,20,20,'VALUES  [4 × 8]',{class:'lbl'});T(svg,420,20,'METADATA: 2-bit index inside each group',{class:'lbl'});
+      for(let r=0;r<4;r++)for(let j=0;j<8;j++){const c=keep[r][j];cell(20+j*46,32+r*38,46,38,W[r][c],false);
+        R(svg,420+j*40,32+r*38,38,36,'fill:var(--surface-2);stroke:var(--line)',{rx:3});T(svg,439+j*40,54+r*38,String(c%4),{'text-anchor':'middle',style:'font-weight:700'});}
+      for(let g=1;g<4;g++){S('line',{x1:20+g*92-1,x2:20+g*92-1,y1:28,y2:186,style:'stroke:var(--ink);stroke-width:2'},svg);S('line',{x1:420+g*80-1,x2:420+g*80-1,y1:28,y2:186,style:'stroke:var(--ink);stroke-width:2'},svg);}}
+    stats($('#sp-stats'),[{v:st==='dense'?'64':'32',l:'non-zero values stored'},{v:st==='dense'?'128 B':'64 + 16 B',l:'FP16 storage (values + metadata)'},{v:st==='dense'?'1×':'up to 2×',l:'math throughput on sparse tensor cores'}]);}
+  seg($('#sp-seg'),[{l:'Dense',v:'dense'},{l:'Prune 2:4',v:'prune'},{l:'Compressed format',v:'comp'}],'dense',render);render('dense');
+})();
+
+/* ---------- 10 distillation ---------- */
+(function(){
+  const svg=$('#ds-svg'),words=['mat','rug','floor','sofa','roof','moon'],lg=[6,4.6,4.2,3.6,1.8,.3];
+  function render(){const t=+$('#ds-t').value/10;$('#ds-tv').textContent=t.toFixed(1);clear(svg);
+    const ex=lg.map(l=>Math.exp(l/t)),z=ex.reduce((a,b)=>a+b,0),p=ex.map(e=>e/z);
+    T(svg,20,20,'"The cat sat on the ___"',{style:'font-weight:700'});
+    R(svg,480,10,12,12,'fill:var(--idle)');T(svg,498,20,'hard label',{style:'font-size:11px'});
+    R(svg,590,10,12,12,'fill:var(--accent)');T(svg,608,20,'teacher soft target',{style:'font-size:11px'});
+    const base=210,H=160,gw=115;S('line',{x1:30,x2:740,y1:base,y2:base,style:'stroke:var(--line)'},svg);
+    words.forEach((w,i)=>{const x=40+i*gw,hh=i===0?H:0;R(svg,x,base-hh,34,hh,'fill:var(--idle)',{rx:3});
+      const sh=p[i]*H;R(svg,x+40,base-sh,34,sh,'fill:var(--accent)',{rx:3});
+      T(svg,x+57,base-sh-6,Math.round(p[i]*100)+'%',{'text-anchor':'middle',style:'font-size:11px;font-weight:700'});
+      T(svg,x+37,base+18,w,{'text-anchor':'middle',style:'font-weight:600'});});
+    T(svg,20,244,`loss = α·CE(student, hard) + (1−α)·KL(student_T ∥ teacher_T)`,{style:'font-size:11px;fill:var(--muted)'});}
+  $('#ds-t').addEventListener('input',render);render();
+})();
+
+/* ---------- 11 speculative decoding ---------- */
+(function(){
+  const prompt=['I','saw','a','dog','ride'];
+  const R=[{d:['in','the','bus'],v:['in','the','car']},{d:['and','it','barked'],v:['and','it','barked','loudly']}];
+  function out(r){const o=[];for(let i=0;i<r.d.length;i++){if(r.d[i]===r.v[i])o.push({t:r.d[i],c:'ok'});else{o.push({t:r.v[i],c:'fix'});return o;}}o.push({t:r.v[r.d.length],c:'fix'});return o;}
+  let s=0;const MAX=6;
+  const pills=(el,arr)=>{el.innerHTML=arr.map(p=>`<span class="pill ${p.c||''}">${p.t}</span>`).join('');};
+  function render(){const r=s===0?-1:Math.floor((s-1)/3),ph=s===0?-1:(s-1)%3;
+    let ctx=prompt.map(t=>({t}));for(let i=0;i<r;i++)ctx=ctx.concat(out(R[i]).map(o=>({t:o.t})));
+    pills($('#sd-ctx'),ctx);
+    if(r<0){pills($('#sd-draft'),[]);pills($('#sd-ver'),[]);pills($('#sd-out'),[]);}
+    else{const rd=R[r];
+      pills($('#sd-draft'),rd.d.map((t,i)=>({t,c:ph===0?'draft':(rd.d[i]===rd.v[i]&&rd.d.slice(0,i).every((x,j)=>x===rd.v[j]))?'ok':'no'})));
+      pills($('#sd-ver'),ph>=1?rd.v.map(t=>({t,c:'ver'})):[]);
+      pills($('#sd-out'),ph===2?out(rd):[]);}
+    const notes=['Prompt: "I saw a dog ride". Press Next step.',
+      'The draft model proposes 3 tokens: cheap, sequential steps on a small model.',
+      'The verifier scores all 3 positions in a single forward pass and predicts "car" where the draft said "bus".',
+      '"in the" matches and is kept. "bus" is rejected, and the verifier\'s own "car" is kept for free: 3 tokens from one pass.',
+      'Round 2: the draft proposes "and it barked".',
+      'The verifier checks all 3 in one pass, agrees with every one, and adds a 4th token.',
+      'All 3 accepted plus the bonus "loudly": 4 tokens from one pass.'];
+    $('#sd-note').textContent=notes[s];
+    const passes=r<0?0:r+(ph>=1?1:0);let toks=0;for(let i=0;i<=r&&i<R.length;i++)if(i<r||ph===2)toks+=out(R[i]).length;
+    stats($('#sd-stats'),[{v:passes,l:'big-model passes'},{v:toks,l:'tokens produced'},{v:toks,l:'passes plain decoding needs',c:'warn'}]);
+    $('#sd-next').disabled=s>=MAX;}
+  $('#sd-next').onclick=()=>{if(s<MAX){s++;render();}};$('#sd-reset').onclick=()=>{s=0;render();};render();
+})();
+
+/* ---------- shared drawing kit ---------- */
+function makeKit(svg){
+  const c30=Math.cos(Math.PI/6);
+  const A=d=>RM?'':`animation:pdIn .6s cubic-bezier(.2,.8,.2,1) ${d}s both;transform-box:fill-box;transform-origin:center;`;
+  function iso(ox,oy,X,Y,Z,u,col,o){o=o||{};
+    const P=(x,y,z)=>[ox+(x-y)*c30*u,oy+(x+y)*.5*u-z*u];
+    const pts=a=>a.map(p=>P(...p).map(v=>v.toFixed(1)).join(',')).join(' ');
+    const g=S('g',{style:o.an||''},svg);const segs=o.segs||[{x0:0,x1:X,col}];
+    segs.forEach(sg=>[[[sg.x0,0,Z],[sg.x1,0,Z],[sg.x1,Y,Z],[sg.x0,Y,Z],.95],[[sg.x0,Y,0],[sg.x1,Y,0],[sg.x1,Y,Z],[sg.x0,Y,Z],.72]].forEach(f=>S('polygon',{points:pts(f.slice(0,4)),style:`fill:${sg.col};fill-opacity:${f[4]};stroke:${sg.col}`},g)));
+    const lc=segs[segs.length-1].col;S('polygon',{points:pts([[X,0,0],[X,Y,0],[X,Y,Z],[X,0,Z]]),style:`fill:${lc};fill-opacity:.5;stroke:${lc}`},g);
+    const Ln=(a,b)=>{const p=P(...a),q=P(...b);S('line',{x1:p[0],y1:p[1],x2:q[0],y2:q[1],style:'stroke:var(--surface);stroke-width:1;opacity:.8'},g);};
+    for(let i=1;i<X;i++){Ln([i,0,Z],[i,Y,Z]);Ln([i,Y,0],[i,Y,Z]);}
+    for(let j=1;j<Y;j++){Ln([0,j,Z],[X,j,Z]);Ln([X,j,0],[X,j,Z]);}
+    for(let z=1;z<Z;z++){Ln([0,Y,z],[X,Y,z]);Ln([X,0,z],[X,Y,z]);}
+    if(o.lab){const a=P(X/2,Y,0),b=P(X,Y/2,0),c=P(X,0,Z/2),l=o.lab;
+      T(g,a[0]-6,a[1]+18,l.x,{'text-anchor':'end',style:'font-weight:700;fill:var(--muted)'});
+      T(g,b[0]+6,b[1]+18,l.y,{style:'font-weight:700;fill:var(--muted)'});
+      T(g,c[0]+8,c[1]+4,l.z,{style:'font-weight:700;fill:var(--muted)'});}
+    const cx=ox+(X-Y)*c30*u/2,top=oy-Z*u;
+    if(o.title)T(g,cx,top-12,o.title,{'text-anchor':'middle',style:'font-weight:700'});
+    if(o.tag){const w=o.tag.length*7.5+14;R(g,cx-w/2,oy+(X+Y)*.5*u+6,w,18,`fill:${o.tagc||'var(--accent)'}`,{rx:9});T(g,cx,oy+(X+Y)*.5*u+19,o.tag,{'text-anchor':'middle',style:'fill:#fff;font-size:10.5px;font-weight:700'});}
+    return g;}
+  function arrow(x1,y1,x2,y2,lab,d,col){const g=S('g',{style:A(d||0)},svg);
+    S('line',{x1,y1,x2,y2,'marker-end':'url(#arr)',style:`stroke:${col||'var(--muted)'};stroke-width:1.8`},g);
+    if(lab)T(g,(x1+x2)/2,(y1+y2)/2-8,lab,{'text-anchor':'middle',style:`font-size:12px;font-weight:600;fill:${col||'var(--accent)'}`});return g;}
+  function heat(x,y,n,cs,seed,col,d){const r=mulberry32(seed),g=S('g',{style:A(d||0)},svg);
+    for(let i=0;i<n;i++)for(let j=0;j<n;j++)R(g,x+j*cs,y+i*cs,cs-1,cs-1,j>i?'fill:url(#hatch)':`fill:${col};opacity:${.25+.75*r()}`);return g;}
+  function mat(x,y,w,h,col,lab,sub,d){const g=S('g',{style:A(d||0)},svg);R(g,x,y,w,h,`fill:${col};opacity:.85`,{rx:4});
+    if(lab)T(g,x+w/2,y+h/2+4,lab,{'text-anchor':'middle',style:'fill:#fff;font-weight:700;font-size:12px'});
+    if(sub)T(g,x+w/2,y+h+15,sub,{'text-anchor':'middle',style:'font-size:11px;fill:var(--muted)'});return g;}
+  function pill(x,y,t,st,d){const w=Math.max(40,t.length*8.5+18),g=S('g',{style:A(d||0)},svg);R(g,x,y,w,26,st||'fill:var(--accent-soft);stroke:var(--accent)',{rx:7});T(g,x+w/2,y+18,t,{'text-anchor':'middle',style:'font-weight:600'});return w;}
+  const big=(x,y,t)=>T(svg,x,y,t,{class:'big'});
+  return{A,iso,arrow,heat,mat,pill,big};
+}
+const HCg=i=>`hsl(${[215,330,160,38][i%4]} 72% 55%)`;
+function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
+  let k=0,timer=null;
+  function render(){clear(o.svg);const st=o.stages[k];st.d();
+    o.note.innerHTML=`<b class="mono" style="color:var(--accent)">${k+1}/${o.stages.length} · ${st.n}</b><div class="formula" style="margin:6px 0">${st.f}</div>${st.c}`;
+    o.chips.innerHTML='';o.stages.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=(i+1)+' '+s.n;b.setAttribute('aria-pressed',String(i===k));b.onclick=()=>{stop();k=i;render();};o.chips.appendChild(b);});
+    o.prev.disabled=k===0;o.next.disabled=k===o.stages.length-1;if(o.after)o.after(k);}
+  function stop(){clearInterval(timer);timer=null;o.play.textContent='Play all';}
+  o.prev.onclick=()=>{stop();if(k>0){k--;render();}};o.next.onclick=()=>{stop();if(k<o.stages.length-1){k++;render();}};
+  o.play.onclick=()=>{if(timer){stop();return;}if(k>=o.stages.length-1)k=0;else k++;render();o.play.textContent='Pause';
+    timer=setInterval(()=>{if(k>=o.stages.length-1){stop();return;}k++;render();},RM?400:4500);};
+  render();return{render};
+}
+
+/* ---------- A1 backward pass ---------- */
+(function(){
+  const svg=$('#bw-svg'),K=makeKit(svg),{A,iso,arrow,heat,mat,pill,big}=K,GR='var(--bad)';
+  let recompute=false;
+  const ST=[
+   {n:'Loss',f:'L = −(1 / b·s) · Σ log p(next token)        ∂L/∂logits = softmax(logits) − one_hot(target)   [b, s, V]',c:'Training uses <b>every position</b>: token t predicts token t+1, and the causal mask stops it from cheating. One forward pass gives s losses per sequence. Training runs everything as prefill-style GEMMs and never needs the slow decode loop.',
+    d(){const w=['The','cat','sat','on','the','mat','.'];T(svg,40,36,'INPUT (position t)',{class:'lbl'});T(svg,40,196,'TARGET (token t+1)',{class:'lbl'});
+      for(let j=0;j<6;j++){const x=40+j*112;pill(x,46,w[j],null,j*.12);arrow(x+30,80,x+30,140,null,.3+j*.12,GR);T(svg,x+40,114,'predicts',{style:'font-size:10px;fill:var(--muted)'});pill(x,148,w[j+1],'fill:color-mix(in srgb,var(--bad) 14%,transparent);stroke:var(--bad)',.4+j*.12);}
+      big(40,230,'6 positions → 6 losses → averaged into one number L');big(40,290,'gradient starts here:  ∂L/∂logits  [b, s, V]');}},
+   {n:'LM head',f:'∂L/∂W_U = Xᵀ · ∂L/∂logits   [h × V]          ∂L/∂X = ∂L/∂logits · W_Uᵀ   [b, s, h]',c:'Every weight gradient is <b>(saved input)ᵀ × (incoming gradient)</b>. So the backward pass needs the X that went <b>into</b> each layer during the forward pass. That is why training keeps activations in memory and inference doesn\'t need to.',
+    d(){iso(140,86,24,6,2,7,GR,{title:'∂L/∂logits  [b, s, V]'});iso(440,86,8,6,2,9,'var(--accent)',{title:'X',tag:'SAVED',an:A(.3)});
+      arrow(300,150,560,62,'Xᵀ ·',.6,GR);mat(570,40,170,44,GR,'∂W_U','[h × V]  same shape as W_U',.8);
+      arrow(300,185,560,225,'· W_Uᵀ',.9,GR);iso(630,200,8,6,2,8,GR,{an:A(1.1),title:'∂L/∂X  [b, s, h]'});}},
+   {n:'MLP',f:'∂W₂ = Hᵀ · ∂Y      ∂H = ∂Y · W₂ᵀ ⊙ act′      ∂W₁ = LN(X)ᵀ · ∂H      ∂X += ∂H · W₁ᵀ',c:'Going back through the MLP needs <b>two saved tensors</b>: the input LN(X) [b, s, h] and the wide hidden H [b, s, ffn]. H is 4× wider than X, so it is a big part of activation memory.',
+    d(){iso(100,90,8,6,2,9,GR,{title:'∂Y  [b, s, h]'});iso(330,80,8,6,2,8,'var(--accent)',{title:'LN(X)',tag:'SAVED',an:A(.2)});iso(530,80,20,6,2,7,'var(--g3)',{title:'H  [b, s, ffn]',tag:'SAVED',an:A(.4)});
+      mat(300,220,170,36,GR,'∂W₁','[h × ffn]',.7);mat(520,220,120,36,GR,'∂W₂','[ffn × h]',.9);arrow(180,170,295,232,'·',.6,GR);arrow(345,175,375,215,null,.6,'var(--accent)');arrow(560,178,578,215,null,.8,'var(--accent)');}},
+   {n:'Attention',f:'∂V = Pᵀ·∂O    ∂P = ∂O·Vᵀ    ∂S = P ⊙ (∂P − rowsum(∂P ⊙ P))    ∂Q = ∂S·K/√d    ∂K = ∂Sᵀ·Q/√d',c:'Attention\'s backward needs the softmax matrix <b>P [b, n_heads, s, s]</b>, the s² activation. At long context it dominates memory. FlashAttention <b>recomputes P tile by tile</b> in the backward pass instead of storing it, trading cheap FLOPs for scarce memory.',
+    d(){T(svg,40,40,'P = softmax(S) per head  [b, n_heads, s, s]',{class:'lbl'});for(let i=0;i<4;i++)heat(40+i*92,52,6,13,i+3,HCg(i),i*.12);
+      const g=S('g',{style:A(.5)},svg);R(g,40,140,350,20,'fill:var(--accent)',{rx:10});T(g,215,154,'SAVED (or recomputed by FlashAttention)',{'text-anchor':'middle',style:'fill:#fff;font-size:11px;font-weight:700'});
+      ['∂Q','∂K','∂V'].forEach((t,i)=>{arrow(400,90,460+i*100,170,null,.6+i*.15,GR);iso(490+i*100,190,8,6,2,6,GR,{an:A(.8+i*.15),title:t})});
+      big(40,290,'∂Q, ∂K, ∂V  each  [b, s, h]');}},
+   {n:'Residual highway',f:'X_{l+1} = X_l + f(X_l)    ⇒    ∂X_{l+1}/∂X_l = I + ∂f/∂X_l',c:'The <b>“+ I”</b> gives the gradient a direct path down through all L layers that skips every block. Without it, gradients get multiplied through 32 blocks and vanish or explode. This is why every sublayer has the shape [b, s, h] → [b, s, h]: it has to be addable to the stream.',
+    d(){for(let i=0;i<6;i++){const y=250-i*38,g=S('g',{style:A(i*.08)},svg);R(g,300,y,220,26,`fill:${G(i>>1&3)};opacity:.85`,{rx:6});T(g,410,y+17,'block '+(i===5?'L':i+1)+'   f(X)',{'text-anchor':'middle',style:'fill:#fff;font-weight:700;font-size:11.5px'});}
+      const g=S('g',{style:A(.6)},svg);S('line',{x1:250,y1:40,x2:250,y2:282,'marker-end':'url(#arr)',style:'stroke:var(--bad);stroke-width:5'},g);
+      T(g,236,160,'+I',{'text-anchor':'end',style:'fill:var(--bad);font-weight:800;font-size:18px'});T(g,40,60,'∂L flows down',{style:'font-weight:700;fill:var(--bad)'});T(g,40,80,'untouched by any block',{style:'fill:var(--muted)'});
+      for(let i=0;i<6;i++)S('line',{x1:300,y1:263-i*38,x2:252,y2:263-i*38,style:'stroke:var(--bad);stroke-width:1.5;opacity:.5;stroke-dasharray:3 3'},svg);
+      T(svg,560,150,'each block only adds',{style:'font-weight:700'});T(svg,560,170,'a correction ∂f/∂X',{style:'fill:var(--muted)'});}},
+   {n:'Grad = param shape',f:'∂L/∂W  has exactly the shape of W        one gradient number per parameter',c:'Every parameter matrix gets a gradient matrix of <b>the same shape</b>. With data parallelism, each GPU computes these on its own slice of the batch, then <b>All-Reduce averages them</b>. That is the same collective as in §04, applied to gradients instead of activations.',
+    d(){const P=[['W_Q,K,V,O','h × h',60,60],['W₁ (up)','h × ffn',120,40],['W₂ (down)','ffn × h',40,110],['E','V × h',30,95],['W_U','h × V',110,30]];
+      let x=30;P.forEach((p,i)=>{mat(x,40,p[2],p[3],'var(--g0)','W','',i*.1);mat(x,40+p[3]+36,p[2],p[3],GR,'∂W','',i*.1+.3);T(svg,x+p[2]/2,30,p[0],{'text-anchor':'middle',style:'font-size:11px;font-weight:700'});T(svg,x+p[2]/2,40+p[3]+24,p[1],{'text-anchor':'middle',style:'font-size:10.5px;fill:var(--muted)'});x+=p[2]+30;});}},
+   {n:'Memory',f:'per param: 2 B weight + 2 B grad + 4 B fp32 master + 4 B Adam m + 4 B Adam v = 16 B        activations/layer ≈ s·b·h·(34 + 5·a·s/h) bytes',c:'For Llama 2 7B at s = 4,096, b = 1: inference needs weights plus KV cache. Training needs 8× the bytes per parameter, <b>plus the activations</b> from the formula, which comes from the same Megatron paper as §04. Recomputation stores only each layer\'s input and redoes the forward pass during backward. Sequence parallelism and selective recompute are the middle ground.',
+    d(){const rows=[['Inference',[['weights',14,'var(--g0)'],['KV cache',2.1,'var(--g2)']]],['Training',[['weights',14,'var(--g0)'],['grads',14,GR],['fp32 master',28,'var(--g1)'],['Adam m',28,'var(--g3)'],['Adam v',28,'hsl(270 60% 58%)'],[recompute?'activations (recompute)':'activations',recompute?1.1:104.2,'var(--accent)']]]];
+      const sc=520/217;rows.forEach((r,i)=>{const y=60+i*110;T(svg,30,y-10,r[0],{style:'font-weight:700'});let x=30,tot=0;
+        r[1].forEach((s,j)=>{const w=s[1]*sc;R(svg,x,y,w,40,`fill:${s[2]}`,{style:`fill:${s[2]};${A(j*.1)}`});if(w>46)T(svg,x+4,y+16,s[0],{style:'fill:#fff;font-size:10.5px;font-weight:700'});if(w>46)T(svg,x+4,y+32,s[1]+' GB',{style:'fill:#fff;font-size:10.5px'});x+=w;tot+=s[1];});
+        T(svg,x+8,y+26,Math.round(tot)+' GB',{class:'big'});});
+      let lx=30;[['weights','var(--g0)'],['grads',GR],['fp32 master','var(--g1)'],['Adam m','var(--g3)'],['Adam v','hsl(270 60% 58%)'],['activations','var(--accent)'],['KV cache','var(--g2)']].forEach(l=>{R(svg,lx,292,12,12,`fill:${l[1]}`,{rx:3});T(svg,lx+16,302,l[0],{style:'font-size:11px'});lx+=l[0].length*7+34;});
+      S('line',{x1:30+80*sc,x2:30+80*sc,y1:30,y2:250,style:'stroke:var(--ink);stroke-width:1.5;stroke-dasharray:4 3'},svg);T(svg,34+80*sc,264,'one 80 GB GPU',{style:'font-size:11px;font-weight:700'});}}];
+  stager({svg,note:$('#bw-note'),chips:$('#bw-chips'),prev:$('#bw-prev'),next:$('#bw-next'),play:$('#bw-play'),stages:ST,after:k=>{$('#bw-extra').style.display=k===ST.length-1?'':'none';}});
+  seg($('#bw-rc'),[{l:'Store all activations',v:false},{l:'Full recomputation',v:true}],false,v=>{recompute=v;clear(svg);ST[ST.length-1].d();});
+})();
+
+/* ---------- A2 modern LLM changes ---------- */
+(function(){
+  const svg=$('#md-svg'),{A,iso,arrow,mat,pill,big}=makeKit(svg),ctl=$('#md-ctl'),note=$('#md-note');
+  let tab='prenorm',T1=1,P1=.9,tokI=0;
+  function box(x,y,w,h,t,col,d){const g=S('g',{style:A(d||0)},svg);R(g,x,y,w,h,`fill:${col}`,{rx:8});T(g,x+w/2,y+h/2+5,t,{'text-anchor':'middle',style:'fill:#fff;font-weight:700'});}
+  const V={
+   prenorm(){note.innerHTML='<b>Pre-norm.</b> The original Transformer normalised <i>after</i> the residual add, so LN sat on the residual path and rescaled gradients at every layer. GPT-2, Llama and most modern models normalise <b>before</b> each sublayer, which leaves the residual path (green) an untouched identity. Training is far more stable, with less need for learning-rate warmup.';
+     [['Post-norm (2017)',140,false],['Pre-norm (GPT-2, Llama, …)',520,true]].forEach(([t,cx,pre],c)=>{T(svg,cx,22,t,{'text-anchor':'middle',style:'font-weight:700'});
+       const ord=pre?[['LN','var(--g1)'],['Attention','var(--g0)'],['⊕','var(--ink)']]:[['Attention','var(--g0)'],['⊕','var(--ink)'],['LN','var(--g1)']];
+       box(cx-60,262,120,26,'X in','var(--accent)',c*.3);
+       ord.forEach((o,i)=>{const y=200-i*58;if(o[0]==='⊕'){const g=S('g',{style:A(c*.3+.1*i)},svg);S('circle',{cx,cy:y+13,r:15,style:'fill:var(--surface);stroke:var(--ink);stroke-width:2'},g);T(g,cx,y+19,'+',{'text-anchor':'middle',class:'big'});}else box(cx-60,y,120,26,o[0],o[1],c*.3+.1*i);
+         S('line',{x1:cx,y1:y+(o[0]==='⊕'?28:26)+30,x2:cx,y2:y+(o[0]==='⊕'?28:26),style:'stroke:var(--muted);stroke-width:1.5'},svg);});
+       const py=pre?200-2*58+13:200-58+13;S('path',{d:`M${cx+60} 275 H${cx+110} V${py} H${cx+15}`,style:`fill:none;stroke:${pre?'var(--ok)':'var(--bad)'};stroke-width:${pre?4:2.5}`},svg);
+       T(svg,cx+118,170,pre?'clean identity':'LN after the add',{style:`font-size:11px;font-weight:700;fill:${pre?'var(--ok)':'var(--bad)'}`});
+       S('line',{x1:cx,y1:pre?84:26,x2:cx,y2:pre?44:6,style:'stroke:var(--muted)'},svg);});},
+   rms(){note.innerHTML='<b>RMSNorm</b> drops LayerNorm\'s mean subtraction and bias and only rescales by the root-mean-square. It is cheaper (one reduction instead of two) and works just as well. Llama, Mistral, Gemma and Qwen all use it.';
+     const x=[2.1,1.4,2.8,.9,1.7,2.5,1.2,2.0],mu=x.reduce((a,b)=>a+b)/8,sd=Math.sqrt(x.reduce((a,b)=>a+(b-mu)**2,0)/8),rms=Math.sqrt(x.reduce((a,b)=>a+b*b,0)/8);
+     const sets=[['input x (one token, h = 8)',x,'var(--muted)'],['LayerNorm: (x − μ)/σ',x.map(v=>(v-mu)/sd),'var(--g1)'],['RMSNorm: x / rms(x)',x.map(v=>v/rms),'var(--g3)']];
+     sets.forEach((s,i)=>{const ox=30+i*245,base=170;T(svg,ox,30,s[0],{style:'font-weight:700;font-size:11.5px'});S('line',{x1:ox,x2:ox+200,y1:base,y2:base,style:'stroke:var(--ink)'},svg);
+       s[1].forEach((v,j)=>{const h=v*38;R(svg,ox+j*25,h>=0?base-h:base,20,Math.abs(h),`fill:${s[2]};${A(i*.25+j*.04)}`,{rx:2});});});
+     big(30,265,'LN: γ·(x−μ)/√(σ²+ε) + β');big(400,265,'RMS: γ·x/√(mean(x²)+ε)');},
+   swiglu(){note.innerHTML='<b>SwiGLU</b> replaces the 2-matrix MLP with <b>3 matrices</b>: a gate path through SiLU multiplies an up path element-wise. To keep the parameter count of a 4h MLP, ffn shrinks to about 8h/3, which is why Llama 2 7B has ffn = 11,008 rather than 16,384. Tensor parallelism splits gate and up by columns and down by rows.';
+     box(30,130,110,34,'X  [b,s,h]','var(--accent)',0);arrow(140,140,205,90,'',.1);arrow(140,155,205,205,'',.1);
+     box(210,70,150,34,'W_gate  h×ffn','var(--g0)',.2);box(210,190,150,34,'W_up  h×ffn','var(--g0)',.3);
+     arrow(360,87,410,87,'',.4);box(415,70,80,34,'SiLU','var(--g1)',.45);
+     arrow(495,90,540,135,'',.55);arrow(360,207,540,155,'',.55);
+     const g=S('g',{style:A(.6)},svg);S('circle',{cx:560,cy:145,r:18,style:'fill:var(--surface);stroke:var(--ink);stroke-width:2'},g);T(g,560,151,'⊙',{'text-anchor':'middle',class:'big'});
+     arrow(578,145,610,145,'',.7);box(612,128,135,34,'W_down  ffn×h','var(--g0)',.75);
+     T(svg,30,272,'params/layer: 3·h·ffn = 3 × 4,096 × 11,008 ≈ 135 M   vs   2·h·4h ≈ 134 M',{style:'font-weight:700'});},
+   sampling(){note.innerHTML='<b>Sampling</b> turns logits into one token. <b>Temperature</b> sharpens (T < 1) or flattens (T > 1) the distribution. <b>Top-p</b> keeps the smallest set of tokens whose probability adds up to p, then renormalises. As T → 0 this becomes greedy decoding (argmax).';
+     const w=['the','a','his','her','its','my','that','one','this','your'],lg=[5.2,4.4,3.6,3.3,2.9,2.5,2.0,1.6,1.2,.8];
+     const ex=lg.map(l=>Math.exp(l/T1)),z=ex.reduce((a,b)=>a+b),p=ex.map(e=>e/z);let cum=0;const keep=p.map(v=>{const k=cum<P1;cum+=v;return k;});
+     const zk=p.reduce((a,v,i)=>a+(keep[i]?v:0),0);
+     T(svg,40,24,`T = ${T1.toFixed(2)}    top-p = ${P1.toFixed(2)}    kept: ${keep.filter(Boolean).length} tokens`,{style:'font-weight:700'});
+     w.forEach((t,i)=>{const x=40+i*70,h=p[i]*200;R(svg,x,250-h,48,h,keep[i]?'fill:var(--accent)':'fill:url(#hatch)',{rx:3});
+       T(svg,x+24,270,t,{'text-anchor':'middle',style:'font-weight:600'});T(svg,x+24,244-h,keep[i]?Math.round(p[i]/zk*100)+'%':'✕',{'text-anchor':'middle',style:`font-size:11px;font-weight:700;fill:${keep[i]?'var(--ink)':'var(--muted)'}`});});
+     S('line',{x1:30,x2:740,y1:250,y2:250,style:'stroke:var(--line)'},svg);},
+   moe(){note.innerHTML='<b>Mixture of Experts</b> swaps the single MLP for <b>E expert MLPs</b> plus a small router that sends each token to its top-k experts. Mixtral 8×7B has 8 experts with top-2 routing, so about 47 B parameters are stored but only about 13 B are used per token. For inference, <b>memory</b> scales with total parameters and <b>compute</b> with active parameters. Spreading experts across GPUs is called expert parallelism.';
+     const toks=['The','cat','sat','on','the','mat'],r=mulberry32(tokI*7+3),sc=[...Array(8)].map(()=>r()),top=sc.map((v,i)=>[v,i]).sort((a,b)=>b[0]-a[0]).slice(0,2),tw=top[0][0]+top[1][0];
+     toks.forEach((t,i)=>pill(40+i*80,20,t,i===tokI?'fill:var(--accent);stroke:var(--accent)':'fill:var(--surface-2);stroke:var(--line)',0));
+     box(300,90,160,34,'router  h → 8','var(--g1)',.1);S('line',{x1:70+tokI*80,y1:48,x2:380,y2:90,style:'stroke:var(--accent);stroke-width:2'},svg);
+     for(let e=0;e<8;e++){const x=30+e*90,on=top.some(t=>t[1]===e),wgt=on?top.find(t=>t[1]===e)[0]/tw:0;
+       S('line',{x1:380,y1:124,x2:x+38,y2:190,style:`stroke:${on?'var(--accent)':'var(--line)'};stroke-width:${on?3:1}`},svg);
+       const g=S('g',{style:on?A(.3):''},svg);R(g,x,190,76,50,on?`fill:${HCg(e)}`:'fill:var(--surface-2);stroke:var(--line)',{rx:8});
+       T(g,x+38,212,'expert '+e,{'text-anchor':'middle',style:`font-weight:700;font-size:11.5px;${on?'fill:#fff':''}`});T(g,x+38,230,on?'w = '+wgt.toFixed(2):'idle',{'text-anchor':'middle',style:`font-size:11px;${on?'fill:#fff':'fill:var(--muted)'}`});}
+     T(svg,30,280,'output = Σ w_e · Expert_e(x)  over the 2 chosen experts    shape stays [b, s, h]',{style:'font-weight:700'});}};
+  function controls(){ctl.innerHTML='';
+    if(tab==='sampling'){ctl.innerHTML='<label class="ctl">Temperature <input type="range" id="md-t" min="5" max="200" value="'+T1*100+'"></label><label class="ctl">Top-p <input type="range" id="md-p" min="30" max="100" value="'+P1*100+'"></label>';
+      $('#md-t').oninput=e=>{T1=e.target.value/100;draw();};$('#md-p').oninput=e=>{P1=e.target.value/100;draw();};}
+    if(tab==='moe'){const b=document.createElement('button');b.className='btn solid';b.type='button';b.textContent='Route next token';b.onclick=()=>{tokI=(tokI+1)%6;draw();};ctl.appendChild(b);}}
+  function draw(){clear(svg);V[tab]();}
+  seg($('#md-seg'),[{l:'Pre-norm',v:'prenorm'},{l:'RMSNorm',v:'rms'},{l:'SwiGLU',v:'swiglu'},{l:'Sampling',v:'sampling'},{l:'Mixture of Experts',v:'moe'}],'prenorm',v=>{tab=v;controls();draw();});
+  controls();draw();
+})();
+
+/* nav highlight */
+(function(){const links=[...document.querySelectorAll('nav.rail a')];
+  const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){links.forEach(l=>l.classList.toggle('on',l.getAttribute('href')==='#'+e.target.id));}});},{rootMargin:'-40% 0px -55% 0px'});
+  document.querySelectorAll('main section').forEach(s=>io.observe(s));})();
+</script>
+</body>
+</html>

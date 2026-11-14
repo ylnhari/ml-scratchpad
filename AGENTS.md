@@ -83,6 +83,7 @@ silently describes an older version.
 | https://ylnhari.github.io/ml-scratchpad/inference-engine/ | `inference-engine/inference_engine_explainer.ipynb` (executed) | `make inference-engine-html` |
 | https://ylnhari.github.io/ml-scratchpad/continuous-batching/ | `continuous-batching/continuous_batching_explainer.ipynb` (executed) | `make continuous-batching-html` |
 | https://ylnhari.github.io/ml-scratchpad/additive-inference/ | `additive-inference/additive_inference_explainer.ipynb` (executed) | `make additive-inference-html` |
+| https://ylnhari.github.io/ml-scratchpad/llm-inference-visualized/ | `llm-inference-visualized/index.html` (hand-written source, not a generated export) | edit `index.html` directly |
 
 ## Subfolders
 
@@ -97,6 +98,7 @@ silently describes an older version.
 | continuous-batching/ | Continuous batching request scheduler | continuous_batching_explainer.ipynb | `continuous-batching` |
 | additive-inference/ | Ternary 1.7-bit multiply-free inference (Mach-1 / BitNet) | additive_inference_explainer.ipynb | `additive-inference` |
 | vllm-memory/ | vLLM GPU-memory lifecycle: profile run, KV pool sizing, scheduler steps, preemption | vllm_memory_explainer.ipynb | (numpy + matplotlib only) |
+| llm-inference-visualized/ | Interactive tensor-shape explainer: forward pass, inference optimizations, backward pass, modern-LLM changes | index.html (interactive page; a notebook can't animate the splits) | none |
 
 ## Running
 

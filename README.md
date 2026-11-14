@@ -34,6 +34,7 @@ Then open any notebook and select **Kernel → Change Kernel → Learning (share
 | `inference-engine/` | Paged KV-cache + speculative decoding (vLLM ideas) | `make inference-engine-notebook` |
 | `continuous-batching/` | Rolling-slot request scheduling (vLLM core) | `make continuous-batching-notebook` |
 | `vllm-memory/` | How vLLM budgets GPU memory: profiling, KV pool, scheduler, preemption — also published as a web page: https://ylnhari.github.io/ml-scratchpad/vllm-memory/ | `make vllm-memory-notebook` |
+| `llm-inference-visualized/` | Interactive page: forward pass shapes, every inference optimization (parallelism splits, KV cache, FlashAttention, paging…), backward pass and modern-LLM changes. Read it at https://ylnhari.github.io/ml-scratchpad/llm-inference-visualized/ | open in browser |
 
 ---
 
