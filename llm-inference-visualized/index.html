@@ -1300,7 +1300,7 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
        S('line',{x1:380,y1:124,x2:x+38,y2:190,style:`stroke:${on?'var(--accent)':'var(--line)'};stroke-width:${on?3:1}`},svg);
        const g=S('g',{style:on?A(.3):''},svg);R(g,x,190,76,50,on?`fill:${HCg(e)}`:'fill:var(--surface-2);stroke:var(--line)',{rx:8});
        T(g,x+38,212,'expert '+e,{'text-anchor':'middle',style:`font-weight:700;font-size:11.5px;${on?'fill:var(--on-fill)':''}`});T(g,x+38,230,on?'w = '+wgt.toFixed(2):'idle',{'text-anchor':'middle',style:`font-size:11px;${on?'fill:var(--on-fill)':'fill:var(--muted)'}`});}
-     T(svg,30,280,'output = Σ w_e · Expert_e(x)  over the 2 chosen experts    shape stays [b, s, h]',{style:'font-weight:700'});}};
+     T(svg,30,272,'output = Σ w_e · Expert_e(x), summed over the 2 chosen experts',{style:'font-weight:700'});T(svg,30,292,'shape in = shape out = [b, s, h]',{style:'font-size:12px;fill:var(--muted)'});}};
   function controls(){ctl.innerHTML='';
     if(tab==='sampling'){ctl.innerHTML='<label class="ctl">Temperature <input type="range" id="md-t" min="5" max="200" value="'+T1*100+'"></label><label class="ctl">Top-p <input type="range" id="md-p" min="30" max="100" value="'+P1*100+'"></label>';
       $('#md-t').oninput=e=>{T1=e.target.value/100;draw();};$('#md-p').oninput=e=>{P1=e.target.value/100;draw();};}
