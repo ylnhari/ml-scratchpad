@@ -140,6 +140,8 @@ nav.rail{margin-top:44px}
 .notation dt{font:800 18px var(--f-mono);color:var(--accent)}
 .notation dd{margin:0;color:var(--ink)}
 @media (max-width:760px){.notation{grid-template-columns:1fr}}
+ul.rows{margin:6px 0;padding-left:20px}
+ul.rows li{margin:2px 0}
 footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
@@ -638,7 +640,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       iso(150,215,8,6,2,8,'var(--accent)',{title:'X in',lab:false});arrow(210,240,292,272,null,0);
       iso(640,60,8,6,2,8,'var(--accent)',{title:'X out',an:A(1.1),lab:false});arrow(538,70,600,70,null,1);
       big(560,200,'L = '+M().L);T(svg,560,222,shp(['b','s','h']),{style:'fill:var(--muted)'});T(svg,560,242,'at every boundary',{style:'fill:var(--muted)'});}},
-   {n:'LM head',f:'logits = LN(X) · W_U      W_U ∈ ℝ^(h × V)      → softmax over V at the last position',c:'A final projection turns each h-vector into <b>V</b> logits, one per vocabulary entry. During generation only the <b>last position</b> (dark row) is new information, so serving engines apply the LM head to that row alone, giving [b, 1, V]. Training uses every row, one loss per position. The other rows were still needed inside the layers: their keys and values are what the last token attended to.',
+   {n:'LM head',f:'logits = LN(X) · W_U      W_U ∈ ℝ^(h × V)      → softmax over V at the last position',c:'A final projection turns each h-vector into <b>V</b> logits, one per vocabulary entry. The dark row is the last position. Which rows go through the LM head depends on the job:<ul class="rows"><li><b>Training</b>: all s rows, one loss each</li><li><b>Generation</b>: last row only, [b, 1, V]</li><li><b>Speculative decoding</b>: the last k+1 rows, to check k drafted tokens in one pass (§11)</li><li><b>Scoring a prompt</b> (log-probs): all s rows</li></ul>',
     d(){iso(90,120,8,6,2,10,'var(--accent)',{title:'X'});arrow(165,150,235,150,'·W_U',.1);
       iso(300,110,24,6,2,9,'var(--g2)',{an:A(.3),hl:5,title:'logits  [b, s, V]',lab:{x:'V',y:'s',z:'b'}});
       const cand=[['the',.62],['a',.18],['his',.09],['her',.06],['bed',.05]],g=S('g',{style:A(.9)},svg);
@@ -1444,7 +1446,7 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
    {b:'a2',n:'Residual add',sh:'[b, s, h] + [b, s, h]',c:'The MLP\'s output is added back onto the stream. One transformer block is now complete.'},
    {b:'stack',n:'× L blocks',sh:'[b, s, h] at every boundary',c:'The block is repeated <b>L</b> times (32 in Llama 2 7B, 80 in 70B), each with its own weights. Early blocks tend to capture syntax and local patterns, later ones more abstract meaning. Shape in equals shape out, so blocks stack like bricks.'},
    {b:'fn',n:'Final norm',sh:'[b, s, h] → same',c:'One last normalisation of the residual stream.'},
-   {b:'lm',n:'LM head',sh:'train [b, s, V] · serve [b, 1, V]',c:'A final matrix turns a token\'s h-vector into <b>V scores</b> (logits), one per vocabulary entry: a guess for the token that comes <b>next</b>. In <b>training</b> every position is used, since each predicts its successor, so one pass gives s predictions and s losses. In <b>generation</b> only the last position\'s guess is new, so serving engines run the LM head on that one row: [b, 1, V]. The earlier positions still had to pass through every layer, because their keys and values are what the last token attends to (and what the KV cache stores).'},
+   {b:'lm',n:'LM head',sh:'train [b, s, V] · serve [b, 1, V]',c:'A final matrix turns a token\'s h-vector into <b>V scores</b> (logits): a guess for the next token. Which rows are computed depends on the job:<ul class="rows"><li><b>Training</b>: all s rows, one loss each</li><li><b>Generation</b>: last row only, [b, 1, V]</li><li><b>Speculative decoding</b>: the last k+1 rows, to check k drafted tokens in one pass (§11)</li><li><b>Scoring a prompt</b> (log-probs): all s rows</li></ul>Earlier tokens still pass through every layer, because their keys and values are what the last token attends to.'},
    {b:'sm',n:'Softmax → next token',sh:'[V] → probabilities',c:'Softmax turns the scores into probabilities that sum to 1. A sampler picks one token: the most likely one, or a random draw shaped by temperature and top-p (A2).'},
    {b:'loop',n:'Append and repeat',sh:'s grows by 1',c:'The chosen token is appended to the input, and the whole stack runs again to produce the next one. This loop is called <b>autoregressive</b> decoding. Each step needs the keys and values of every earlier token, which is why the KV cache (§02) and the prefill/decode split (§01) exist.'}];
   const tk=['I','saw','a','dog','ride','in'];
