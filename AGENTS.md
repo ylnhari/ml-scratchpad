@@ -99,7 +99,7 @@ silently describes an older version.
 | continuous-batching/ | Continuous batching request scheduler | continuous_batching_explainer.ipynb | `continuous-batching` |
 | additive-inference/ | Ternary 1.7-bit multiply-free inference (Mach-1 / BitNet) | additive_inference_explainer.ipynb | `additive-inference` |
 | vllm-memory/ | vLLM GPU-memory lifecycle: profile run, KV pool sizing, scheduler steps, preemption | vllm_memory_explainer.ipynb (+ visual/index.html, interactive page with in-browser Python) | (numpy + matplotlib only) |
-| llm-inference-visualized/ | Interactive tensor-shape explainer: forward pass, inference optimizations, backward pass, modern-LLM changes, RoPE word order | index.html (interactive page; a notebook can't animate the splits) | none |
+| llm-inference-visualized/ | Interactive tensor-shape explainer: forward pass, inference optimizations, backward pass, modern-LLM changes, RoPE word order, LoRA fine-tuning | index.html (interactive page; a notebook can't animate the splits) | none |
 
 ## Running
 

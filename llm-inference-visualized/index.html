@@ -197,6 +197,11 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <li><a class="sub" href="#rope-gap"><b>·</b>Same gap, same score</a></li>
     <li><a class="sub" href="#rope-speeds"><b>·</b>Why many speeds</a></li>
     <li><a class="sub" href="#rope-real"><b>·</b>The real speeds</a></li>
+    <li><a href="#lora"><b>A4</b>Fine-tuning with LoRA</a></li>
+    <li><a class="sub" href="#lora-shapes"><b>·</b>The shapes</a></li>
+    <li><a class="sub" href="#lora-where"><b>·</b>Which layers</a></li>
+    <li><a class="sub" href="#lora-train"><b>·</b>Training</a></li>
+    <li><a class="sub" href="#lora-serve"><b>·</b>Merged vs separate</a></li>
   </ol>
 </nav>
 
@@ -208,7 +213,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <nav class="parts" aria-label="Parts">
       <a href="#architecture"><span>PART I</span><b>Foundations</b><small>The transformer, attention, and the tensor shapes everything else is built on.</small></a>
       <a href="#phases"><span>PART II</span><b>Inference optimizations</b><small>Prefill and decode, KV cache, batching, parallelism, attention variants and more.</small></a>
-      <a href="#backward"><span>PART III</span><b>Deeper dive</b><small>The backward pass, training memory, what modern LLMs change, and how RoPE encodes word order.</small></a>
+      <a href="#backward"><span>PART III</span><b>Deeper dive</b><small>The backward pass, training memory, what modern LLMs change, how RoPE encodes word order, and fine-tuning with LoRA.</small></a>
     </nav>
   </div>
 </header>
@@ -589,6 +594,70 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <div class="fig">
     <div class="svgbox"><svg id="rp-svg" viewBox="0 0 760 300" role="img" aria-label="Speed of each of the 64 pairs on a log scale, with the distance at which each completes a full turn"></svg></div>
     <div class="stats" id="rp-stats"></div>
+  </div>
+</section>
+
+<section id="lora">
+  <div class="sh"><span class="n">A4</span><h2>Fine-tuning with LoRA</h2></div>
+  <p class="cap"><b>Fine-tuning</b> means training an existing model a little more so it gets better at one job, such as answering in your company's style. Updating every weight is expensive: for a 7-billion-parameter model, training needs about 16 bytes per weight (section A1), so roughly 110 GB before any activations. <b>LoRA</b> (low-rank adaptation) freezes the original weights and learns a small <b>add-on</b> next to some of the weight matrices instead. This chapter shows its shapes, where it goes, what happens during training, and the two ways to serve it.</p>
+</section>
+
+<section id="lora-shapes">
+  <div class="sh"><span class="n">A4.1</span><h2>The shapes: a big frozen matrix plus two thin ones</h2></div>
+  <p class="cap">Take one weight matrix <b>W</b> of shape [d_in, d_out], for example a query projection of [4096, 4096]. Full fine-tuning would learn a change ΔW of that same size. LoRA assumes the change is simple enough to write as the product of two thin matrices:</p>
+  <ul class="cap">
+    <li><b>A</b> has shape [d_in, r] and squeezes each token's d_in numbers down to just <b>r</b> numbers.</li>
+    <li><b>B</b> has shape [r, d_out] and expands those r numbers back to d_out.</li>
+    <li><b>r</b> is the <b>rank</b>, a small number you choose, typically 8 to 64.</li>
+  </ul>
+  <p class="cap">The layer's output becomes y = x·W + (α / r)·x·A·B. <b>α</b> (alpha) is a fixed scaling setting. B starts at all zeros, so at the first step the add-on contributes nothing and the model behaves exactly like the original. Drag the rank to see how few numbers LoRA trains.</p>
+  <div class="fig">
+    <div class="controls">
+      <label class="ctl">rank r <span class="mono" id="ls-rv"></span><input type="range" id="ls-r" min="0" max="6" value="3"></label>
+      <span class="mono" style="font-size:12px;color:var(--muted)">matrix</span><div class="seg" id="ls-mat"></div>
+    </div>
+    <div class="svgbox"><svg id="ls-svg" viewBox="0 0 760 300" role="img" aria-label="Frozen matrix W next to the thin LoRA matrices A and B"></svg></div>
+    <div class="stats" id="ls-stats"></div>
+  </div>
+</section>
+
+<section id="lora-where">
+  <div class="sh"><span class="n">A4.2</span><h2>Which layers get an adapter</h2></div>
+  <p class="cap">LoRA can sit next to any weight matrix. In each transformer block there are seven candidates: the four attention projections (q, k, v and the output o) and the three MLP matrices (gate, up and down). You choose which ones, and the same choice repeats in every one of the L blocks. The pair of matrices A and B for one weight is called an <b>adapter</b>; all of them together are often called "the LoRA".</p>
+  <p class="cap">Embeddings, norms and the LM head are usually left alone. Adapting more matrices gives the add-on more room to learn, at the cost of more trainable numbers. The counts below are for Llama 2 7B (32 blocks, h = 4096, MLP width 11,008).</p>
+  <div class="fig">
+    <div class="controls">
+      <span class="mono" style="font-size:12px;color:var(--muted)">targets</span><div class="seg" id="lw-seg"></div>
+      <label class="ctl">rank r <span class="mono" id="lw-rv"></span><input type="range" id="lw-r" min="0" max="6" value="3"></label>
+    </div>
+    <div class="svgbox"><svg id="lw-svg" viewBox="0 0 760 300" role="img" aria-label="One transformer block with the adapted weight matrices highlighted"></svg></div>
+    <div class="stats" id="lw-stats"></div>
+  </div>
+</section>
+
+<section id="lora-train">
+  <div class="sh"><span class="n">A4.3</span><h2>What happens during training</h2></div>
+  <p class="cap">The forward pass runs both paths: the frozen W and the small A·B detour, added together. The backward pass still sends gradients <b>through</b> W, because earlier layers need them, but W itself is never updated. Only A and B receive updates, so only they need gradients kept and optimizer state (the extra numbers Adam stores for every trained weight). That is where the memory saving comes from. Step through it.</p>
+  <div class="fig">
+    <div class="controls"><button class="btn" id="lt-prev" type="button">◀ Prev</button><button class="btn" id="lt-next" type="button">Next ▶</button><button class="btn" id="lt-play" type="button">Play</button></div>
+    <div class="chips" id="lt-chips"></div>
+    <div class="note" id="lt-note" style="margin:0 0 10px"></div>
+    <div class="svgbox"><svg id="lt-svg" viewBox="0 0 760 300" role="img" aria-label="LoRA training: forward through both paths, backward updates only A and B"></svg></div>
+  </div>
+</section>
+
+<section id="lora-serve">
+  <div class="sh"><span class="n">A4.4</span><h2>Serving: merged vs separate adapters</h2></div>
+  <p class="cap">After training there are two ways to use the adapter.</p>
+  <ul class="cap">
+    <li><b>Merged</b>: compute W′ = W + (α / r)·A·B once and save it as an ordinary weight matrix. The model has exactly the original shapes, so it runs at exactly the original speed. But each fine-tune is now a full separate copy of the model.</li>
+    <li><b>Separate</b>: keep the one shared base W and add the small x·A·B detour at run time. That costs a little extra compute per token, but adapters are tiny files you can swap in and out. One server can hold one copy of the base and many adapters, and even give each request in a batch a different one.</li>
+  </ul>
+  <p class="cap">Rule of thumb: one fine-tune that serves heavy traffic, merge it; many fine-tunes (one per customer or task), keep them separate on a shared base.</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="lv-seg"></div></div>
+    <div class="svgbox"><svg id="lv-svg" viewBox="0 0 760 300" role="img" aria-label="Merged adapter versus separate adapters on a shared base model"></svg></div>
+    <div class="stats" id="lv-stats"></div>
   </div>
 </section>
 
@@ -1694,6 +1763,94 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
     [0,16,32,48,63].forEach(i=>T(svg,x0+i*bw+bw/2,y1+16,'pair '+i,{'text-anchor':'middle',style:'font-size:10.5px;fill:var(--muted)'}));
     [['fast: tell neighbours apart',x0,'var(--g0)'],['middle: sentence to page',x0+235,'var(--g1)'],['slow: long range, rarely wrap',x0+445,'var(--g3)']].forEach(([t,x,c])=>{R(svg,x,y1+30,10,10,`fill:${c}`,{rx:2});T(svg,x+15,y1+39,t,{style:'font-size:11px'});});
     stats($('#rp-stats'),[{v:'≈ 57°',l:'pair 0 per position'},{v:'≈ 6 tokens',l:'pair 0 full turn'},{v:'≈ 0.0066°',l:'pair 63 per position'},{v:'≈ 54,000 tokens',l:'pair 63 full turn'}]);})();
+})();
+
+
+/* ---------- A4 LoRA ---------- */
+(function(){
+  const RS=[1,4,8,16,32,64,128];
+  const fmtN=n=>n>=1e9?fmt(n/1e9,2)+'B':n>=1e6?fmt(n/1e6,n>=1e7?1:2)+'M':n>=1e3?fmt(n/1e3,1)+'K':String(n);
+  const pct=x=>x<0.01?x.toFixed(4)+'%':x<1?x.toFixed(2)+'%':x.toFixed(1)+'%';
+  /* A4.1 shapes */
+  (function(){const svg=$('#ls-svg');const MATS={q:{n:'W_q (attention)',din:4096,dout:4096},up:{n:'W_up (MLP)',din:4096,dout:11008}};let mk='q';
+    function render(){clear(svg);const r=RS[+$('#ls-r').value];$('#ls-rv').textContent=r;const M=MATS[mk];
+      const sc=150/4096,Wh=M.din*sc,Ww=M.dout*sc*(mk==='up'?0.55:1),y0=50;
+      R(svg,30,y0,Ww,Wh,'fill:var(--idle);stroke:var(--line)',{rx:4});
+      T(svg,30+Ww/2,y0+Wh/2-4,'W  (frozen)',{'text-anchor':'middle',style:'font-weight:700'});T(svg,30+Ww/2,y0+Wh/2+14,`[${M.din.toLocaleString()}, ${M.dout.toLocaleString()}]`,{'text-anchor':'middle',style:'font-size:12px;fill:var(--muted)'});
+      T(svg,30+Ww/2,y0+Wh+22,`${fmtN(M.din*M.dout)} numbers`,{'text-anchor':'middle',style:'font-size:12px'});
+      const bx=30+Ww+50;T(svg,bx-25,y0+Wh/2+6,'+',{'text-anchor':'middle',class:'big'});
+      const rw=Math.max(3,Math.min(60,r*0.9));
+      R(svg,bx,y0,rw,Wh,'fill:var(--g0)',{rx:3});T(svg,bx+rw/2,y0-8,'A',{'text-anchor':'middle',style:'font-weight:800'});
+      T(svg,bx+rw+8,y0+Wh+22,`[${M.din.toLocaleString()}, ${r}]`,{'text-anchor':'middle',style:'font-size:11px;fill:var(--muted)'});
+      const cx=bx+rw+16;T(svg,cx+4,y0+Wh/2+5,'·',{'text-anchor':'middle',class:'big'});
+      const Bw=Math.min(300,M.dout*sc*(mk==='up'?0.55:1));R(svg,cx+18,y0,Bw,rw,'fill:var(--g3)',{rx:3});T(svg,cx+18+Bw/2,y0-8,'B  (starts at zero)',{'text-anchor':'middle',style:'font-weight:800'});
+      T(svg,cx+18+Bw/2,y0+rw+16,`[${r}, ${M.dout.toLocaleString()}]`,{'text-anchor':'middle',style:'font-size:11px;fill:var(--muted)'});
+      const lora=r*(M.din+M.dout),full=M.din*M.dout;
+      T(svg,cx+18,y0+Wh-20,`A and B together: ${fmtN(lora)} numbers`,{style:'font-weight:700;fill:var(--accent)'});
+      T(svg,cx+18,y0+Wh,`= ${pct(100*lora/full)} of W`,{style:'font-weight:700;fill:var(--accent)'});
+      T(svg,30,272,'y = x·W + (α / r)·x·A·B',{style:'font-size:12.5px;font-weight:700'});T(svg,30,292,'shapes of the detour: x [b, s, d_in] → A → [b, s, r] → B → [b, s, d_out]',{style:'font-size:12px;fill:var(--muted)'});
+      stats($('#ls-stats'),[{v:fmtN(full),l:'numbers in W (frozen)'},{v:fmtN(lora),l:'numbers in A + B (trained)'},{v:pct(100*lora/full),l:'trained share of this matrix'}]);}
+    $('#ls-r').oninput=render;seg($('#ls-mat'),[{l:'W_q 4096×4096',v:'q'},{l:'W_up 4096×11008',v:'up'}],'q',v=>{mk=v;render();});render();})();
+
+  /* A4.2 where */
+  (function(){const svg=$('#lw-svg');const h=4096,f=11008,L=32,TOT=6.74e9;
+    const MATS=[['q','attn',h,h],['k','attn',h,h],['v','attn',h,h],['o','attn',h,h],['gate','mlp',h,f],['up','mlp',h,f],['down','mlp',f,h]];
+    const P={qv:['q','v'],attn:['q','k','v','o'],all:['q','k','v','o','gate','up','down']};let pk='qv';
+    function render(){clear(svg);const r=RS[+$('#lw-r').value];$('#lw-rv').textContent=r;const on=P[pk];
+      T(svg,20,24,'one transformer block (repeated 32 times); highlighted = has an adapter',{class:'lbl'});
+      R(svg,20,40,340,200,'fill:none;stroke:var(--line);stroke-dasharray:5 4',{rx:10});T(svg,30,58,'attention',{style:'font-weight:700'});
+      R(svg,400,40,340,200,'fill:none;stroke:var(--line);stroke-dasharray:5 4',{rx:10});T(svg,410,58,'MLP',{style:'font-weight:700'});
+      let per=0;MATS.forEach(([n,grp,din,dout],i)=>{const a=on.includes(n);const j=grp==='attn'?i:i-4;const x=grp==='attn'?36+j*80:420+j*104,w=grp==='attn'?68:92;
+        R(svg,x,90,w,90,`fill:${a?'var(--g1)':'var(--idle)'};stroke:${a?'var(--accent)':'var(--line)'};stroke-width:${a?2.5:1}`,{rx:8});
+        T(svg,x+w/2,128,'W_'+n,{'text-anchor':'middle',style:'font-weight:800'});T(svg,x+w/2,146,`${din/1024}K×${(dout/1024).toFixed(dout%1024?1:0)}K`,{'text-anchor':'middle',style:'font-size:11px;fill:var(--muted)'});
+        if(a){R(svg,x+6,188,w-12,26,'fill:var(--accent)',{rx:6});T(svg,x+w/2,205,'+ A·B',{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700;font-size:12px'});per+=r*(din+dout);}});
+      const tot=per*L;T(svg,20,272,`trained: ${fmtN(per)} per block × 32 blocks = ${fmtN(tot)} numbers, ${pct(100*tot/TOT)} of the 6.74B in Llama 2 7B`,{style:'font-weight:700;fill:var(--accent)'});
+      stats($('#lw-stats'),[{v:on.length+' of 7',l:'matrices adapted per block'},{v:fmtN(tot),l:'trained numbers in total'},{v:pct(100*tot/TOT),l:'of the model'},{v:fmt(tot*2/1e6,0)+' MB',l:'adapter file at 2 bytes each'}]);}
+    $('#lw-r').oninput=render;seg($('#lw-seg'),[{l:'q and v only',v:'qv'},{l:'all attention',v:'attn'},{l:'all seven',v:'all'}],'qv',v=>{pk=v;render();});render();})();
+
+  /* A4.3 training stager */
+  (function(){const svg=$('#lt-svg'),{A,arrow}=makeKit(svg);
+    function base(hl){
+      const box=(x,y,w,h,t,col,lk,d)=>{const g=S('g',{style:A(d||0)},svg);R(g,x,y,w,h,`fill:${col}`,{rx:8});T(g,x+w/2,y+h/2+5,t,{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700'});if(lk)T(g,x+w-14,y+16,'🔒',{'text-anchor':'middle',style:'font-size:12px'});};
+      box(20,120,90,44,'x','var(--accent)');box(220,50,170,50,'W  (frozen)','var(--idle)',true);box(220,180,70,44,'A','var(--g0)');box(320,180,70,44,'B','var(--g3)');
+      box(470,120,60,44,'+','var(--surface-2)');box(620,120,110,44,'y','var(--accent)');
+      return box;}
+    const ST=[
+     {n:'Forward: two paths',f:'y = x·W + (α / r)·x·A·B',c:'The input x goes through the frozen W as usual, and also through the small detour: A squeezes it to r numbers per token, B expands it back. The two results are added (the detour scaled by α / r).',
+      d(){base();arrow(110,135,220,80,null,.1);arrow(110,150,220,200,null,.2);arrow(290,202,320,202,null,.3);arrow(390,80,470,135,null,.4);arrow(390,202,470,150,null,.5);arrow(530,142,620,142,null,.6);}},
+     {n:'Loss',f:'loss = L(rest of the model(y), target)',c:'The output goes on through the rest of the model to a loss, exactly as in normal training (section A1). Nothing about the loss changes.',
+      d(){base();arrow(530,142,620,142,null,0);const g=S('g',{style:A(.2)},svg);R(g,620,220,110,40,'fill:var(--bad);opacity:.85',{rx:8});T(g,675,245,'loss',{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700'});arrow(675,164,675,220,null,.3);}},
+     {n:'Backward: gradients flow through W',f:'∂L/∂x needs W (passed back)      ∂L/∂W not kept: W is frozen',c:'Gradients travel back through both paths. They pass <b>through</b> W, because the layers before this one still need their gradient. But W is frozen, so no gradient for W itself is kept and W never changes.',
+      d(){base();[[620,142,530,142],[470,135,390,80],[220,80,110,135]].forEach((a,i)=>S('line',{x1:a[0],y1:a[1],x2:a[2],y2:a[3],'marker-end':'url(#arr)',style:`stroke:var(--bad);stroke-width:3;stroke-dasharray:6 4;${A(i*.15)}`},svg));T(svg,305,40,'gradient passes through, W not updated',{'text-anchor':'middle',style:'font-size:12px;font-weight:700;fill:var(--bad)'});}},
+     {n:'Update only A and B',f:'A ← A − lr·∂L/∂A      B ← B − lr·∂L/∂B      W unchanged',c:'Only A and B get their own gradients and an optimizer update. Adam keeps two extra numbers per trained weight, so its memory now scales with the adapter (millions of numbers), not the model (billions).',
+      d(){base();[[470,150,390,202],[320,202,290,202]].forEach((a,i)=>S('line',{x1:a[0],y1:a[1],x2:a[2],y2:a[3],'marker-end':'url(#arr)',style:`stroke:var(--bad);stroke-width:3;stroke-dasharray:6 4;${A(i*.15)}`},svg));
+        const g=S('g',{style:A(.3)},svg);R(g,215,232,180,24,'fill:var(--ok)',{rx:6});T(g,305,249,'A, B updated',{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700;font-size:12px'});}},
+     {n:'Memory: full vs LoRA',f:'full: 16 B × 6.74B weights      LoRA: 2 B × 6.74B (frozen) + 16 B × 16.8M (adapter)',c:'Rough memory for Llama 2 7B, ignoring activations. Full fine-tuning: 16 bytes per weight (weight, gradient, FP32 copy, two Adam numbers). LoRA on all attention matrices at r = 16: the frozen base in FP16 (2 bytes per weight) plus 16 bytes per adapter number. Storing the frozen base in 4 bits instead (QLoRA) shrinks the base further.',
+      d(){const sc=560/110,rows=[['full fine-tune',[['weights + grads + Adam',107.8,'var(--g2)']]],['LoRA (FP16 base)',[['frozen base',13.5,'var(--idle)'],['adapter + its Adam',0.27,'var(--accent)']]],['QLoRA (4-bit base)',[['frozen base',3.4,'var(--idle)'],['adapter + its Adam',0.27,'var(--accent)']]]];
+        rows.forEach(([n,parts],i)=>{const y=50+i*75;T(svg,20,y-8,n,{style:'font-weight:700'});let x=20,tot=0;parts.forEach(([l,v,c],j)=>{R(svg,x,y,Math.max(3,v*sc),34,`fill:${c};${A(i*.15+j*.05)}`,{rx:4});x+=Math.max(3,v*sc);tot+=v;});T(svg,x+8,y+23,`≈ ${fmt(tot,tot<10?1:0)} GB`,{class:'big'});});}}];
+    stager({svg,note:$('#lt-note'),chips:$('#lt-chips'),prev:$('#lt-prev'),next:$('#lt-next'),play:$('#lt-play'),stages:ST});})();
+
+  /* A4.4 merged vs separate */
+  (function(){const svg=$('#lv-svg');let mode='merged';
+    function mat(x,y,w,h,t,col,sub){R(svg,x,y,w,h,`fill:${col}`,{rx:8});T(svg,x+w/2,y+h/2+(sub?-2:5),t,{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700'});if(sub)T(svg,x+w/2,y+h/2+15,sub,{'text-anchor':'middle',style:'fill:var(--on-fill);font-size:11px'});}
+    function render(){clear(svg);
+      if(mode==='merged'){T(svg,20,26,'merge once, offline:',{class:'lbl'});
+        mat(20,45,120,60,'W','var(--idle)','frozen base');T(svg,160,80,'+',{'text-anchor':'middle',class:'big'});mat(180,45,120,60,'(α/r)·A·B','var(--accent)');T(svg,320,80,'=',{'text-anchor':'middle',class:'big'});mat(340,45,140,60,"W′",'var(--g1)','same shape as W');
+        T(svg,20,150,'then serve it like any model:',{class:'lbl'});
+        ['request 1','request 2','request 3'].forEach((t,i)=>{R(svg,20,165+i*36,110,28,'fill:var(--surface-2)',{rx:6});T(svg,75,184+i*36,t,{'text-anchor':'middle',style:'font-size:12px'});});
+        S('line',{x1:135,y1:215,x2:200,y2:215,'marker-end':'url(#arr)',style:'stroke:var(--muted);stroke-width:2'},svg);mat(205,180,150,70,"model with W′",'var(--g1)','one fine-tune only');
+        T(svg,400,190,'✓ zero extra compute per token',{style:'font-weight:700;fill:var(--ok)'});T(svg,400,214,'✗ every fine-tune is a full model copy',{style:'font-weight:700;fill:var(--bad)'});T(svg,400,238,'✗ switching tasks means loading another model',{style:'font-weight:700;fill:var(--bad)'});
+        stats($('#lv-stats'),[{v:'0',l:'extra work per token'},{v:'13.5 GB',l:'per fine-tune (7B, FP16)'},{v:'1',l:'task per loaded model'}]);}
+      else{T(svg,20,26,'one shared base, adapters added at run time:',{class:'lbl'});
+        const reqs=[['request 1','customer A','var(--g0)'],['request 2','customer B','var(--g2)'],['request 3','customer A','var(--g0)'],['request 4','customer C','var(--g3)']];
+        reqs.forEach(([t,a,c],i)=>{R(svg,20,50+i*46,150,36,'fill:var(--surface-2)',{rx:6});T(svg,30,73+i*46,t,{style:'font-size:12px'});R(svg,112,58+i*46,50,20,`fill:${c}`,{rx:5});T(svg,137,72+i*46,a.slice(-1),{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700;font-size:11px'});});
+        S('line',{x1:175,y1:140,x2:230,y2:140,'marker-end':'url(#arr)',style:'stroke:var(--muted);stroke-width:2'},svg);
+        mat(235,90,170,100,'shared base W','var(--idle)','loaded once');
+        [['A',0,'var(--g0)'],['B',1,'var(--g2)'],['C',2,'var(--g3)']].forEach(([n,i,c])=>{R(svg,430,70+i*46,90,34,`fill:${c}`,{rx:6});T(svg,475,92+i*46,'adapter '+n,{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700;font-size:12px'});});
+        T(svg,430,225,'each request adds its own x·A·B',{style:'font-size:12px;fill:var(--muted)'});
+        T(svg,560,90,'✓ one base, many tasks',{style:'font-weight:700;fill:var(--ok)'});T(svg,560,114,'✓ adapters are small files',{style:'font-weight:700;fill:var(--ok)'});T(svg,560,138,'✓ mix adapters in one batch',{style:'font-weight:700;fill:var(--ok)'});T(svg,560,162,'✗ a little extra work',{style:'font-weight:700;fill:var(--bad)'});T(svg,574,180,'per token',{style:'font-weight:700;fill:var(--bad)'});
+        stats($('#lv-stats'),[{v:'small',l:'extra work per token (the A·B detour)'},{v:'≈ 34 MB',l:'per adapter (all attention, r = 16)'},{v:'many',l:'tasks per loaded base'}]);}}
+    seg($('#lv-seg'),[{l:'Merged adapter',v:'merged'},{l:'Separate adapters',v:'separate'}],'merged',v=>{mode=v;render();});render();})();
 })();
 
 /* layout: split each figure section into a text column and a figure column */
