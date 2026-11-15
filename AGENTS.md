@@ -75,6 +75,7 @@ silently describes an older version.
 | Page | Source | Regenerate |
 |------|--------|------------|
 | https://ylnhari.github.io/ml-scratchpad/vllm-memory/ | `vllm-memory/vllm_memory_explainer.ipynb` (executed) | `make vllm-memory-html` |
+| https://ylnhari.github.io/ml-scratchpad/vllm-memory/visual/ | `vllm-memory/visual/src/` parts + the notebook's code cells (generated) | `make vllm-memory-visual` |
 | https://ylnhari.github.io/ml-scratchpad/turbo-quant/ | `turbo-quant/turbo_quant_explainer.ipynb` (executed) | `make turbo-quant-html` |
 | https://ylnhari.github.io/ml-scratchpad/attention-transformer/ | `attention-transformer/attention_explainer.ipynb` (executed) | `make attention-transformer-html` |
 | https://ylnhari.github.io/ml-scratchpad/nanogpt-from-scratch/ | `nanogpt-from-scratch/nanogpt_explainer.ipynb` (executed) | `make nanogpt-html` |
@@ -97,7 +98,7 @@ silently describes an older version.
 | inference-engine/ | Paged KV-cache + speculative decoding | inference_engine_explainer.ipynb | `inference-engine` |
 | continuous-batching/ | Continuous batching request scheduler | continuous_batching_explainer.ipynb | `continuous-batching` |
 | additive-inference/ | Ternary 1.7-bit multiply-free inference (Mach-1 / BitNet) | additive_inference_explainer.ipynb | `additive-inference` |
-| vllm-memory/ | vLLM GPU-memory lifecycle: profile run, KV pool sizing, scheduler steps, preemption | vllm_memory_explainer.ipynb | (numpy + matplotlib only) |
+| vllm-memory/ | vLLM GPU-memory lifecycle: profile run, KV pool sizing, scheduler steps, preemption | vllm_memory_explainer.ipynb (+ visual/index.html, interactive page with in-browser Python) | (numpy + matplotlib only) |
 | llm-inference-visualized/ | Interactive tensor-shape explainer: forward pass, inference optimizations, backward pass, modern-LLM changes | index.html (interactive page; a notebook can't animate the splits) | none |
 
 ## Running

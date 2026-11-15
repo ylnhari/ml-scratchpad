@@ -1,7 +1,7 @@
 # ── Shared environment ────────────────────────────────────────────────────────
 # One .venv at ml-scratchpad/ root. Run `make venv` once, then `make kernel`.
 
-.PHONY: venv install kernel deps clean nanogpt-notebook nanogpt-regen kv-cache-notebook kv-cache-regen rope-notebook rope-regen inference-engine-notebook inference-engine-regen continuous-batching-notebook continuous-batching-regen turbo-quant-notebook attention-transformer-notebook turbo-quant-regen attention-transformer-regen additive-inference-notebook additive-inference-regen vllm-memory-notebook vllm-memory-regen vllm-memory-html turbo-quant-html attention-transformer-html nanogpt-html kv-cache-html rope-html inference-engine-html continuous-batching-html additive-inference-html
+.PHONY: venv install kernel deps clean nanogpt-notebook nanogpt-regen kv-cache-notebook kv-cache-regen rope-notebook rope-regen inference-engine-notebook inference-engine-regen continuous-batching-notebook continuous-batching-regen turbo-quant-notebook attention-transformer-notebook turbo-quant-regen attention-transformer-regen additive-inference-notebook additive-inference-regen vllm-memory-notebook vllm-memory-regen vllm-memory-html vllm-memory-visual turbo-quant-html attention-transformer-html nanogpt-html kv-cache-html rope-html inference-engine-html continuous-batching-html additive-inference-html
 
 venv:
 	python -m venv .venv
@@ -121,3 +121,7 @@ clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; \
 	find . -name "*.pyc" -delete 2>/dev/null; \
 	echo "Clean."
+
+# Interactive visual version: https://ylnhari.github.io/ml-scratchpad/vllm-memory/visual/ . Rebuild after editing the notebook or visual/src/.
+vllm-memory-visual:
+	python vllm-memory/visual/src/build.py

@@ -433,6 +433,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <div class="formula" id="pg-table"></div>
     <div class="stats" id="pg-stats"></div>
   </div>
+  <p class="cap">See it at full scale: <a href="https://ylnhari.github.io/ml-scratchpad/vllm-memory/visual/">vLLM Memory, Visualized</a> sizes a real KV pool (27,635 blocks of 16 tokens) and runs vLLM's scheduler over it, with the Python behind every figure runnable in the page.</p>
 </section>
 
 <section id="quant">
@@ -518,7 +519,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 </main>
 </div>
 
-<footer>Source: <a href="https://developer.nvidia.com/blog/mastering-llm-techniques-inference-optimization/">NVIDIA Technical Blog — Mastering LLM Techniques: Inference Optimization</a>. Shapes and formulas follow the article. Grid sizes are scaled down for drawing, and utilisation bars are illustrative. Go deeper with the runnable notebooks in this repo: <a href="https://ylnhari.github.io/ml-scratchpad/attention-transformer/">attention</a> · <a href="https://ylnhari.github.io/ml-scratchpad/rope/">RoPE</a> · <a href="https://ylnhari.github.io/ml-scratchpad/nanogpt-from-scratch/">nanoGPT + backprop</a> · <a href="https://ylnhari.github.io/ml-scratchpad/kv-cache/">KV cache</a> · <a href="https://ylnhari.github.io/ml-scratchpad/continuous-batching/">continuous batching</a> · <a href="https://ylnhari.github.io/ml-scratchpad/inference-engine/">paged KV + speculative decoding</a> · <a href="https://ylnhari.github.io/ml-scratchpad/vllm-memory/">vLLM memory</a>.</footer>
+<footer>Source: <a href="https://developer.nvidia.com/blog/mastering-llm-techniques-inference-optimization/">NVIDIA Technical Blog — Mastering LLM Techniques: Inference Optimization</a>. Shapes and formulas follow the article. Grid sizes are scaled down for drawing, and utilisation bars are illustrative. Go deeper with the runnable notebooks in this repo: <a href="https://ylnhari.github.io/ml-scratchpad/attention-transformer/">attention</a> · <a href="https://ylnhari.github.io/ml-scratchpad/rope/">RoPE</a> · <a href="https://ylnhari.github.io/ml-scratchpad/nanogpt-from-scratch/">nanoGPT + backprop</a> · <a href="https://ylnhari.github.io/ml-scratchpad/kv-cache/">KV cache</a> · <a href="https://ylnhari.github.io/ml-scratchpad/continuous-batching/">continuous batching</a> · <a href="https://ylnhari.github.io/ml-scratchpad/inference-engine/">paged KV + speculative decoding</a> · <a href="https://ylnhari.github.io/ml-scratchpad/vllm-memory/">vLLM memory</a> (and its <a href="https://ylnhari.github.io/ml-scratchpad/vllm-memory/visual/">visual version</a>).</footer>
 
 <script>
 const NS="http://www.w3.org/2000/svg";
@@ -814,13 +815,13 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     for(let l=0;l<32;l++)R(pp,80+l*20,28,17,30,`fill:${G(l>>3)}`,{rx:3});
     for(let g=0;g<4;g++)T(pp,80+g*160+78,74,`GPU ${g} · L${g*8}–${g*8+7}`,{'text-anchor':'middle',style:'font-size:11px'});
     const x0=80,unit=160,w=unit/m,tot=(m+p-1)*w;
-    T(pp,20,106,`SCHEDULE: batch split into ${m} microbatch${m>1?'es':''}`,{class:'lbl'});
+    T(pp,20,96,`SCHEDULE: batch split into ${m} microbatch${m>1?'es':''}`,{class:'lbl'});
     for(let i=0;i<p;i++){const y=118+i*42;T(pp,20,y+21,'GPU '+i,{style:'font-weight:600'});
       R(pp,x0,y,tot,32,'fill:url(#hatch)',{rx:4});
       for(let j=0;j<m;j++){R(pp,x0+(i+j)*w,y,w-1.5,32,`fill:${G(i)};opacity:${j%2?.75:1}`,{rx:3});
         if(w>=20)T(pp,x0+(i+j)*w+w/2,y+21,String(j+1),{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700'});}}
-    S('line',{x1:x0+tot,x2:x0+tot,y1:112,y2:290,style:'stroke:var(--ink);stroke-width:1.5;stroke-dasharray:3 3'},pp);
-    T(pp,x0+tot+4,302,'done',{style:'font-weight:700'});
+    S('line',{x1:x0+tot,x2:x0+tot,y1:114,y2:290,style:'stroke:var(--ink);stroke-width:1.5;stroke-dasharray:3 3'},pp);
+    T(pp,x0+tot,108,'done',{'text-anchor':'middle',style:'font-weight:700'});
     T(pp,x0,302,'time →  (hatched = pipeline bubble, GPU idle)',{class:'lbl'});
     const bub=(p-1)/(m+p-1);
     stats($('#pp-stats'),[{v:'1/4',l:'weights per GPU'},{v:Math.round(bub*100)+'%',l:'bubble (idle) fraction',c:bub>.4?'warn':'good'},
@@ -1008,7 +1009,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     }else{qi=Math.floor(k/8);kj=k%8;orow=qi;ofrac=(kj+1)/8;
       for(let r=0;r<n;r++)for(let c=0;c<n;c++)R(svg,SX+c*ts,SY+r*ts,ts-2,ts-2,'fill:none;stroke:var(--line);stroke-dasharray:2 2',{rx:2});
       R(svg,SX+kj*ts-1,SY+qi*ts-1,ts,ts,'fill:var(--g2);stroke:var(--ink);stroke-width:2');
-      T(svg,SX,SY+n*ts+18,'S never stored: only this tile exists, in SRAM',{style:'font-weight:600;font-size:11px'});}
+      T(svg,SX,SY+n*ts+18,'S never stored:',{style:'font-weight:600;font-size:11px'});T(svg,SX,SY+n*ts+33,'only this tile exists, in SRAM',{style:'font-weight:600;font-size:11px'});}
     T(svg,SX+80,SY-8,'S  [N × N]',{'text-anchor':'middle',style:'font-weight:700'});
     bar(40,'Q',qi,'var(--g0)');bar(76,'K',kj,'var(--g3)');bar(112,'V',kj,'var(--g3)');
     T(svg,392,SY-8,'O',{'text-anchor':'middle',style:'font-weight:700'});

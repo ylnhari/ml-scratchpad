@@ -16,6 +16,8 @@ Llama-3.1-8B-Instruct in BF16 on a single H100 80 GB with vLLM's defaults.
 
 **Read it in a browser, no setup:** https://ylnhari.github.io/ml-scratchpad/vllm-memory/
 
+**Visual version with runnable code:** https://ylnhari.github.io/ml-scratchpad/vllm-memory/visual/ — one interactive figure per idea, and the notebook's Python runs in the page (Pyodide). Source parts live in `visual/src/`; rebuild with `make vllm-memory-visual` (it reads the notebook's code cells, so rebuild after editing the notebook).
+
 Open the notebook with `make vllm-memory-notebook` from the `learning/` root. The notebook is pre-executed;
 all 20 figures are embedded, so it reads without running anything. To change the example, edit
 the constants in the first code cell and re-run.
