@@ -1462,8 +1462,22 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
         if(i<6){const g=S('g',{style:A(.2+i*.08)},svg);S('path',{d:`M${ZX+90} ${130+5*58+15} C ${ZX+200} ${130+5*58+15}, ${ZX+200} ${y+15}, ${ZX+90} ${y+15}`,style:`fill:none;stroke:var(--g0);stroke-width:${1+w[i]*14};opacity:${.25+w[i]}`},g);T(g,ZX+210,y+20,Math.round(w[i]*100)+'%',{style:'font-size:11.5px;font-weight:700'});}});
       T(svg,ZX+20,120,'"in" looks back',{class:'lbl'});},
     a1(){Z._add();},a2(){Z._add();},
-    _add(){const r=mulberry32(9),x=[...Array(6)].map(()=>r()*2+.3),d=[...Array(6)].map(()=>r()*.8-.3);[['stream x',x,'var(--accent)'],['+ sublayer Δ',d,'var(--g0)'],['= x + Δ',x.map((v,i)=>v+d[i]),'var(--accent)']].forEach((s,i)=>{const ox=ZX+15+i*88;T(svg,ox,150,s[0],{class:'lbl'});
-      s[1].forEach((v,j)=>R(svg,v<0?ox+30+v*25:ox+30,165+j*34,Math.abs(v)*25,26,`fill:${s[2]};${A(i*.25+j*.04)}`,{rx:3}));});},
+    _add(){const r=mulberry32(9),x=[...Array(6)].map(()=>r()*1.6+.5),d=[...Array(6)].map((_,i)=>[.5,-.35,.7,.25,-.2,.45][i]),u=24;
+      const M='font-family:var(--f-body);font-style:italic;';
+      T(svg,CX,124,'x′ = x + Δx',{'text-anchor':'middle',style:M+'font-size:24px;font-weight:600'});
+      T(svg,CX,146,'Δx = sublayer(norm(x))',{'text-anchor':'middle',style:M+'font-size:14px;fill:var(--muted)'});
+      const cols=[[ZX+18,'x','stream in','var(--accent)'],[ZX+108,'Δx','sublayer','var(--g1)'],[ZX+192,'x′','stream out','']];
+      cols.forEach(([ox,sym,sub,col],i)=>{T(svg,ox,182,sym,{style:M+`font-size:20px;font-weight:600;fill:${col||'var(--ink)'}`});T(svg,ox,198,sub,{style:'font-size:10.5px;fill:var(--muted)'});});
+      T(svg,ZX+92,320,'+',{'text-anchor':'middle',style:'font-size:22px;font-weight:700'});T(svg,ZX+180,320,'=',{'text-anchor':'middle',style:'font-size:22px;font-weight:700'});
+      for(let j=0;j<6;j++){const y=212+j*36,dl=A(.05*j);
+        R(svg,ZX+18,y,x[j]*u,26,`fill:var(--accent);${dl}`,{rx:3});
+        const dx=d[j];R(svg,dx<0?ZX+108+30+dx*u:ZX+108+30,y,Math.abs(dx)*u,26,`fill:var(--g1);${A(.2+.05*j)}`,{rx:3});
+        S('line',{x1:ZX+138,x2:ZX+138,y1:y-3,y2:y+29,style:'stroke:var(--muted);stroke-width:1'},svg);
+        const xo=ZX+192;
+        if(dx>=0){R(svg,xo,y,x[j]*u,26,`fill:var(--accent);${A(.4+.05*j)}`);R(svg,xo+x[j]*u,y,dx*u,26,`fill:var(--g1);${A(.45+.05*j)}`,{rx:3});}
+        else{R(svg,xo,y,(x[j]+dx)*u,26,`fill:var(--accent);${A(.4+.05*j)}`,{rx:3});R(svg,xo+(x[j]+dx)*u,y,-dx*u,26,`fill:url(#hatch);${A(.45+.05*j)}`);}}
+      T(svg,ZX+18,440,'each row = one of the h numbers',{style:'font-size:10.5px;fill:var(--muted)'});
+      T(svg,ZX+18,458,'amber = added · hatched = removed',{style:'font-size:10.5px;fill:var(--muted)'});},
     mlp(){const cols=[[6,'h'],[14,'ffn'],[6,'h']],xs=[ZX+40,CX,ZX+ZW-40];cols.forEach((c,i)=>{const n=c[0],sp=320/(n-1);T(svg,xs[i],140,c[1],{'text-anchor':'middle',class:'lbl'});
       for(let j=0;j<n;j++){const y=160+j*sp;if(i<2){const m=cols[i+1][0],sp2=320/(m-1);for(let q=0;q<m;q+=i?2:3)S('line',{x1:xs[i],y1:y,x2:xs[i+1],y2:160+q*sp2,style:'stroke:var(--g2);opacity:.18'},svg);}
         S('circle',{cx:xs[i],cy:y,r:7,style:`fill:var(--g2);${A(i*.25+j*.02)}`},svg);}});
