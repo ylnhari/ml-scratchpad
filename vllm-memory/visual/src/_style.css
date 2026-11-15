@@ -103,7 +103,7 @@ table.sum td.ok{color:var(--ok);font-weight:600}
 table.sum td.no{color:var(--bad);font-weight:600}
 /* wide screens: text column (sticky) beside the figure column */
 @media (min-width:1280px){
-  section.split{display:grid;grid-template-columns:minmax(300px,370px) minmax(0,1fr);gap:44px;align-items:start}
+  section.split{display:grid;grid-template-columns:minmax(340px,440px) minmax(0,1fr);gap:48px;align-items:start}
   section.split>.col-text{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}
   section.split>.col-fig{min-width:0}
   section.split>.col-fig>.fig:first-child{margin-top:0}
@@ -135,3 +135,7 @@ ul.rows{margin:6px 0;padding-left:20px}
 ul.rows li{margin:2px 0}
 footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* text column is the reading column: larger type on wide screens, where the figure leaves room */
+@media (min-width:1280px){body{font-size:16px}.col-text .cap,.col-text p,.col-text li,.col-text .note{font-size:17px;line-height:1.6}.col-text h2{font-size:30px}.notation dd,.part .cap,.dek{font-size:17px}.note{font-size:15px;line-height:1.55}nav.rail a{font-size:14px}}
+@media (min-width:1700px){section.split{grid-template-columns:minmax(380px,500px) minmax(0,1fr)}.col-text .cap,.col-text p,.col-text li,.col-text .note{font-size:18.5px}.notation dd,.part .cap{font-size:18px}}
