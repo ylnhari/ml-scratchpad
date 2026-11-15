@@ -1,0 +1,176 @@
+<div class="wrap">
+<nav class="rail" aria-label="Sections">
+  <ol>
+    <li class="grp">THE EXAMPLE</li>
+    <li><a href="#example"><b>00</b>The worked example</a></li>
+    <li><a href="#weights"><b>01</b>Weights</a></li>
+    <li><a href="#kvtoken"><b>02</b>KV cache per token</a></li>
+    <li class="grp">STARTUP</li>
+    <li><a href="#startup"><b>03</b>Second by second</a></li>
+    <li><a href="#pool"><b>04</b>Sizing the KV pool</a></li>
+    <li class="grp">SERVING</li>
+    <li><a href="#request"><b>05</b>One request</a></li>
+    <li><a href="#scheduler"><b>06</b>The scheduler loop</a></li>
+    <li><a href="#limits"><b>07</b>Concurrency limits</a></li>
+    <li><a href="#batching"><b>08</b>Why batching is cheap</a></li>
+    <li class="grp">RUN IT</li>
+    <li><a href="#run"><b>09</b>Run the notebook's code</a></li>
+  </ol>
+</nav>
+<main>
+<header class="top">
+  <h1>vLLM Memory, Visualized</h1>
+  <p class="dek">What happens to a GPU's memory from the moment you type <code>vllm serve</code> to the thousandth request. One worked example runs through every figure, and the Python behind each one runs right here in your browser.</p>
+  <nav class="parts" aria-label="Parts">
+    <a href="#example"><span>PART I</span><b>The example and the cache</b><small>The model, the GPU, the flags, and how big one token's memory is.</small></a>
+    <a href="#startup"><span>PART II</span><b>Startup</b><small>Weights, the profile run, and how the KV pool is sized before any request arrives.</small></a>
+    <a href="#request"><span>PART III</span><b>Serving</b><small>One request, then many: blocks, the scheduler, preemption and throughput.</small></a>
+  </nav>
+</header>
+
+<div class="part"><span>PART I</span><h3>The example and the cache</h3>
+  <p class="cap">Every number on this page is computed from one setup by the code of the notebook this page is drawn from. A few words first.</p>
+  <div class="notation">
+    <dl>
+      <dt>token</dt><dd>a word or piece of a word, the unit the model reads and writes</dd>
+      <dt>GiB</dt><dd>2<sup>30</sup> bytes (MiB = 2<sup>20</sup>, KiB = 2<sup>10</sup>), the units vLLM's logs use</dd>
+      <dt>KV cache</dt><dd>the keys and values every earlier token left behind, kept on the GPU so they are not recomputed at each new token</dd>
+      <dt>block</dt><dd>vLLM stores the KV cache in fixed blocks of <b>16 tokens</b>, so memory is handed out in small, equal pieces</dd>
+      <dt>util</dt><dd><code>--gpu-memory-utilization</code>: the share of the GPU vLLM may use for everything</dd>
+    </dl>
+  </div>
+</div>
+
+<section id="example">
+  <div class="sh"><span class="n">00</span><h2>The worked example</h2></div>
+  <p class="cap">Llama-3.1-8B-Instruct in BF16 on one NVIDIA H100 80 GB, with vLLM's default flags except where noted. Change any of these in §09 and re-run the code.</p>
+  <details class="code"><summary>The notebook's setup cell</summary><pre id="code-setup"></pre></details>
+  <div class="fig"><div id="ex-cards" class="excards"></div></div>
+</section>
+
+<section id="weights">
+  <div class="sh"><span class="n">01</span><h2>Weights: a fixed cost paid once</h2></div>
+  <p class="cap">The model is 8.03 billion numbers. How many bytes each takes (its <b>precision</b>) sets the size of the weights, which are loaded once at startup and never move.</p>
+  <details class="code"><summary>The notebook's code</summary><pre id="code-weights"></pre></details>
+  <div class="fig"><div class="svgbox"><svg id="w-svg" viewBox="0 0 760 250" role="img" aria-label="Weight size by precision"></svg></div></div>
+</section>
+
+<section id="kvtoken">
+  <div class="sh"><span class="n">02</span><h2>The KV cache, one token at a time</h2></div>
+  <p class="cap">Every token a request has seen leaves a key and a value in <b>every layer</b>. Llama-3.1-8B has 32 layers, and 8 key/value heads of 128 numbers each (its 32 query heads share them, which is grouped-query attention).</p>
+  <p class="cap">So one token costs 2 × 8 × 128 × 2 bytes per layer, times 32 layers. Drag the slider to grow one request.</p>
+  <details class="code"><summary>The notebook's code</summary><pre id="code-kv"></pre></details>
+  <div class="fig">
+    <div class="controls"><label class="ctl">tokens in the request <span class="mono" id="kv-n"></span><input type="range" id="kv-r" min="0" max="32768" step="256" value="1024"></label></div>
+    <div class="svgbox"><svg id="kv-svg" viewBox="0 0 760 330" role="img" aria-label="KV cache per token and per request"></svg></div>
+    <div class="stats" id="kv-stats"></div>
+  </div>
+</section>
+
+<div class="part"><span>PART II</span><h3>Startup</h3><p class="cap">Before the first request, vLLM decides how much memory the KV cache gets and takes all of it at once.</p></div>
+
+<section id="startup">
+  <div class="sh"><span class="n">03</span><h2>Startup, second by second</h2></div>
+  <p class="cap">Memory on the GPU changes in a fixed order when the server starts. Step through the phases. Times are typical for an 8B model; the order is what matters.</p>
+  <details class="code"><summary>The notebook's code</summary><pre id="code-pool"></pre></details>
+  <div class="fig">
+    <div class="controls"><button class="btn solid" id="su-prev" type="button">◀ Prev</button><button class="btn solid" id="su-next" type="button">Next ▶</button><button class="btn solid" id="su-play" type="button">Play all</button></div>
+    <div class="chips" id="su-chips"></div>
+    <div class="note" id="su-note" style="margin:10px 0"></div>
+    <div class="svgbox"><svg id="su-svg" viewBox="0 0 760 330" role="img" aria-label="GPU memory during startup"></svg></div>
+  </div>
+</section>
+
+<section id="pool">
+  <div class="sh"><span class="n">04</span><h2>Sizing the KV pool</h2></div>
+  <p class="cap">The pool is whatever is left under the budget: <b>budget − weights − the measured activation peak − other workspaces</b>. It is split into 16-token blocks, and vLLM prints two lines that summarise everything.</p>
+  <p class="cap">The <b>activation peak</b> is measured by a dummy run of the largest possible step, and real logs show it varies by two orders of magnitude between models. Try the measured values below; 4.0 GiB is the notebook's placeholder for this example.</p>
+  <details class="code"><summary>The notebook's code</summary><pre id="code-blocks"></pre></details>
+  <div class="fig">
+    <div class="controls">
+      <label class="ctl">--gpu-memory-utilization <span class="mono" id="pl-uv"></span><input type="range" id="pl-u" min="0.80" max="0.98" step="0.01" value="0.92"></label>
+      <div class="seg" id="pl-kv"></div>
+    </div>
+    <div class="controls"><span class="mono" style="font-size:12px;color:var(--muted)">activation peak</span><div class="seg" id="pl-peak"></div></div>
+    <div class="svgbox"><svg id="pl-svg" viewBox="0 0 760 210" role="img" aria-label="Who owns the GPU memory"></svg></div>
+    <pre class="log" id="pl-log"></pre>
+    <div class="stats" id="pl-stats"></div>
+  </div>
+</section>
+
+<div class="part"><span>PART III</span><h3>Serving</h3><p class="cap">The pool is reserved and empty. Requests now borrow blocks from it and give them back.</p></div>
+
+<section id="request">
+  <div class="sh"><span class="n">05</span><h2>One request, start to finish</h2></div>
+  <p class="cap">A request arrives with a 1,000-token prompt and asks for up to 300 new tokens. Two times matter to the user: <b>TTFT</b>, the time to the first token, and <b>ITL</b>, the inter-token latency between the tokens that follow.</p>
+  <details class="code"><summary>The notebook's code</summary><pre id="code-request"></pre></details>
+  <div class="fig">
+    <div class="controls"><button class="btn solid" id="rq-prev" type="button">◀ Prev</button><button class="btn solid" id="rq-next" type="button">Next ▶</button><button class="btn solid" id="rq-play" type="button">Play all</button></div>
+    <div class="chips" id="rq-chips"></div>
+    <div class="note" id="rq-note" style="margin:10px 0"></div>
+    <div class="svgbox"><svg id="rq-svg" viewBox="0 0 760 330" role="img" aria-label="One request's blocks and time"></svg></div>
+  </div>
+</section>
+
+<section id="scheduler">
+  <div class="sh"><span class="n">06</span><h2>Many requests: the scheduler loop</h2></div>
+  <p class="cap">Every step, vLLM's scheduler runs this loop, which the notebook implements in about 40 lines:</p>
+  <pre class="loop">budget = max_num_batched_tokens
+1. each RUNNING request gets 1 token (or its
+   next prompt chunk); allocate a block if needed.
+   No free block? PREEMPT the newest running
+   request: free its blocks, re-queue it.
+2. admit WAITING requests while budget and
+   max_num_seqs allow (long prompts are chunked)
+3. run ONE forward pass for everything scheduled
+4. finished requests free all their blocks</pre>
+  <p class="cap">Both runs below are the notebook's own, with its exact seeds and results.</p>
+  <details class="code"><summary>The notebook's simulator</summary><pre id="code-sim"></pre></details>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="sc-seg"></div><button class="btn solid" id="sc-play" type="button">Play</button><label class="ctl" style="flex:1;min-width:200px">step <span class="mono" id="sc-sv"></span><input type="range" id="sc-r" min="0" max="385" value="12" style="width:100%"></label></div>
+    <div id="sc-gridwrap"><p class="lbl-h" id="sc-gl"></p><canvas id="sc-grid" width="1440" height="240" aria-label="Block table"></canvas></div>
+    <div class="svgbox"><svg id="sc-svg" viewBox="0 0 760 300" role="img" aria-label="Running, waiting and pool use per step"></svg></div>
+    <div class="stats" id="sc-stats"></div>
+    <div class="note" id="sc-note"></div>
+  </div>
+</section>
+
+<section id="limits">
+  <div class="sh"><span class="n">07</span><h2>The three concurrency limits</h2></div>
+  <p class="cap">"How many users at once?" has several answers, and the smallest wins. Short requests hit <code>--max-num-seqs</code>; long ones run out of KV pool. <code>--max-num-batched-tokens</code> never limits how many run, only how fast prompts get in. The pool here follows the settings you chose in §04.</p>
+  <details class="code"><summary>The notebook's code</summary><pre id="code-limits"></pre></details>
+  <div class="fig">
+    <div class="controls"><span class="mono" style="font-size:12px;color:var(--muted)">--max-num-seqs</span><div class="seg" id="lm-seg"></div></div>
+    <div class="svgbox"><svg id="lm-svg" viewBox="0 0 760 320" role="img" aria-label="Concurrency limits by request length"></svg></div>
+    <div class="stats" id="lm-stats"></div>
+  </div>
+</section>
+
+<section id="batching">
+  <div class="sh"><span class="n">08</span><h2>Why batching is nearly free</h2></div>
+  <p class="cap">A decode step reads all 15 GiB of weights to produce one token per request. Reading them once for 1 request or for 256 costs about the same, so the step time barely moves while throughput climbs. Each user still sees about one token per step.</p>
+  <details class="code"><summary>The notebook's code</summary><pre id="code-speed"></pre></details>
+  <div class="fig">
+    <div class="svgbox"><svg id="bt-svg" viewBox="0 0 760 300" role="img" aria-label="Step time and throughput by batch size"></svg></div>
+    <div class="stats" id="bt-stats"></div>
+  </div>
+</section>
+
+<section id="run">
+  <div class="sh"><span class="n">09</span><h2>Run the notebook's code</h2></div>
+  <p class="cap">This is the notebook's calculation code, minus the plotting. Press <b>Run</b> and real Python (Pyodide, with NumPy) executes it in your browser and prints the same lines the notebook prints. Edit any constant, such as <code>UTIL</code>, <code>MAX_MODEL_LEN</code> or <code>BYTES_KV = 1</code> for an FP8 cache, and run again.</p>
+  <p class="cap">The first run downloads about 10 MB. For the full notebook with every figure, open it in <a href="https://colab.research.google.com/github/ylnhari/ml-scratchpad/blob/main/vllm-memory/vllm_memory_explainer.ipynb">Google Colab</a>, view it on <a href="https://github.com/ylnhari/ml-scratchpad/blob/main/vllm-memory/vllm_memory_explainer.ipynb">GitHub</a>, or read the <a href="https://ylnhari.github.io/ml-scratchpad/vllm-memory/">executed version</a>.</p>
+  <div class="fig">
+    <div class="controls"><button class="btn solid" id="py-run" type="button">▶ Run</button><button class="btn solid" id="py-reset" type="button">Reset code</button><span class="mono" id="py-status" style="font-size:12px;color:var(--muted)">not started</span></div>
+    <textarea id="py-code" spellcheck="false" aria-label="Python code"></textarea>
+    <p class="lbl-h">OUTPUT</p>
+    <pre class="log" id="py-out">Press Run. Expected output, from the notebook:
+per token : 32 layers × 4,096 B = 131,072 B = 128 KiB
+GPU KV cache size: 442,160 tokens   (27,635 blocks of 16)
+…</pre>
+  </div>
+</section>
+
+</main>
+</div>
+<footer>New to the transformer, the KV cache or batching? Start with <a href="https://ylnhari.github.io/ml-scratchpad/llm-inference-visualized/">LLM Inference, Visualized</a>. <footer>Drawn from the notebook <a href="https://github.com/ylnhari/ml-scratchpad/tree/main/vllm-memory">ml-scratchpad/vllm-memory</a>, which cites vLLM's source (<code>vllm/v1/worker/gpu_model_runner.py</code>, <code>vllm/v1/core/sched/scheduler.py</code>), the model's HuggingFace config and public startup logs. The activation peak of 4.0 GiB is the notebook's placeholder; your server's log prints the measured value. Times use the notebook's model of 60% of peak hardware throughput.</footer>
