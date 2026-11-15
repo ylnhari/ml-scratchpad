@@ -37,7 +37,7 @@
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body)}
 a{color:var(--accent)}
-header{max-width:1640px;margin:0 auto;padding:44px 20px 20px}
+
 h1{font:800 clamp(34px,5vw,58px)/1.02 var(--f-display);margin:0 0 10px;letter-spacing:-.02em;text-wrap:balance}
 .dek{color:var(--muted);max-width:70ch;margin:0}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;font:500 13px var(--f-mono)}
@@ -120,6 +120,17 @@ table.sum td.no{color:var(--bad);font-weight:600}
 }
 .col-text .cap{max-width:none}
 ul.cap{padding-left:20px}
+header.top{max-width:1640px;margin:0 auto;padding:44px 24px 8px}
+@media (min-width:901px){header.top .top-in{margin-left:240px}}
+.parts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:22px}
+.parts a{display:block;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;transition:border-color .15s,transform .15s}
+.parts a:hover{border-color:var(--accent);transform:translateY(-2px)}
+.parts span{font:700 11px var(--f-mono);letter-spacing:.12em;color:var(--accent)}
+.parts b{display:block;font:700 18px var(--f-display);margin:2px 0 4px}
+.parts small{display:block;color:var(--muted);font-size:13px;line-height:1.45}
+@media (max-width:700px){.parts{grid-template-columns:1fr}}
+.sw.hatch{background:repeating-linear-gradient(45deg,var(--muted) 0 2px,transparent 2px 6px);border:1px solid var(--muted)}
+.legend .lk{color:var(--muted);font-family:var(--f-body)}
 footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
@@ -135,16 +146,15 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   </defs>
 </svg>
 
-<header>
-  <h1>LLM Inference, Visualized</h1>
-  <p class="dek">How a large language model turns text into the next token, and how inference systems make that fast, drawn as live figures you can step through. Part I builds the model with the tensor shapes you need. Part II covers the optimisations. Part III goes deeper, into training and what modern LLMs change. Each GPU keeps the same colour throughout.</p>
-  <div class="legend">
-    <span><i class="sw" style="background:var(--g0)"></i>GPU 0</span>
-    <span><i class="sw" style="background:var(--g1)"></i>GPU 1</span>
-    <span><i class="sw" style="background:var(--g2)"></i>GPU 2</span>
-    <span><i class="sw" style="background:var(--g3)"></i>GPU 3</span>
-    <span><i class="sw" style="background:url(#hatch);border:1px solid var(--muted)"></i>idle / wasted</span>
-    <span>s = sequence · h = hidden (d_model) · t = GPUs</span>
+<header class="top">
+  <div class="top-in">
+    <h1>LLM Inference, Visualized</h1>
+    <p class="dek">How a large language model turns text into the next token, and how inference systems make that fast. Every idea is a live figure you can step through.</p>
+    <nav class="parts" aria-label="Parts">
+      <a href="#architecture"><span>PART I</span><b>Foundations</b><small>The transformer, attention, and the tensor shapes everything else is built on.</small></a>
+      <a href="#phases"><span>PART II</span><b>Inference optimizations</b><small>Prefill and decode, KV cache, batching, parallelism, attention variants and more.</small></a>
+      <a href="#backward"><span>PART III</span><b>Deeper dive</b><small>The backward pass, training memory, and what modern LLMs change.</small></a>
+    </nav>
   </div>
 </header>
 
@@ -277,6 +287,14 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 <section id="parallel">
   <div class="sh"><span class="n">04</span><h2>Model parallelism</h2></div>
   <p class="cap">One GPU is rarely enough. This chapter takes the strategies one at a time: why we need them, what each one splits, and what it costs. They all reuse the shapes from §00.</p>
+  <div class="legend" aria-label="Colour key">
+    <span><i class="sw" style="background:var(--g0)"></i>GPU 0</span>
+    <span><i class="sw" style="background:var(--g1)"></i>GPU 1</span>
+    <span><i class="sw" style="background:var(--g2)"></i>GPU 2</span>
+    <span><i class="sw" style="background:var(--g3)"></i>GPU 3</span>
+    <span><i class="sw hatch"></i>idle or wasted</span>
+    <span class="lk">each GPU keeps its colour in every figure from here on · t = number of GPUs</span>
+  </div>
   <div class="note">Every strategy answers one question: <b>which dimension of which tensor gets cut, and what must travel between GPUs as a result?</b> DP cuts the batch b, PP cuts the layer stack, TP cuts the weights (and with them h, the heads and ffn), SP cuts the sequence s, and EP cuts the set of experts.</div>
 </section>
 <section id="par-why">
