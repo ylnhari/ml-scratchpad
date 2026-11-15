@@ -68,8 +68,8 @@ const path=(pts)=>pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)
       S('line',{x1:o.X(0),x2:o.X(60),y1:o.Y(b.req),y2:o.Y(b.req),style:`stroke:var(--ink);stroke-dasharray:5 4;stroke-width:${id==='B'?2.5:1}`},svg);T(svg,o.X(0)+4,o.Y(b.req)-5,'budget ceiling 73.2 GiB',{style:`font-size:10.5px;font-weight:${id==='B'?800:500}`});
       const pts=[];for(let s=0;s<=tEnd;s+=.05)pts.push([o.X(s),o.Y(mem(s))]);
       S('path',{d:path(pts),style:'stroke:var(--accent);stroke-width:3;fill:none'},svg);
-      PH.forEach(([pid,,pt],j)=>{if(j<=i){S('line',{x1:o.X(pt),x2:o.X(pt),y1:30,y2:280,style:'stroke:var(--muted);stroke-dasharray:2 3;opacity:.6'},svg);T(svg,o.X(pt)+3,46,pid,{style:`font-weight:800;fill:${j===i?'var(--accent)':'var(--muted)'}`});}});
-      const now=mem(id==='D'?31.5:tEnd-.01);const g=S('g',{style:A(.2)},svg);T(g,o.X(Math.min(tEnd,52)),o.Y(now)-10,fmt(now,1)+' GiB',{'text-anchor':'middle',style:'font-weight:800'});}}));
+      PH.forEach(([pid,,pt],j)=>{if(j<=i){S('line',{x1:o.X(pt),x2:o.X(pt),y1:30,y2:280,style:'stroke:var(--muted);stroke-dasharray:2 3;opacity:.6'},svg);T(svg,o.X(pt)+3,272,pid,{style:`font-weight:800;fill:${j===i?'var(--accent)':'var(--muted)'}`});}});
+      const now=mem(id==='D'?31.5:tEnd-.01);const g=S('g',{style:A(.2)},svg);T(g,o.X(Math.min(tEnd,52)),o.Y(now)-(now<10?30:10),fmt(now,1)+' GiB',{'text-anchor':'middle',style:'font-weight:800'});}}));
   stager({svg,note:$('#su-note'),chips:$('#su-chips'),prev:$('#su-prev'),next:$('#su-next'),play:$('#su-play'),stages:ST});})();
 
 /* ---------- 04 KV pool ---------- */

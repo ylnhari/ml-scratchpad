@@ -112,7 +112,8 @@ table.sum td.ok{color:var(--ok);font-weight:600}
 table.sum td.no{color:var(--bad);font-weight:600}
 /* wide screens: text column (sticky) beside the figure column */
 @media (min-width:1280px){
-  section.split{display:grid;grid-template-columns:minmax(340px,440px) minmax(0,1fr);gap:48px;align-items:start}
+  section.split{display:grid;grid-template-columns:minmax(300px,370px) minmax(0,1fr);gap:44px;align-items:start}
+  section.split .svgbox svg{min-width:0}
   section.split>.col-text{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}
   section.split>.col-fig{min-width:0}
   section.split>.col-fig>.fig:first-child{margin-top:0}
@@ -167,7 +168,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 /* text column is the reading column: larger type on wide screens, where the figure leaves room */
 @media (min-width:1280px){body{font-size:16px}.col-text .cap,.col-text p,.col-text li,.col-text .note{font-size:17px;line-height:1.6}.col-text h2{font-size:30px}.notation dd,.part .cap,.dek{font-size:17px}.note{font-size:15px;line-height:1.55}nav.rail a{font-size:14px}}
-@media (min-width:1700px){section.split{grid-template-columns:minmax(380px,500px) minmax(0,1fr)}.col-text .cap,.col-text p,.col-text li,.col-text .note{font-size:18.5px}.notation dd,.part .cap{font-size:18px}}
+@media (min-width:1900px){.col-text .cap,.col-text p,.col-text li,.col-text .note{font-size:18.5px}.notation dd,.part .cap{font-size:18px}}
 </style>
 </head>
 <body>
@@ -244,7 +245,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <details class="code"><summary>The notebook's code</summary><pre id="code-kv"></pre></details>
   <div class="fig">
     <div class="controls"><label class="ctl">tokens in the request <span class="mono" id="kv-n"></span><input type="range" id="kv-r" min="0" max="32768" step="256" value="1024"></label></div>
-    <div class="svgbox"><svg id="kv-svg" viewBox="0 0 760 330" role="img" aria-label="KV cache per token and per request"></svg></div>
+    <div class="svgbox"><svg id="kv-svg" viewBox="0 0 760 344" role="img" aria-label="KV cache per token and per request"></svg></div>
     <div class="stats" id="kv-stats"></div>
   </div>
 </section>
@@ -497,8 +498,8 @@ const path=(pts)=>pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)
       S('line',{x1:o.X(0),x2:o.X(60),y1:o.Y(b.req),y2:o.Y(b.req),style:`stroke:var(--ink);stroke-dasharray:5 4;stroke-width:${id==='B'?2.5:1}`},svg);T(svg,o.X(0)+4,o.Y(b.req)-5,'budget ceiling 73.2 GiB',{style:`font-size:10.5px;font-weight:${id==='B'?800:500}`});
       const pts=[];for(let s=0;s<=tEnd;s+=.05)pts.push([o.X(s),o.Y(mem(s))]);
       S('path',{d:path(pts),style:'stroke:var(--accent);stroke-width:3;fill:none'},svg);
-      PH.forEach(([pid,,pt],j)=>{if(j<=i){S('line',{x1:o.X(pt),x2:o.X(pt),y1:30,y2:280,style:'stroke:var(--muted);stroke-dasharray:2 3;opacity:.6'},svg);T(svg,o.X(pt)+3,46,pid,{style:`font-weight:800;fill:${j===i?'var(--accent)':'var(--muted)'}`});}});
-      const now=mem(id==='D'?31.5:tEnd-.01);const g=S('g',{style:A(.2)},svg);T(g,o.X(Math.min(tEnd,52)),o.Y(now)-10,fmt(now,1)+' GiB',{'text-anchor':'middle',style:'font-weight:800'});}}));
+      PH.forEach(([pid,,pt],j)=>{if(j<=i){S('line',{x1:o.X(pt),x2:o.X(pt),y1:30,y2:280,style:'stroke:var(--muted);stroke-dasharray:2 3;opacity:.6'},svg);T(svg,o.X(pt)+3,272,pid,{style:`font-weight:800;fill:${j===i?'var(--accent)':'var(--muted)'}`});}});
+      const now=mem(id==='D'?31.5:tEnd-.01);const g=S('g',{style:A(.2)},svg);T(g,o.X(Math.min(tEnd,52)),o.Y(now)-(now<10?30:10),fmt(now,1)+' GiB',{'text-anchor':'middle',style:'font-weight:800'});}}));
   stager({svg,note:$('#su-note'),chips:$('#su-chips'),prev:$('#su-prev'),next:$('#su-next'),play:$('#su-play'),stages:ST});})();
 
 /* ---------- 04 KV pool ---------- */

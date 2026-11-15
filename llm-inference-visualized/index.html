@@ -78,7 +78,7 @@ label.ctl{display:grid;gap:3px;font-size:12px;color:var(--muted)}
 select,input[type=range]{font:500 13px var(--f-body);color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
 input[type=range]{padding:0;accent-color:var(--accent);width:170px}
 .mono{font-family:var(--f-mono)}
-.formula{font:500 13.5px var(--f-mono);background:var(--surface-2);border-radius:10px;padding:10px 12px;overflow-x:auto;white-space:nowrap;margin-top:10px}
+.formula{font:500 13.5px/1.6 var(--f-mono);background:var(--surface-2);border-radius:10px;padding:10px 12px;overflow-wrap:anywhere;margin-top:10px}
 .formula b{color:var(--g2)}
 svg text{font-family:var(--f-mono);fill:var(--ink);font-size:12px}
 svg .lbl{font-size:10.5px;fill:var(--muted);letter-spacing:.06em}
@@ -112,7 +112,9 @@ table.sum td.ok{color:var(--ok);font-weight:600}
 table.sum td.no{color:var(--bad);font-weight:600}
 /* wide screens: text column (sticky) beside the figure column */
 @media (min-width:1280px){
-  section.split{display:grid;grid-template-columns:minmax(340px,440px) minmax(0,1fr);gap:48px;align-items:start}
+  section.split{display:grid;grid-template-columns:minmax(300px,370px) minmax(0,1fr);gap:44px;align-items:start}
+  section.split .svgbox svg{min-width:0}
+  section.split table.sum{min-width:0}
   section.split>.col-text{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}
   section.split>.col-fig{min-width:0}
   section.split>.col-fig>.fig:first-child{margin-top:0}
@@ -122,7 +124,7 @@ table.sum td.no{color:var(--bad);font-weight:600}
 .col-text .cap{max-width:none}
 /* text column is the reading column: larger type on wide screens, where the figure leaves room */
 @media (min-width:1280px){body{font-size:16px}.note{font-size:15px;line-height:1.55}nav.rail a{font-size:14px}.col-text .cap,.col-text li,.col-text .note{font-size:17px;line-height:1.6}.col-text h2{font-size:30px}.notation .cap,.notation dd,.part .cap{font-size:17px}.nota-h{font-size:20px}}
-@media (min-width:1700px){section.split{grid-template-columns:minmax(380px,500px) minmax(0,1fr)}.col-text .cap,.col-text li,.col-text .note{font-size:18.5px}.notation .cap,.notation dd,.part .cap{font-size:18px}}
+@media (min-width:1900px){.col-text .cap,.col-text li,.col-text .note{font-size:18.5px}.notation .cap,.notation dd,.part .cap{font-size:18px}}
 ul.cap{padding-left:20px}
 header.top{padding:40px 0 8px}
 .wrap{padding-top:0}
@@ -285,7 +287,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="kv">
   <div class="sh"><span class="n">02</span><h2>KV cache memory</h2></div>
-  <p class="cap">Each token's keys and values (K and V, from §00.2) are saved so later tokens do not recompute them. That store is the <b>KV cache</b>, and it grows linearly with batch × sequence length. Drag the sliders to see how it crowds the weights out of GPU memory.</p>
+  <p class="cap">Each token's keys and values (K and V, from section 00.2, Attention) are saved so later tokens do not recompute them. That store is the <b>KV cache</b>, and it grows linearly with batch × sequence length. Drag the sliders to see how it crowds the weights out of GPU memory.</p>
   <div class="fig">
     <div class="controls">
       <label class="ctl">Model<select id="kv-preset">
@@ -315,7 +317,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="parallel">
   <div class="sh"><span class="n">04</span><h2>Model parallelism</h2></div>
-  <p class="cap">One GPU is rarely enough. This chapter takes the strategies one at a time: why we need them, what each one splits, and what it costs. They all reuse the shapes from §00.3.</p>
+  <p class="cap">One GPU is rarely enough. This chapter takes the strategies one at a time: why we need them, what each one splits, and what it costs. They all reuse the shapes from section 00.3 (Follow the shapes).</p>
   <div class="legend" aria-label="Colour key">
     <span><i class="sw" style="background:var(--g0)"></i>GPU 0</span>
     <span><i class="sw" style="background:var(--g1)"></i>GPU 1</span>
@@ -328,7 +330,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 </section>
 <section id="par-why">
   <div class="sh"><span class="n">04.1</span><h2>Why one GPU is not enough</h2></div>
-  <p class="cap">Weights alone outgrow a GPU fast, and the KV cache from §02 comes on top. Parallelism serves three different goals, and each strategy helps only some of them.</p>
+  <p class="cap">Weights alone outgrow a GPU fast, and the KV cache from section 02 (KV cache memory) comes on top. Parallelism serves three different goals, and each strategy helps only some of them.</p>
   <div class="fig">
     <div class="controls"><span class="mono" style="font-size:12px;color:var(--muted)">precision</span><div class="seg" id="why-prec"></div></div>
     <div class="svgbox"><svg id="why-svg" viewBox="0 0 760 290" role="img" aria-label="GPUs needed per model"></svg></div>
@@ -342,7 +344,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <div class="controls"><div class="seg" id="dp-model"></div><button class="btn solid" id="dp-replay" type="button">Send requests</button></div>
     <div class="svgbox"><svg id="dp-svg" viewBox="0 0 760 300" role="img" aria-label="Data parallelism replicas"></svg></div>
     <div class="stats" id="dp-stats"></div>
-    <div class="note">In training, DP replicas also All-Reduce their gradients after every step (see A1). At inference there is nothing to sync: replicas sit behind a load balancer.</div>
+    <div class="note">In training, DP replicas also All-Reduce their gradients after every step (see section A1, Backward pass). At inference there is nothing to sync: replicas sit behind a load balancer.</div>
   </div>
 </section>
 <section id="par-pp">
@@ -499,7 +501,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 <div class="part"><span>PART III</span><h3>Deeper dive</h3><p class="cap">Optional. Why the architecture looks the way it does (training), and what current LLMs change.</p></div>
 <section id="backward">
   <div class="sh"><span class="n">A1</span><h2>Backward pass &amp; training memory</h2></div>
-  <p class="cap">Inference only ever runs forward. Training runs the gradient back through every stage, and that is where the activation memory in §04 comes from.</p>
+  <p class="cap">Inference only ever runs forward. Training runs the gradient back through every stage, and that is where the activation memory in section 04 (Model parallelism) comes from.</p>
   <div class="fig">
     <div class="controls"><button class="btn solid" id="bw-prev" type="button">◀ Prev</button><button class="btn solid" id="bw-next" type="button">Next ▶</button><button class="btn solid" id="bw-play" type="button">Play all</button>
       <span id="bw-extra" style="display:none"><span class="seg" id="bw-rc"></span></span></div>
@@ -589,7 +591,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       T(svg,tx,ty+12*cs+18,`V = ${M().V.toLocaleString()} rows, h = ${M().h.toLocaleString()} cols`,{class:'lbl'});
       used.forEach((r,i)=>arrow(tx+8*cs+6,ty+r*cs+7,470,96+i*12,null,.2+i*.08));
       iso(560,110,8,6,2,12,'var(--accent)',{an:A(.9),title:'X'});big(440,280,'X  '+shp(['b','s','h']));}},
-   {n:'LayerNorm',f:'LN(x) = γ ⊙ (x − μ) / √(σ² + ε) + β        μ, σ² taken over h',c:'LayerNorm normalises each token\'s h-vector on its own (the dark row), so it is <b>independent across tokens</b>. That is why sequence parallelism (§04.5) can split it along s. The shape does not change.',
+   {n:'LayerNorm',f:'LN(x) = γ ⊙ (x − μ) / √(σ² + ε) + β        μ, σ² taken over h',c:'LayerNorm normalises each token\'s h-vector on its own (the dark row), so it is <b>independent across tokens</b>. That is why sequence parallelism (section 04.5) can split it along s. The shape does not change.',
     d(){iso(300,86,8,6,2,17,'var(--accent)',{hl:2,an:A(0),title:'X  [b, s, h]'});
       const g=S('g',{style:A(.4)},svg);T(g,500,120,'one token = one h-vector',{style:'font-weight:700'});T(g,500,142,'normalise across its h values',{style:'fill:var(--muted)'});T(g,500,164,'every token on its own',{style:'fill:var(--muted)'});
       big(40,290,'in & out  '+shp(['b','s','h']));}},
@@ -619,7 +621,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
         T(g,x,y-rr-12,`q at ${m},  k at ${n}`,{'text-anchor':'middle',style:'font-weight:700'});T(g,x,y+rr+20,'angle gap = 2θ',{'text-anchor':'middle',style:'fill:var(--bad);font-weight:700'});});
       T(svg,545,262,'same gap → same score q·k',{'text-anchor':'middle',style:'font-weight:700'});
       big(40,296,'applied to Q, K  '+shp(['b','nh','s','dh'])+'  shape unchanged');}},
-   {n:'Scores',f:'S = Q·Kᵀ / √d_head  + causal mask      → [b, n_heads, s, s]',c:'In each head, every token scores every earlier token. The upper triangle is masked because a token can\'t see the future. This <b>s × s</b> matrix is why attention cost grows with s², and it is the matrix FlashAttention (§06) never writes to HBM.',
+   {n:'Scores',f:'S = Q·Kᵀ / √d_head  + causal mask      → [b, n_heads, s, s]',c:'In each head, every token scores every earlier token. The upper triangle is masked because a token can\'t see the future. This <b>s × s</b> matrix is why attention cost grows with s², and it is the matrix FlashAttention (section 06) never writes to HBM.',
     d(){const tk=['The','cat','sat','on','the','mat'];
       for(let i=0;i<4;i++){const x=60+i*175,y=70;T(svg,x,y-14,'head '+i,{style:`font-weight:700;fill:${HC(i)}`});heat(x+30,y,6,16,i+3,false,HC(i),i*.2);
         if(i===0){tk.forEach((t,j)=>T(svg,x+24,y+j*16+12,t,{'text-anchor':'end',style:'font-size:10px;fill:var(--muted)'}));T(svg,x+30,y+6*16+16,'keys →',{class:'lbl'});}}
@@ -638,21 +640,21 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     d(){iso(100,120,8,6,2,10,'var(--accent)',{title:'[b, s, h]'});arrow(180,150,265,150,'·W₁',.1);
       iso(330,120,20,6,2,10,'var(--g3)',{an:A(.3),title:'[b, s, ffn]',lab:{x:'ffn',y:'s',z:'b'}});arrow(515,150,590,150,'act · W₂',.6);
       iso(660,120,8,6,2,10,'var(--accent)',{an:A(.8),title:'[b, s, h]'});big(40,290,shp(['b','s','f'])+'  inside the MLP');}},
-   {n:'× L layers',f:'block(X) = X + MLP(LN(X + Attn(LN(X))))      repeated L times',c:'One block is attention plus MLP, and the model stacks <b>L</b> of them. The shape is [b, s, h] at every layer boundary. The colours show how pipeline parallelism (§04.3) would cut this stack into 4 stages.',
+   {n:'× L layers',f:'block(X) = X + MLP(LN(X + Attn(LN(X))))      repeated L times',c:'One block is attention plus MLP, and the model stacks <b>L</b> of them. The shape is [b, s, h] at every layer boundary. The colours show how pipeline parallelism (section 04.3) would cut this stack into 4 stages.',
     d(){const n=8;for(let i=0;i<n;i++){const y=262-i*27,g=S('g',{style:A(i*.12)},svg);R(g,300,y,230,22,`fill:${G(i>>1)};opacity:.85`,{rx:6});
         T(g,415,y+15,i===n-1?'layer L':i===n-2?'⋮':'layer '+(i+1),{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700;font-size:11.5px'});}
       iso(150,215,8,6,2,8,'var(--accent)',{title:'X in',lab:false});arrow(210,240,292,272,null,0);
       iso(640,60,8,6,2,8,'var(--accent)',{title:'X out',an:A(1.1),lab:false});arrow(538,70,600,70,null,1);
       big(560,200,'L = '+M().L);T(svg,560,222,shp(['b','s','h']),{style:'fill:var(--muted)'});T(svg,560,242,'at every boundary',{style:'fill:var(--muted)'});}},
-   {n:'LM head',f:'logits = LN(X) · W_U      W_U ∈ ℝ^(h × V)      → softmax over V at the last position',c:'A final projection turns each h-vector into <b>V</b> logits, one per vocabulary entry. The dark row is the last position. Which rows go through the LM head depends on the job:<ul class="rows"><li><b>Training</b>: all s rows, one loss each</li><li><b>Generation</b>: last row only, [b, 1, V]</li><li><b>Speculative decoding</b>: the last k+1 rows, to check k drafted tokens in one pass (§11)</li><li><b>Scoring a prompt</b> (log-probs): all s rows</li></ul>',
+   {n:'LM head',f:'logits = LN(X) · W_U      W_U ∈ ℝ^(h × V)      → softmax over V at the last position',c:'A final projection turns a token\'s <b>hidden state</b> (its h numbers after the last layer) into <b>V</b> logits, one per vocabulary entry. The dark row is the last token. Whose hidden states go through the LM head depends on the job:<ul class="rows"><li><b>Generating a reply</b>: only the <b>last token\'s</b> hidden state is scored. Its V scores pick the next token, so the output is [b, 1, V].</li><li><b>Training</b>: <b>every token\'s</b> hidden state is scored. Each position predicts the token that follows it, so one sentence of s tokens gives s predictions and s losses at once.</li><li><b>Speculative decoding</b> (section 11): the <b>last k+1 tokens</b> are scored. A small draft model guessed k tokens; their hidden states check each guess in one pass, and the extra one gives the big model\'s own next token.</li><li><b>Scoring an existing text</b> (log-probs): <b>every token</b> is scored, to measure how likely each word of that text was.</li></ul>',
     d(){iso(90,120,8,6,2,10,'var(--accent)',{title:'X'});arrow(165,150,235,150,'·W_U',.1);
       iso(300,110,24,6,2,9,'var(--g2)',{an:A(.3),hl:5,title:'logits  [b, s, V]',lab:{x:'V',y:'s',z:'b'}});
       const cand=[['the',.62],['a',.18],['his',.09],['her',.06],['bed',.05]],g=S('g',{style:A(.9)},svg);
       T(g,560,48,'last position, softmax',{class:'lbl'});
       cand.forEach((c,i)=>{const y=62+i*30;T(g,600,y+15,c[0],{'text-anchor':'end',style:'font-weight:600'});R(g,610,y,95*c[1]/.62,20,`fill:${i?'var(--idle)':'var(--g3)'}`,{rx:4});T(g,616+95*c[1]/.62,y+15,Math.round(c[1]*100)+'%',{style:'font-size:11px'});});
-      T(g,560,240,'"I saw a dog ride in" → "the"',{style:'font-weight:700'});big(40,290,'logits  '+shp(['b','s','V']));}}];
+      T(g,560,232,'"I saw a dog ride in"',{style:'font-weight:700'});T(g,560,250,'→ next token "the"',{style:'font-weight:700'});big(40,290,'logits  '+shp(['b','s','V']));}}];
   function render(){clear(svg);const st=ST[k];st.d();
-    $('#an-note').innerHTML=`<b class="mono" style="color:var(--accent)">${k+1}/${ST.length} · ${st.n}</b><div class="formula" style="margin:6px 0">${st.f}</div>${st.c}`;
+    $('#an-note').innerHTML=`<b class="mono" style="color:var(--accent)">${k+1}/${ST.length} · ${st.n}</b><div class="formula" style="margin:6px 0">${String(st.f).replace(/\s{3,}/g,'<br>')}</div>${st.c}`;
     const ch=$('#an-chips');ch.innerHTML='';ST.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=(i+1)+' '+s.n;b.setAttribute('aria-pressed',String(i===k));b.onclick=()=>{stop();k=i;render();};ch.appendChild(b);});
     $('#an-prev').disabled=k===0;$('#an-next').disabled=k===ST.length-1;
     const m=M();$('#an-gloss').innerHTML=[['b','batch: sequences processed together',m.b],['s','sequence length: tokens per sequence',m.s],['h','hidden size (d_model): numbers per token',m.h],['n_heads','attention heads',m.nh],['d_head','h / n_heads: width of one head',m.dh],['L','transformer layers',m.L],['V','vocabulary size',m.V],['ffn','MLP inner width: a hyperparameter, ≈4h classic, ≈8h/3 with SwiGLU',m.f]]
@@ -1204,7 +1206,7 @@ const HCg=i=>`hsl(${[8,45,325,160][i%4]} 80% 76%)`;
 function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
   let k=0,timer=null;
   function render(){clear(o.svg);const st=o.stages[k];st.d();
-    o.note.innerHTML=`<b class="mono" style="color:var(--accent)">${k+1}/${o.stages.length} · ${st.n}</b><div class="formula" style="margin:6px 0">${st.f}</div>${st.c}`;
+    o.note.innerHTML=`<b class="mono" style="color:var(--accent)">${k+1}/${o.stages.length} · ${st.n}</b><div class="formula" style="margin:6px 0">${String(st.f).replace(/\s{3,}/g,'<br>')}</div>${st.c}`;
     o.chips.innerHTML='';o.stages.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=(i+1)+' '+s.n;b.setAttribute('aria-pressed',String(i===k));b.onclick=()=>{stop();k=i;render();};o.chips.appendChild(b);});
     o.prev.disabled=k===0;o.next.disabled=k===o.stages.length-1;if(o.after)o.after(k);}
   function stop(){clearInterval(timer);timer=null;o.play.textContent='Play all';}
@@ -1241,16 +1243,16 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
       T(g,236,160,'+I',{'text-anchor':'end',style:'fill:var(--bad);font-weight:800;font-size:18px'});T(g,40,60,'∂L flows down',{style:'font-weight:700;fill:var(--bad)'});T(g,40,80,'untouched by any block',{style:'fill:var(--muted)'});
       for(let i=0;i<6;i++)S('line',{x1:300,y1:263-i*38,x2:252,y2:263-i*38,style:'stroke:var(--bad);stroke-width:1.5;opacity:.5;stroke-dasharray:3 3'},svg);
       T(svg,560,150,'each block only adds',{style:'font-weight:700'});T(svg,560,170,'a correction ∂f/∂X',{style:'fill:var(--muted)'});}},
-   {n:'Grad = param shape',f:'∂L/∂W  has exactly the shape of W        one gradient number per parameter',c:'Every parameter matrix gets a gradient matrix of <b>the same shape</b>. With data parallelism, each GPU computes these on its own slice of the batch, then <b>All-Reduce averages them</b>. That is the same collective as in tensor parallelism (§04.4), applied to gradients instead of activations.',
+   {n:'Grad = param shape',f:'∂L/∂W  has exactly the shape of W        one gradient number per parameter',c:'Every parameter matrix gets a gradient matrix of <b>the same shape</b>. With data parallelism, each GPU computes these on its own slice of the batch, then <b>All-Reduce averages them</b>. That is the same collective as in tensor parallelism (section 04.4), applied to gradients instead of activations.',
     d(){const P=[['W_Q,K,V,O','h × h',60,60],['W₁ (up)','h × ffn',120,40],['W₂ (down)','ffn × h',40,110],['E','V × h',30,95],['W_U','h × V',110,30]];
       let x=30;P.forEach((p,i)=>{mat(x,40,p[2],p[3],'var(--g0)','W','',i*.1);mat(x,40+p[3]+36,p[2],p[3],GR,'∂W','',i*.1+.3);T(svg,x+p[2]/2,30,p[0],{'text-anchor':'middle',style:'font-size:11px;font-weight:700'});T(svg,x+p[2]/2,40+p[3]+24,p[1],{'text-anchor':'middle',style:'font-size:10.5px;fill:var(--muted)'});x+=p[2]+30;});}},
-   {n:'Memory',f:'per param: 2 B weight + 2 B grad + 4 B fp32 master + 4 B Adam m + 4 B Adam v = 16 B        activations/layer ≈ s·b·h·(34 + 5·a·s/h) bytes',c:'For Llama 2 7B at s = 4,096, b = 1: inference needs weights plus KV cache. Training needs 8× the bytes per parameter, <b>plus the activations</b> from the formula, which comes from the same Megatron paper as sequence parallelism (§04.5). Recomputation stores only each layer\'s input and redoes the forward pass during backward. Sequence parallelism and selective recompute are the middle ground.',
+   {n:'Memory',f:'per param: 2 B weight + 2 B grad + 4 B fp32 master + 4 B Adam m + 4 B Adam v = 16 B        activations/layer ≈ s·b·h·(34 + 5·a·s/h) bytes',c:'For Llama 2 7B at s = 4,096, b = 1: inference needs weights plus KV cache. Training needs 8× the bytes per parameter, <b>plus the activations</b> from the formula, which comes from the same Megatron paper as sequence parallelism (section 04.5). Recomputation stores only each layer\'s input and redoes the forward pass during backward. Sequence parallelism and selective recompute are the middle ground.',
     d(){const rows=[['Inference',[['weights',14,'var(--g0)'],['KV cache',2.1,'var(--g2)']]],['Training',[['weights',14,'var(--g0)'],['grads',14,GR],['fp32 master',28,'var(--g1)'],['Adam m',28,'var(--g3)'],['Adam v',28,'hsl(265 70% 80%)'],[recompute?'activations (recompute)':'activations',recompute?1.1:104.2,'var(--accent)']]]];
       const sc=520/217;rows.forEach((r,i)=>{const y=60+i*110;T(svg,30,y-10,r[0],{style:'font-weight:700'});let x=30,tot=0;
-        r[1].forEach((s,j)=>{const w=s[1]*sc;R(svg,x,y,w,40,`fill:${s[2]}`,{style:`fill:${s[2]};${A(j*.1)}`});if(w>46)T(svg,x+4,y+16,s[0],{style:'fill:var(--on-fill);font-size:10.5px;font-weight:700'});if(w>46)T(svg,x+4,y+32,s[1]+' GB',{style:'fill:var(--on-fill);font-size:10.5px'});x+=w;tot+=s[1];});
+        r[1].forEach((s,j)=>{const w=s[1]*sc;R(svg,x,y,w,40,`fill:${s[2]}`,{style:`fill:${s[2]};${A(j*.1)}`});const lab=s[0].length*6.6+8<=w?s[0]:(s[0]==='fp32 master'?'master':s[0].split(' ')[0]);if(w>46)T(svg,x+4,y+16,lab,{style:'fill:var(--on-fill);font-size:10.5px;font-weight:700'});if(w>46)T(svg,x+4,y+32,s[1]+' GB',{style:'fill:var(--on-fill);font-size:10.5px'});x+=w;tot+=s[1];});
         T(svg,x+8,y+26,Math.round(tot)+' GB',{class:'big'});});
       let lx=30;[['weights','var(--g0)'],['grads',GR],['fp32 master','var(--g1)'],['Adam m','var(--g3)'],['Adam v','hsl(265 70% 80%)'],['activations','var(--accent)'],['KV cache','var(--g2)']].forEach(l=>{R(svg,lx,292,12,12,`fill:${l[1]}`,{rx:3});T(svg,lx+16,302,l[0],{style:'font-size:11px'});lx+=l[0].length*7+34;});
-      S('line',{x1:30+80*sc,x2:30+80*sc,y1:30,y2:250,style:'stroke:var(--ink);stroke-width:1.5;stroke-dasharray:4 3'},svg);T(svg,34+80*sc,264,'one 80 GB GPU',{style:'font-size:11px;font-weight:700'});}}];
+      [[30,56],[104,166],[214,250]].forEach(([a,b])=>S('line',{x1:30+80*sc,x2:30+80*sc,y1:a,y2:b,style:'stroke:var(--ink);stroke-width:1.5;stroke-dasharray:4 3'},svg));T(svg,34+80*sc,264,'one 80 GB GPU',{style:'font-size:11px;font-weight:700'});}}];
   stager({svg,note:$('#bw-note'),chips:$('#bw-chips'),prev:$('#bw-prev'),next:$('#bw-next'),play:$('#bw-play'),stages:ST,after:k=>{$('#bw-extra').style.display=k===ST.length-1?'':'none';}});
   seg($('#bw-rc'),[{l:'Store all activations',v:false},{l:'Full recomputation',v:true}],false,v=>{recompute=v;clear(svg);ST[ST.length-1].d();});
 })();
@@ -1379,7 +1381,7 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
       T(svg,250,190,'each GPU fills its own rows,',{style:'font-size:11.5px'});T(svg,250,206,'zeros elsewhere → All-Reduce',{style:'font-size:11.5px'});
       mx(450,110,280,50,'col','W_U  [h, V]  column-split','',.5);mx(450,200,140,40,null,'logits  V/2','',.7,C0);mx(590,200,140,40,null,'logits  V/2','',.75,C1);
       T(svg,450,272,'softmax: global max & sum',{style:'font-weight:700;font-size:12px'});T(svg,450,290,'→ one tiny All-Reduce',{style:'font-weight:700;font-size:12px'});}},
-   {n:'What is not split',f:'LayerNorm · Dropout · residual add      → replicated on every TP GPU',c:'Between the split blocks, every GPU holds the <b>same full [b, s, h]</b> after the All-Reduce. LayerNorm, Dropout and the residual add have almost no weights to split, so TP simply runs them on <b>every GPU</b>: the same memory and the same work, repeated t times. §04.5 shows how sequence parallelism removes that waste.',
+   {n:'What is not split',f:'LayerNorm · Dropout · residual add      → replicated on every TP GPU',c:'Between the split blocks, every GPU holds the <b>same full [b, s, h]</b> after the All-Reduce. LayerNorm, Dropout and the residual add have almost no weights to split, so TP simply runs them on <b>every GPU</b>: the same memory and the same work, repeated t times. section 04.5 (Sequence parallelism) shows how sequence parallelism removes that waste.',
     d(){const blocks=[['LN',0],['Attention',1],['AR',2],['Dropout + add',0],['LN',0],['MLP',1],['AR',2],['Dropout + add',0]];let x=20;
       blocks.forEach((b,i)=>{const w=b[1]===2?54:b[0].length>4?112:70,d=i*.12;
         if(b[1]===1){const g=S('g',{style:A(d)},svg);R(g,x,110,w,30,`fill:${C0}`,{rx:5});R(g,x,146,w,30,`fill:${C1}`,{rx:5});T(g,x+w/2,129,b[0]+' 1/2',{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700;font-size:11px'});T(g,x+w/2,165,b[0]+' 1/2',{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700;font-size:11px'});}
@@ -1443,16 +1445,16 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
    {b:'tok',n:'Tokenizer',sh:'[b, s] integers',c:'Text is cut into <b>tokens</b>: whole words, word pieces or punctuation (in English, roughly ¾ of a word each). Each token has a fixed ID in a vocabulary of V entries (32,000 for Llama 2). The model never sees letters, only these integers.'},
    {b:'emb',n:'Token embedding',sh:'[b, s] → [b, s, h]',c:'A learned table with one row per vocabulary entry turns each ID into a vector of <b>h</b> numbers (4,096 for Llama 2 7B). Similar tokens end up with similar vectors. From here on, each token is a point in an h-dimensional space, and every layer refines that point.'},
    {b:'n1',n:'Norm (before attention)',sh:'[b, s, h] → same',c:'Each token\'s vector is rescaled to a standard size before it enters a sublayer. This keeps numbers in a stable range through dozens of layers. Modern LLMs use <b>RMSNorm</b> and apply it <b>before</b> each sublayer (pre-norm).'},
-   {b:'att',zt:'Self-attention',n:'Masked multi-head self-attention',sh:'[b, s, h] → same',c:'The only place where <b>tokens exchange information</b>. Each token asks a question (its query), compares it with what every earlier token offers (its key), and pulls in a weighted mix of their content (their values). <b>Masked</b> means a token can only look backwards. <b>Multi-head</b> means several of these lookups run in parallel, each free to learn a different pattern. §00.2 shows it step by step.'},
+   {b:'att',zt:'Self-attention',n:'Masked multi-head self-attention',sh:'[b, s, h] → same',c:'The only place where <b>tokens exchange information</b>. Each token asks a question (its query), compares it with what every earlier token offers (its key), and pulls in a weighted mix of their content (their values). <b>Masked</b> means a token can only look backwards. <b>Multi-head</b> means several of these lookups run in parallel, each free to learn a different pattern. section 00.2 (Attention, the core idea) shows it step by step.'},
    {b:'a1',n:'Residual add',sh:'[b, s, h] + [b, s, h]',c:'Attention\'s output is <b>added</b> to its input instead of replacing it. Picture a <b>residual stream</b> running up the spine of the model: every sublayer reads from it and writes a correction back into it. That is why every sublayer has to keep the shape [b, s, h].'},
    {b:'n2',n:'Norm (before the MLP)',sh:'[b, s, h] → same',c:'The same rescaling again, before the second sublayer.'},
    {b:'mlp',zt:'MLP',n:'MLP (feed-forward network)',sh:'[b, s, h] → [b, s, ffn] → [b, s, h]',c:'Now each token is processed <b>on its own</b>: its vector is expanded to a wider space (ffn, about 2.7–4× h), passed through a nonlinearity, and projected back. Attention moves information <b>between</b> tokens; the MLP transforms it <b>within</b> each token. The MLPs hold about two-thirds of the parameters, and much of what the model "knows".'},
    {b:'a2',n:'Residual add',sh:'[b, s, h] + [b, s, h]',c:'The MLP\'s output is added back onto the stream. One transformer block is now complete.'},
    {b:'stack',n:'× L blocks',sh:'[b, s, h] at every boundary',c:'The block is repeated <b>L</b> times (32 in Llama 2 7B, 80 in 70B), each with its own weights. Early blocks tend to capture syntax and local patterns, later ones more abstract meaning. Shape in equals shape out, so blocks stack like bricks.'},
    {b:'fn',n:'Final norm',sh:'[b, s, h] → same',c:'One last normalisation of the residual stream.'},
-   {b:'lm',n:'LM head',sh:'train [b, s, V] · serve [b, 1, V]',c:'A final matrix turns a token\'s h-vector into <b>V scores</b> (logits): a guess for the next token. Which rows are computed depends on the job:<ul class="rows"><li><b>Training</b>: all s rows, one loss each</li><li><b>Generation</b>: last row only, [b, 1, V]</li><li><b>Speculative decoding</b>: the last k+1 rows, to check k drafted tokens in one pass (§11)</li><li><b>Scoring a prompt</b> (log-probs): all s rows</li></ul>Earlier tokens still pass through every layer, because their keys and values are what the last token attends to.'},
-   {b:'sm',n:'Softmax → next token',sh:'[V] → probabilities',c:'Softmax turns the scores into probabilities that sum to 1. A sampler picks one token: the most likely one, or a random draw shaped by temperature and top-p (A2).'},
-   {b:'loop',n:'Append and repeat',sh:'s grows by 1',c:'The chosen token is appended to the input, and the whole stack runs again to produce the next one. This loop is called <b>autoregressive</b> decoding. Each step needs the keys and values of every earlier token, which is why the KV cache (§02) and the prefill/decode split (§01) exist.'}];
+   {b:'lm',n:'LM head',sh:'train [b, s, V] · serve [b, 1, V]',c:'A final matrix turns a token\'s <b>hidden state</b> (its h numbers after the last layer) into <b>V scores</b> (logits), one per vocabulary entry: a guess for the token that comes next. Whose hidden states go through it depends on the job:<ul class="rows"><li><b>Generating a reply</b>: only the <b>last token\'s</b> hidden state is scored. Its V scores pick the next token, so the output is [b, 1, V].</li><li><b>Training</b>: <b>every token\'s</b> hidden state is scored. Each position predicts the token that follows it, so one sentence of s tokens gives s predictions and s losses at once.</li><li><b>Speculative decoding</b> (section 11): the <b>last k+1 tokens</b> are scored. A small draft model guessed k tokens; their hidden states check each guess in one pass, and the extra one gives the big model\'s own next token.</li><li><b>Scoring an existing text</b> (log-probs): <b>every token</b> is scored, to measure how likely each word of that text was.</li></ul>The earlier tokens still pass through every layer even when only the last one is scored, because the last token\'s attention reads their keys and values.'},
+   {b:'sm',n:'Softmax → next token',sh:'[V] → probabilities',c:'Softmax turns the scores into probabilities that sum to 1. A sampler picks one token: the most likely one, or a random draw shaped by temperature and top-p (see section A2, What modern LLMs change).'},
+   {b:'loop',n:'Append and repeat',sh:'s grows by 1',c:'The chosen token is appended to the input, and the whole stack runs again to produce the next one. This loop is called <b>autoregressive</b> decoding. Each step needs the keys and values of every earlier token, which is why the KV cache (section 02) and the prefill/decode split (section 01, Prefill vs decode) exist.'}];
   const tk=['I','saw','a','dog','ride','in'];
   const ZX=480,ZW=270,CX=ZX+ZW/2;
   const Z={
@@ -1460,7 +1462,7 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
     tok(){tk.forEach((t,i)=>{const y=140+i*48,g=S('g',{style:A(i*.08)},svg);R(g,ZX+30,y,90,32,'fill:var(--accent-soft);stroke:var(--accent)',{rx:7});T(g,ZX+75,y+21,t,{'text-anchor':'middle',style:'font-weight:700'});T(g,ZX+140,y+21,'→',{});R(g,ZX+160,y,90,32,'fill:var(--surface-2)',{rx:7});T(g,ZX+205,y+21,'id '+[306,4446,263,11203,22977,297][i],{'text-anchor':'middle',style:'font-size:11.5px'});});},
     emb(){for(let r=0;r<10;r++)for(let c=0;c<6;c++)R(svg,ZX+20+c*16,150+r*20,14,18,r===3?A(.2)+'fill:var(--accent)':'fill:var(--g0);opacity:.2');T(svg,ZX+20,140,'table [V × h]',{class:'lbl'});
       S('line',{x1:ZX+125,y1:219,x2:ZX+175,y2:219,'marker-end':'url(#arr)',style:'stroke:var(--muted);stroke-width:2'},svg);
-      const r=mulberry32(5);for(let c=0;c<6;c++){const v=r();R(svg,ZX+185,150+c*26,70*v+10,22,`fill:var(--accent);opacity:${.4+.6*v};${A(.4+c*.06)}`,{rx:3});}T(svg,ZX+185,140,'"dog" as h numbers',{class:'lbl'});},
+      const r=mulberry32(5);for(let c=0;c<6;c++){const v=r();R(svg,ZX+185,150+c*26,70*v+10,22,`fill:var(--accent);opacity:${.4+.6*v};${A(.4+c*.06)}`,{rx:3});}T(svg,ZX+ZW-6,140,'"dog" as h numbers',{class:'lbl','text-anchor':'end'});},
     n1(){Z._norm();},n2(){Z._norm();},fn(){Z._norm();},
     _norm(){const x=[2.6,.4,3.1,1.2,2.2,.8],rms=Math.sqrt(x.reduce((a,b)=>a+b*b,0)/6);[['before',x],['after',x.map(v=>v/rms)]].forEach((s,i)=>{const ox=ZX+20+i*130;T(svg,ox,150,s[0],{class:'lbl'});
       s[1].forEach((v,j)=>R(svg,ox,165+j*34,v*36,26,`fill:var(--g3);${A(i*.3+j*.05)}`,{rx:3}));});},
@@ -1490,7 +1492,7 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
       T(svg,CX,505,'expand → nonlinearity → compress',{'text-anchor':'middle',style:'font-weight:600'});},
     stack(){for(let i=0;i<7;i++){const y=470-i*48,g=S('g',{style:A(i*.08)},svg);R(g,ZX+40,y,ZW-80,38,`fill:${G(i>>1&3)};opacity:.85`,{rx:7});T(g,CX,y+24,i===6?'block L':i===5?'⋮':'block '+(i+1),{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700'});}},
     lm(){const r=mulberry32(4);for(let c=0;c<6;c++)R(svg,ZX+20,160+c*30,22,26,'fill:var(--accent)',{rx:3});T(svg,ZX+20,150,'h',{class:'lbl'});
-      S('line',{x1:ZX+50,y1:245,x2:ZX+80,y2:245,'marker-end':'url(#arr)',style:'stroke:var(--muted);stroke-width:2'},svg);T(svg,ZX+90,150,'V scores (one per vocabulary entry)',{class:'lbl'});
+      S('line',{x1:ZX+50,y1:245,x2:ZX+80,y2:245,'marker-end':'url(#arr)',style:'stroke:var(--muted);stroke-width:2'},svg);T(svg,ZX+90,136,'V scores',{class:'lbl'});T(svg,ZX+90,150,'(one per vocabulary entry)',{style:'font-size:10px;fill:var(--muted)'});
       for(let i=0;i<40;i++){const v=r();R(svg,ZX+90+i*4.2,160,3.4,330,`fill:var(--g1);opacity:${.15+.85*v*v};${A(i*.01)}`);}},
     sm(){[['the',.62],['a',.18],['his',.09],['her',.06],['bed',.05]].forEach((c,i)=>{const y=150+i*56;T(svg,ZX+70,y+24,c[0],{'text-anchor':'end',style:'font-weight:700'});R(svg,ZX+80,y,170*c[1]/.62,34,`fill:${i?'var(--idle)':'var(--accent)'};${A(i*.08)}`,{rx:5});T(svg,ZX+86+170*c[1]/.62,y+23,Math.round(c[1]*100)+'%',{style:'font-size:12px;font-weight:700'});});},
     loop(){const seqs=[['I','saw','a','dog','ride','in'],['+ the'],['+ park'],['+ .']];let y=150;seqs.forEach((s,i)=>{const g=S('g',{style:A(i*.35)},svg);T(g,ZX+20,y+18,i?'step '+(i+1):'prompt',{class:'lbl'});
