@@ -133,6 +133,13 @@ nav.rail{margin-top:44px}
 @media (max-width:700px){.parts{grid-template-columns:1fr}}
 .sw.hatch{background:repeating-linear-gradient(45deg,var(--muted) 0 2px,transparent 2px 6px);border:1px solid var(--muted)}
 .legend .lk{color:var(--muted);font-family:var(--f-body)}
+.notation{display:grid;grid-template-columns:300px minmax(0,1fr);gap:28px;align-items:center;margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 22px}
+.notation svg{width:100%;height:auto}
+.nota-h{font:700 17px var(--f-display);margin:0 0 4px}
+.notation dl{display:grid;grid-template-columns:28px 1fr;gap:6px 10px;margin:0}
+.notation dt{font:800 18px var(--f-mono);color:var(--accent)}
+.notation dd{margin:0;color:var(--ink)}
+@media (max-width:760px){.notation{grid-template-columns:1fr}}
 footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
@@ -194,7 +201,21 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   </div>
 </header>
 
-<div class="part"><span>PART I</span><h3>Foundations</h3><p class="cap">What a language model is made of, how attention works, and the tensor shapes it moves around. Everything in Part II builds on this.</p></div>
+<div class="part"><span>PART I</span><h3>Foundations</h3><p class="cap">What a language model is made of, how attention works, and the tensor shapes it moves around. Everything in Part II builds on this.</p>
+  <div class="notation">
+    <svg id="nota-svg" viewBox="0 0 300 205" role="img" aria-label="A block of numbers with axes b, s and h"></svg>
+    <div>
+      <p class="nota-h">Three letters used on every figure</p>
+      <p class="cap" style="margin:0 0 10px">Inside the model, text becomes a block of numbers with three sides. We write its shape as <b>[b, s, h]</b>:</p>
+      <dl>
+        <dt>b</dt><dd><b>batch</b>: how many separate texts are processed together. For example, 2 users' prompts.</dd>
+        <dt>s</dt><dd><b>sequence length</b>: how many tokens each text has. For example, 6 tokens: "I saw a dog ride in".</dd>
+        <dt>h</dt><dd><b>hidden size</b>: how many numbers describe one token. For example, 4,096 in Llama 2 7B (drawn as 8 here).</dd>
+      </dl>
+      <p class="cap" style="margin:8px 0 0">So <b>[b, s]</b> is a grid of token IDs, and <b>[b, s, h]</b> is that grid with a vector of h numbers at every cell. Other letters are introduced where they first appear.</p>
+    </div>
+  </div>
+</div>
 <section id="architecture">
   <div class="sh"><span class="n">00.1</span><h2>The transformer, end to end</h2></div>
   <p class="cap">Every large language model you have used, including GPT, Llama, Claude, Gemini and Mistral, is built from this one diagram. Data flows from the bottom to the top. Press play to follow it, or click any part.</p>
@@ -214,7 +235,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <li>a <b>key</b>: what do I contain?</li>
     <li>a <b>value</b>: what will I pass on if someone picks me?</li>
   </ul>
-  <p class="cap">The query is compared with every earlier key using a dot product. The scores are divided by √d to keep them in a sensible range, then turned into weights with softmax. The token's new vector is the weighted mix of the values.</p>
+  <p class="cap">The query is compared with every earlier key using a dot product. The scores are divided by √d, where d is the length of the query and key vectors, to keep them in a sensible range, then turned into weights with softmax. The token's new vector is the weighted mix of the values.</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="ax-head"></div></div>
     <div class="svgbox"><svg id="ax-svg" viewBox="0 0 760 520" role="img" aria-label="Attention weights for a chosen word"></svg></div>
@@ -651,8 +672,8 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
   function cap(){
     if(step===0)return['READY','Press <b>Run prefill</b>. Each step plays in 6 short stages, and the current stage is highlighted while the rest dims.'];
     const pre=step===1,tk=pre?'':gen[step-2],out=gen[step-1],N=4+step;
-    const P=['All 5 prompt tokens go in <b>together</b>.','They stack into X: <b>5 rows × d</b>. One matrix, not 5 vectors.','Every weight in W streams in from HBM, <b>once</b> for all 5 rows.','One GEMM produces Y with all 5 rows at once. The compute units are <b>busy</b>.','K and V for all 5 tokens are written to the KV cache.',`The last row predicts the first new token: <b>"${out}"</b>.`];
-    const D=[`Only the newest token <b>"${tk}"</b> goes in. Older tokens are already cached.`,'X is now <b>1 row × d</b>, a single vector.','W still streams in from HBM <b>in full</b>, for just 1 row. That is why decode is memory-bound.','GEMV: 1 output row, so most compute units sit <b>idle</b>.',`Its K and V are appended. Attention reads all <b>${N}</b> cached entries.`,`Next token: <b>"${out}"</b>.`];
+    const P=['All 5 prompt tokens go in <b>together</b>.','They stack into X: <b>5 rows × h</b> (one row of h numbers per token). One matrix, not 5 vectors.','Every weight in W streams in from HBM, <b>once</b> for all 5 rows.','One GEMM produces Y with all 5 rows at once. The compute units are <b>busy</b>.','K and V for all 5 tokens are written to the KV cache.',`The last row predicts the first new token: <b>"${out}"</b>.`];
+    const D=[`Only the newest token <b>"${tk}"</b> goes in. Older tokens are already cached.`,'X is now <b>1 row × h</b>, a single vector.','W still streams in from HBM <b>in full</b>, for just 1 row. That is why decode is memory-bound.','GEMV: 1 output row, so most compute units sit <b>idle</b>.',`Its K and V are appended. Attention reads all <b>${N}</b> cached entries.`,`Next token: <b>"${out}"</b>.`];
     return[`${pre?'PREFILL':'DECODE '+(step-1)} · ${sub+1}/6 · ${NAMES[sub]}`,(pre?P:D)[sub]];}
   function grid(par,x,y,rows,cols,cs,style,ghost,delayFn){
     for(let r=0;r<(ghost||rows);r++)for(let c=0;c<cols;c++){const on=r<rows;
@@ -669,14 +690,14 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       R(pg,x,26,w,26,`fill:${isNew?'var(--g3)':isGen?'var(--accent-soft)':'var(--surface-2)'};stroke:${proc?'var(--accent)':'var(--line)'};stroke-width:${proc?2.5:1}`,{rx:6});
       T(pg,x+w/2,44,tk,{'text-anchor':'middle',style:`fill:${isNew?'#fff':'var(--ink)'};font-weight:600`});x+=w+6;});
     const cs=13,y0=96;
-    T(g[1],20,y0-12,`X  [${n||'n'} × d]`,{class:'big'});
+    T(g[1],20,y0-12,`X  [${n||'n'} × h]`,{class:'big'});
     grid(S('g',{style:anim(1,0)},g[1]),20,y0,n,8,cs,'fill:var(--accent)',5);
-    T(g[2],135,y0+52,'×',{class:'big'});T(g[2],160,y0-12,'W  [d × d]',{class:'big'});
+    T(g[2],135,y0+52,'×',{class:'big'});T(g[2],160,y0-12,'W  [h × h]',{class:'big'});
     grid(g[2],160,y0,8,8,cs,'fill:var(--g0);opacity:.55',0,(r,c)=>anim(2,c*.09+r*.02));
     T(g[2],160,y0+122,'streamed from HBM every step',{class:'lbl'});
-    T(g[3],275,y0+52,'=',{class:'big'});T(g[3],300,y0-12,`Y  [${n||'n'} × d]`,{class:'big'});
+    T(g[3],275,y0+52,'=',{class:'big'});T(g[3],300,y0-12,`Y  [${n||'n'} × h]`,{class:'big'});
     grid(S('g',{style:anim(3,.1)},g[3]),300,y0,n,8,cs,'fill:var(--g3)',5);
-    const kx=470;T(g[4],kx,y0-12,'KV CACHE  [tokens × 2 × d]',{class:'lbl'});
+    const kx=470;T(g[4],kx,y0-12,'KV CACHE  [tokens × 2 × h]',{class:'lbl'});
     const filled=step===0?0:sub>=4?4+step:(pre?0:3+step),prev=pre?0:3+step;
     for(let i=0;i<10;i++){const yy=y0+i*15,on=i<filled,fresh=on&&i>=prev&&sub>=4,a=fresh?anim(4,(i-prev)*.12):'';
       const dash='fill:none;stroke:var(--line);stroke-dasharray:2 2';
@@ -719,7 +740,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     clear(svg);
     // 3D-ish tensor block: batch × seq × (2·layers·kv·hd)
     T(svg,20,18,'KV CACHE TENSOR SHAPE',{class:'lbl'});
-    const dims=[['batch',b],['seq',seq.toLocaleString()],['K,V',2],['layers',p.L],['kv_heads',p.kv],['head_dim',hd]];
+    const dims=[['batch',b],['seq',seq.toLocaleString()],['K,V',2],['layers',p.L],['kv_heads',p.kv],['d_head',hd]];
     let x=20;dims.forEach((d,i)=>{const w=104;R(svg,x,28,w,44,`fill:${i===4?'var(--g2)':'var(--surface-2)'};stroke:var(--line)`,{rx:8});
       T(svg,x+w/2,46,d[0],{'text-anchor':'middle',class:'lbl',style:i===4?'fill:#fff':''});
       T(svg,x+w/2,64,String(d[1]),{'text-anchor':'middle',style:`font-weight:700;${i===4?'fill:#fff':''}`});
@@ -737,7 +758,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     const cx=X0+cap*scale;S('line',{x1:cx,x2:cx,y1:114,y2:178,style:'stroke:var(--ink);stroke-width:2'},svg);
     T(svg,cx,192,`${cap} GB capacity`,{'text-anchor':cx>600?'end':'middle',style:'font-weight:600'});
     T(svg,20,228,tot>cap?`Does not fit: ${fmt(tot-cap,1)} GB over`:`Free: ${fmt(cap-tot,1)} GB`,{style:`font-weight:700;fill:${tot>cap?'var(--bad)':'var(--ok)'}`});
-    $('#kv-formula').innerHTML=`KV = batch × seq × 2 × layers × (kv_heads × head_dim) × bytes = ${b} × ${seq.toLocaleString()} × 2 × ${p.L} × (${p.kv} × ${hd}) × ${kb} = <b>${fmt(kv,2)} GB</b>`;
+    $('#kv-formula').innerHTML=`KV = batch × seq × 2 × layers × (kv_heads × d_head) × bytes = ${b} × ${seq.toLocaleString()} × 2 × ${p.L} × (${p.kv} × ${hd}) × ${kb} = <b>${fmt(kv,2)} GB</b>`;
     const mb=Math.floor((cap-w)*1e9/(seq*perTok));
     stats($('#kv-stats'),[
       {v:fmt(perTok/1024,0)+' KB',l:'KV per token'},
@@ -1400,6 +1421,8 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
   $('#sum-tbl').innerHTML='<thead><tr>'+['strategy','splits','fits a bigger model','more throughput','lower latency','communication'].map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map((v,i)=>`<td class="${i===0?'k':cls(v)}">${v}</td>`).join('')+'</tr>').join('')+'</tbody>';
 })();
 
+/* ---------- notation key ---------- */
+(function(){const svg=$('#nota-svg');if(!svg)return;const {iso}=makeKit(svg);iso(128,60,8,6,2,16,'var(--accent)',{lab:{x:'h',y:'s',z:'b'}});svg.querySelectorAll('text').forEach(t=>t.style.fontSize='17px');})();
 /* ---------- 00.1 architecture ---------- */
 (function(){
   const svg=$('#ar-svg'),{A}=makeKit(svg);let k=0,timer=null;
