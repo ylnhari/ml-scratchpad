@@ -112,7 +112,7 @@ table.sum td.ok{color:var(--ok);font-weight:600}
 table.sum td.no{color:var(--bad);font-weight:600}
 /* wide screens: text column (sticky) beside the figure column */
 @media (min-width:1280px){
-  section.split{display:grid;grid-template-columns:minmax(300px,370px) minmax(0,1fr);gap:44px;align-items:start}
+  section.split{display:grid;grid-template-columns:minmax(340px,440px) minmax(0,1fr);gap:48px;align-items:start}
   section.split>.col-text{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}
   section.split>.col-fig{min-width:0}
   section.split>.col-fig>.fig:first-child{margin-top:0}
@@ -120,6 +120,9 @@ table.sum td.no{color:var(--bad);font-weight:600}
   .dek{max-width:90ch}
 }
 .col-text .cap{max-width:none}
+/* text column is the reading column: larger type on wide screens, where the figure leaves room */
+@media (min-width:1280px){body{font-size:16px}.note{font-size:15px;line-height:1.55}nav.rail a{font-size:14px}.col-text .cap,.col-text li,.col-text .note{font-size:17px;line-height:1.6}.col-text h2{font-size:30px}.notation .cap,.notation dd,.part .cap{font-size:17px}.nota-h{font-size:20px}}
+@media (min-width:1700px){section.split{grid-template-columns:minmax(380px,500px) minmax(0,1fr)}.col-text .cap,.col-text li,.col-text .note{font-size:18.5px}.notation .cap,.notation dd,.part .cap{font-size:18px}}
 ul.cap{padding-left:20px}
 header.top{padding:40px 0 8px}
 .wrap{padding-top:0}
@@ -194,7 +197,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 <header class="top">
   <div class="top-in">
     <h1>LLM Inference, Visualized</h1>
-    <p class="dek">How a large language model turns text into the next token, and how inference systems make that fast. Every idea is a live figure you can step through.</p>
+    <p class="dek">How a large language model writes text one piece at a time, and how inference systems make that fast. Every idea is a live figure you can step through.</p>
     <nav class="parts" aria-label="Parts">
       <a href="#architecture"><span>PART I</span><b>Foundations</b><small>The transformer, attention, and the tensor shapes everything else is built on.</small></a>
       <a href="#phases"><span>PART II</span><b>Inference optimizations</b><small>Prefill and decode, KV cache, batching, parallelism, attention variants and more.</small></a>
@@ -208,13 +211,13 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <svg id="nota-svg" viewBox="0 0 300 205" role="img" aria-label="A block of numbers with axes b, s and h"></svg>
     <div>
       <p class="nota-h">Three letters used on every figure</p>
-      <p class="cap" style="margin:0 0 10px">Inside the model, text becomes a block of numbers with three sides. We write its shape as <b>[b, s, h]</b>:</p>
+      <p class="cap" style="margin:0 0 10px">A model does not read letters. It cuts text into <b>tokens</b>, which are whole words or pieces of words, and works on one list of numbers per token. All of that fits in a block of numbers with three sides, and we write its shape as <b>[b, s, h]</b>:</p>
       <dl>
         <dt>b</dt><dd><b>batch</b>: how many separate texts are processed together. For example, 2 users' prompts.</dd>
         <dt>s</dt><dd><b>sequence length</b>: how many tokens each text has. For example, 6 tokens: "I saw a dog ride in".</dd>
         <dt>h</dt><dd><b>hidden size</b>: how many numbers describe one token. For example, 4,096 in Llama 2 7B (drawn as 8 here).</dd>
       </dl>
-      <p class="cap" style="margin:8px 0 0">So <b>[b, s]</b> is a grid of token IDs, and <b>[b, s, h]</b> is that grid with a vector of h numbers at every cell. Other letters are introduced where they first appear.</p>
+      <p class="cap" style="margin:8px 0 0">So the input is b texts of s tokens each, and once inside the model every one of those tokens is h numbers long: a block of b × s × h numbers. Other letters are introduced where they first appear.</p>
     </div>
   </div>
 </div>
@@ -265,7 +268,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 <div class="part"><span>PART II</span><h3>Inference optimizations</h3><p class="cap">How serving systems make inference fast and cheap, and which of those shapes or memory costs each technique attacks.</p></div>
 <section id="phases">
   <div class="sh"><span class="n">01</span><h2>Prefill vs decode</h2></div>
-  <p class="cap">Prefill pushes all prompt tokens through as one matrix–matrix product. Decode handles one token per step, a matrix–vector product, and still reads every weight.</p>
+  <p class="cap">Answering a request has two phases. <b>Prefill</b> reads the whole prompt at once, as one matrix–matrix product. <b>Decode</b> then writes the reply one token per step, a matrix–vector product that still reads every weight.</p>
   <div class="fig">
     <div class="controls">
       <button class="btn solid" id="pd-next" type="button">Run prefill</button>
@@ -282,7 +285,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="kv">
   <div class="sh"><span class="n">02</span><h2>KV cache memory</h2></div>
-  <p class="cap">The KV cache grows linearly with batch × sequence length. Drag the sliders to see how it crowds the weights out of GPU memory.</p>
+  <p class="cap">Each token's keys and values (K and V, from §00.2) are saved so later tokens do not recompute them. That store is the <b>KV cache</b>, and it grows linearly with batch × sequence length. Drag the sliders to see how it crowds the weights out of GPU memory.</p>
   <div class="fig">
     <div class="controls">
       <label class="ctl">Model<select id="kv-preset">
@@ -344,7 +347,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 </section>
 <section id="par-pp">
   <div class="sh"><span class="n">04.3</span><h2>Pipeline parallelism: split the layers</h2></div>
-  <p class="cap">Cut the stack of layers into stages, one per GPU. Each GPU stores 1/p of the weights and passes only a small activation tensor [b, s, h] to the next stage. But stages must wait on each other, and a single request still has to walk through every stage in turn.</p>
+  <p class="cap">Cut the stack of layers into stages, one per GPU. Each of the p GPUs stores 1/p of the weights and passes only a small activation tensor [b, s, h] to the next stage. But stages must wait on each other, and a single request still has to walk through every stage in turn.</p>
   <div class="fig">
     <div id="par-pipe">
       <div class="controls"><span class="mono" style="font-size:12px;color:var(--muted)">microbatches</span><div class="seg" id="pp-m"></div></div>
@@ -366,7 +369,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 </section>
 <section id="par-sp">
   <div class="sh"><span class="n">04.5</span><h2>Sequence parallelism: remove TP's copies</h2></div>
-  <p class="cap">TP leaves LayerNorm and Dropout copied on every GPU. These ops treat each token on its own, so they can be split along the sequence s instead. Compare the possible layouts of the same [b, s, h] tensor on two GPUs:</p>
+  <p class="cap">TP leaves LayerNorm and Dropout (a training-only step that randomly zeroes some values) copied on every GPU. These ops treat each token on its own, so they can be split along the sequence s instead. Compare the possible layouts of the same [b, s, h] tensor on two GPUs:</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="cube-seg"></div><button class="btn solid" id="cube-replay" type="button">Replay cut</button></div>
     <div class="svgbox"><svg id="cube-svg" viewBox="0 0 760 290" role="img" aria-label="3D activation tensor split across GPUs"></svg></div>
@@ -390,7 +393,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 </section>
 <section id="par-combo">
   <div class="sh"><span class="n">04.6</span><h2>Putting it together</h2></div>
-  <p class="cap">Real deployments mix strategies to match the hardware: TP inside a server where NVLink is fast, PP across servers where links are slow, and DP to replicate for traffic. Pick a deployment:</p>
+  <p class="cap">Real deployments mix strategies to match the hardware: TP inside a server where NVLink (the direct GPU-to-GPU link) is fast, PP across servers where links are slow, and DP to replicate for traffic. Pick a deployment:</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="cb-seg"></div></div>
     <div class="note" id="cb-note" style="margin:0 0 10px"></div>
@@ -405,7 +408,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="attention">
   <div class="sh"><span class="n">05</span><h2>MHA → GQA → MQA</h2></div>
-  <p class="cap">Query heads keep their own projections, while K/V heads are shared across groups. Fewer KV heads means a smaller KV cache and fewer memory reads.</p>
+  <p class="cap">In standard multi-head attention (<b>MHA</b>), every query head has its own key and value head. Grouped-query attention (<b>GQA</b>) lets a group of query heads share one, and multi-query attention (<b>MQA</b>) shares one across all of them. Fewer KV heads means a smaller KV cache and fewer memory reads.</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="at-seg"></div></div>
     <div class="svgbox"><svg id="at-svg" viewBox="0 0 760 290" role="img" aria-label="Query heads sharing KV heads"></svg></div>
@@ -415,7 +418,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="flash">
   <div class="sh"><span class="n">06</span><h2>FlashAttention: tiling in SRAM</h2></div>
-  <p class="cap">Standard attention writes the full N×N score matrix to HBM and reads it back. FlashAttention computes it tile by tile in on-chip SRAM and never stores it. The output is exactly the same.</p>
+  <p class="cap">A GPU has two kinds of memory: a large but slow main memory (<b>HBM</b>) and a tiny but very fast on-chip memory (<b>SRAM</b>). Standard attention writes the full s × s table of scores to HBM and reads it back. FlashAttention computes it one small tile at a time in SRAM and never stores the whole table. The output is exactly the same.</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="fa-seg"></div><button class="btn solid" id="fa-play" type="button">Play</button></div>
     <div class="svgbox"><svg id="fa-svg" viewBox="0 0 760 290" role="img" aria-label="FlashAttention tiling"></svg></div>
@@ -438,7 +441,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="quant">
   <div class="sh"><span class="n">08</span><h2>Quantization</h2></div>
-  <p class="cap">48 weights snapped to a grid of 2<sup>b</sup> levels. A single outlier stretches the grid and wipes out resolution for everything else. Clipping the range trades that rounding error for clipping error.</p>
+  <p class="cap">Quantization stores each number with fewer bits, so it can only take a few evenly spaced values: 16 with 4 bits, 256 with 8. Here 48 weights are snapped to the nearest one. A single outlier stretches the grid and wipes out resolution for everything else. Clipping the range trades that rounding error for clipping error.</p>
   <div class="fig">
     <div class="controls">
       <div class="seg" id="q-bits"></div>
@@ -462,7 +465,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="distill">
   <div class="sh"><span class="n">10</span><h2>Distillation: soft targets</h2></div>
-  <p class="cap">The student learns from the teacher's full probability distribution, not just the one right answer. Raise the temperature to see the information carried by the "wrong" answers.</p>
+  <p class="cap">The student learns from the teacher's full probability distribution, not just the one right answer. Raise the temperature (a setting that flattens the probabilities) to see the information carried by the "wrong" answers.</p>
   <div class="fig">
     <div class="controls"><label class="ctl">Temperature T = <span class="mono" id="ds-tv"></span><input type="range" id="ds-t" min="5" max="50" value="10"></label></div>
     <div class="svgbox"><svg id="ds-svg" viewBox="0 0 760 250" role="img" aria-label="Hard label vs soft targets"></svg></div>
@@ -1010,7 +1013,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       for(let r=0;r<n;r++)for(let c=0;c<n;c++)R(svg,SX+c*ts,SY+r*ts,ts-2,ts-2,'fill:none;stroke:var(--line);stroke-dasharray:2 2',{rx:2});
       R(svg,SX+kj*ts-1,SY+qi*ts-1,ts,ts,'fill:var(--g2);stroke:var(--ink);stroke-width:2');
       T(svg,SX,SY+n*ts+18,'S never stored:',{style:'font-weight:600;font-size:11px'});T(svg,SX,SY+n*ts+33,'only this tile exists, in SRAM',{style:'font-weight:600;font-size:11px'});}
-    T(svg,SX+80,SY-8,'S  [N × N]',{'text-anchor':'middle',style:'font-weight:700'});
+    T(svg,SX+80,SY-8,'S  [s × s]',{'text-anchor':'middle',style:'font-weight:700'});
     bar(40,'Q',qi,'var(--g0)');bar(76,'K',kj,'var(--g3)');bar(112,'V',kj,'var(--g3)');
     T(svg,392,SY-8,'O',{'text-anchor':'middle',style:'font-weight:700'});
     for(let i=0;i<n;i++){const done=mode==='flash'?(i<orow||(i===orow&&k===63)):(k>=192&&i<=orow)||k>=255;const cur=i===orow&&!done;
@@ -1024,7 +1027,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       T(svg,sx,sy+76,mode==='flash'?'online softmax: running max m, sum ℓ':'tile passes through → back to HBM',{style:'font-size:11px;fill:var(--muted)'});
       T(svg,sx,sy+96,mode==='flash'?`accumulating O row block ${qi}`:'',{style:'font-size:11px;fill:var(--muted)'});}
     T(svg,470,228,`score traffic via HBM: ${mode==='std'?traffic:0} tiles`,{style:`font-weight:700;fill:${mode==='std'?'var(--bad)':'var(--ok)'}`});
-    T(svg,470,250,`N×N matrix in HBM: ${mode==='std'?(mat?'yes':'—'):'never'}`,{style:'font-weight:700'});
+    T(svg,470,250,`s × s table in HBM: ${mode==='std'?(mat?'yes':'—'):'never'}`,{style:'font-weight:700'});
     stats($('#fa-stats'),[{v:mode==='std'?'4N²':'0',l:'score-matrix HBM reads+writes',c:mode==='std'?'warn':'good'},
       {v:'O(N²)',l:mode==='std'?'extra HBM memory':'compute (unchanged)'},{v:'exact',l:'output vs standard'}]);}
   function stop(){clearInterval(timer);timer=null;$('#fa-play').textContent='Play';}
