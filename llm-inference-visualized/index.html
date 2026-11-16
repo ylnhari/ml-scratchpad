@@ -44,7 +44,7 @@ h1{font:800 clamp(34px,5vw,58px)/1.02 var(--f-display);margin:0 0 10px;letter-sp
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .sw{width:14px;height:14px;border-radius:4px;display:inline-block}
 .wrap{max-width:1640px;margin:0 auto;padding:0 24px 60px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px}
-nav.rail{position:sticky;top:16px;align-self:start;font-size:13.5px}
+nav.rail{position:sticky;top:16px;align-self:start;font-size:13.5px;max-height:calc(100vh - 32px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding-right:4px}
 nav.rail ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
 nav.rail a{display:flex;gap:8px;padding:5px 8px;border-radius:7px;text-decoration:none;color:var(--muted)}
 nav.rail a b{font:600 12px var(--f-mono);color:var(--accent);min-width:20px}
@@ -130,7 +130,7 @@ table.sum td.no{color:var(--bad);font-weight:600}
 ul.cap{padding-left:20px}
 header.top{padding:40px 0 8px}
 .wrap{padding-top:0}
-nav.rail{margin-top:44px}
+nav.rail{margin-top:44px;max-height:calc(100vh - 60px)}
 .parts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:22px}
 .parts a{display:block;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;transition:border-color .15s,transform .15s}
 .parts a:hover{border-color:var(--accent);transform:translateY(-2px)}
@@ -330,6 +330,17 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <div class="controls"><button class="btn solid" id="bt-play" type="button">Replay</button></div>
     <div class="svgbox"><svg id="bt-svg" viewBox="0 0 760 300" role="img" aria-label="Batching timelines"></svg></div>
     <div class="stats" id="bt-stats"></div>
+  </div>
+  <p class="cap">The same idea as a live server: requests <b>arrive</b> over time and wait in a queue, run in one of four slots, and <b>leave</b> when their reply is finished. Switch between the two policies and watch how long requests wait.</p>
+  <div class="fig">
+    <div class="controls">
+      <div class="seg" id="bl-mode"></div>
+      <button class="btn solid" id="bl-play" type="button">Play</button>
+      <button class="btn" id="bl-step" type="button">Step</button>
+      <button class="btn" id="bl-reset" type="button">Reset</button>
+    </div>
+    <div class="svgbox"><svg id="bl-svg" viewBox="0 0 760 300" role="img" aria-label="Live batching: requests arriving, running in slots, and leaving"></svg></div>
+    <div class="stats" id="bl-stats"></div>
   </div>
 </section>
 
@@ -1042,6 +1053,54 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     {v:B.T,l:'in-flight: steps to finish'},{v:Math.round(100*sum/(N*B.T))+'%',l:'in-flight: slots busy',c:'good'}]);
   function play(){clearInterval(timer);let u=0;if(RM){render(TM);return;}timer=setInterval(()=>{render(u);if(++u>TM)clearInterval(timer);},90);}
   $('#bt-play').onclick=play;render(TM);
+})();
+
+
+/* ---------- 03b live batching ---------- */
+(function(){
+  const svg=$('#bl-svg'),N=4,LEN=[5,12,3,8,6,4,10,3,7,5,2,9],ARR=[0,0,0,1,2,3,5,6,8,9,11,12];
+  let mode='inflight',t,slots,queue,done,arrived,timer=null,fresh;
+  function reset(){t=0;slots=Array(N).fill(null);queue=[];done=[];arrived=0;fresh=new Set();admitArrivals();schedule();render();}
+  function admitArrivals(){while(arrived<LEN.length&&ARR[arrived]<=t){queue.push({id:arrived,len:LEN[arrived],gen:0,arr:ARR[arrived],start:null});arrived++;}}
+  function schedule(){const empty=slots.map((s,i)=>s?null:i).filter(i=>i!==null);
+    if(mode==='static'&&empty.length<N)return;
+    empty.forEach(i=>{if(queue.length){const r=queue.shift();r.start=t;slots[i]=r;fresh.add(r.id);}});}
+  function step(){fresh=new Set();t++;
+    slots.forEach((r,i)=>{if(r){r.gen++;if(r.gen>=r.len){r.end=t;done.push(r);slots[i]=null;fresh.add('d'+r.id);}}});
+    admitArrivals();schedule();render();}
+  const finished=()=>done.length===LEN.length;
+  const L=id=>String.fromCharCode(65+id);
+  function card(x,y,w,r,showProg,isNew,dim){const g=S('g',{style:(isNew&&!RM?'animation:pdIn .5s cubic-bezier(.2,.8,.2,1) both;transform-box:fill-box;transform-origin:center;':'')+(dim?'opacity:.55':'')},svg);
+    R(g,x,y,w,26,`fill:var(--surface);stroke:${PAL(r.id)};stroke-width:2`,{rx:6});R(g,x,y,26,26,`fill:${PAL(r.id)}`,{rx:6});
+    T(g,x+13,y+18,L(r.id),{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:800'});
+    if(showProg){const pw=w-110;R(g,x+34,y+9,pw,8,'fill:var(--idle)',{rx:4});R(g,x+34,y+9,pw*r.gen/r.len,8,`fill:${PAL(r.id)}`,{rx:4});T(g,x+w-6,y+18,`${r.gen}/${r.len} tokens`,{'text-anchor':'end',style:'font-size:11px'});}
+    else T(g,x+34,y+18,`${r.len} tokens to write`,{style:'font-size:11px;fill:var(--muted)'});}
+  function render(){clear(svg);
+    T(svg,20,26,'WAITING IN QUEUE',{class:'lbl'});
+    const left=LEN.length-arrived;T(svg,20,44,left?`${left} more still to arrive`:'all requests have arrived',{style:'font-size:11px;fill:var(--muted)'});
+    queue.slice(0,7).forEach((r,i)=>card(20,56+i*31,180,r,false,fresh.has(r.id)&&false,false));if(queue.length>7)T(svg,20,56+7*31+14,`+${queue.length-7} more`,{style:'font-size:11px;fill:var(--muted)'});
+    if(!queue.length)T(svg,20,74,'(empty)',{style:'font-size:12px;fill:var(--muted)'});
+    S('line',{x1:208,x2:238,y1:150,y2:150,'marker-end':'url(#arr)',style:'stroke:var(--muted);stroke-width:2'},svg);
+    T(svg,250,26,'GPU: 4 BATCH SLOTS',{class:'lbl'});
+    const waitingForBatch=mode==='static'&&slots.some(s=>s)&&slots.some(s=>!s)&&queue.length;
+    T(svg,250,44,waitingForBatch?'static: free slots wait for the batch to end':mode==='static'?'static: the whole batch starts together':'in-flight: free slot refilled next step',{style:`font-size:11px;fill:${waitingForBatch?'var(--bad)':'var(--muted)'};font-weight:${waitingForBatch?700:400}`});
+    for(let i=0;i<N;i++){const y=56+i*52;R(svg,250,y-4,280,40,'fill:var(--surface-2)',{rx:8});T(svg,258,y+20,'slot '+(i+1),{style:'font-size:10.5px;fill:var(--muted)'});
+      const r=slots[i];if(r)card(300,y+3,222,r,true,fresh.has(r.id),false);else{R(svg,300,y+3,222,26,'fill:url(#hatch)',{rx:6});T(svg,411,y+21,'idle',{'text-anchor':'middle',style:'font-size:11px;fill:var(--muted)'});}}
+    S('line',{x1:538,x2:568,y1:150,y2:150,'marker-end':'url(#arr)',style:'stroke:var(--muted);stroke-width:2'},svg);
+    T(svg,580,26,'DONE',{class:'lbl'});T(svg,580,44,'waited = steps in queue',{style:'font-size:11px;fill:var(--muted)'});
+    done.forEach((r,i)=>{const x=580+(i%2)*88,y=56+Math.floor(i/2)*31;const g=S('g',{style:fresh.has('d'+r.id)&&!RM?'animation:pdIn .5s cubic-bezier(.2,.8,.2,1) both;transform-box:fill-box;transform-origin:center;':''},svg);
+      R(g,x,y,80,26,'fill:var(--surface);stroke:var(--line)',{rx:6});R(g,x,y,24,26,`fill:${PAL(r.id)}`,{rx:6});T(g,x+12,y+18,L(r.id),{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:800'});
+      T(g,x+30,y+18,`waited ${r.start-r.arr}`,{style:'font-size:10.5px'});});
+    T(svg,250,282,`step ${t}`,{style:'font-weight:700'});
+    const busy=slots.filter(Boolean).length,avg=done.length?done.reduce((a,r)=>a+(r.start-r.arr),0)/done.length:0;
+    stats($('#bl-stats'),[{v:t,l:'decode steps so far'},{v:queue.length,l:'waiting'},{v:busy+' / 4',l:'slots busy now'},{v:done.length+' / 12',l:'finished'},{v:done.length?fmt(avg,1)+' steps':'—',l:'average wait before starting'}]);
+    $('#bl-step').disabled=finished();$('#bl-play').textContent=timer?'Pause':finished()?'Replay':'Play';}
+  function stop(){clearInterval(timer);timer=null;render();}
+  $('#bl-play').onclick=()=>{if(timer){stop();return;}if(finished())reset();timer=setInterval(()=>{if(finished()){stop();return;}step();},RM?250:700);render();};
+  $('#bl-step').onclick=()=>{if(timer)stop();if(!finished())step();};
+  $('#bl-reset').onclick=()=>{stop();reset();};
+  seg($('#bl-mode'),[{l:'In-flight batching',v:'inflight'},{l:'Static batching',v:'static'}],'inflight',v=>{mode=v;clearInterval(timer);timer=null;reset();});
+  reset();
 })();
 
 /* ---------- 04 parallelism ---------- */
@@ -2023,7 +2082,7 @@ document.querySelectorAll('main section').forEach(sec=>{if(!sec.querySelector(':
   [...sec.children].forEach(ch=>{(ch.classList.contains('fig')?f:t).appendChild(ch);});sec.append(t,f);sec.classList.add('split');});
 /* nav highlight */
 (function(){const links=[...document.querySelectorAll('nav.rail a')];
-  const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){links.forEach(l=>l.classList.toggle('on',l.getAttribute('href')==='#'+e.target.id));}});},{rootMargin:'-40% 0px -55% 0px'});
+  const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){links.forEach(l=>l.classList.toggle('on',l.getAttribute('href')==='#'+e.target.id));const on=links.find(l=>l.classList.contains('on'));const rail=document.querySelector('nav.rail');if(on&&rail){const r=on.getBoundingClientRect(),rr=rail.getBoundingClientRect();if(r.top<rr.top+40||r.bottom>rr.bottom-40)rail.scrollTo({top:rail.scrollTop+(r.top-rr.top)-rr.height/2,behavior:RM?'auto':'smooth'});}}});},{rootMargin:'-40% 0px -55% 0px'});
   document.querySelectorAll('main section').forEach(s=>io.observe(s));})();
 </script>
 </body>
