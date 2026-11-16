@@ -60,6 +60,7 @@ h2{font:700 26px/1.15 var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:
 .fig svg{width:100%;height:auto;display:block}
 .svgbox{overflow-x:auto}
 .svgbox svg{min-width:640px}
+.e2cfg{display:inline-flex;align-items:center;gap:6px}.e2cfg>.mono{font-size:11.5px;color:var(--muted)}.e2cfg .seg .btn{font-size:12px;padding:3px 8px}
 .spd{display:inline-flex;align-items:center;gap:2px;font:500 11px var(--f-mono,monospace);color:var(--muted)}.spd button{font:600 11px var(--f-mono,monospace);padding:2px 5px;border-radius:6px;border:1px solid var(--surface-2);background:transparent;color:var(--muted);cursor:pointer}.spd button[aria-pressed=true]{background:var(--accent);color:var(--on-fill);border-color:var(--accent)}
 .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
 .seg{display:inline-flex;flex-wrap:wrap;gap:4px;background:var(--surface-2);padding:3px;border-radius:10px}
@@ -186,7 +187,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <li><a class="sub" href="#par-tpc"><b>·</b>Tensor (TP)</a></li>
     <li><a class="sub" href="#par-sp"><b>·</b>Sequence (SP)</a></li>
     <li><a class="sub" href="#par-combo"><b>·</b>Combining</a></li>
-    <li><a class="sub" href="#par-e2e"><b>·</b>End to end</a></li>
+    <li><a class="sub" href="#par-e2e"><b>·</b>End to end (configurable)</a></li>
     <li><a href="#attention"><b>05</b>MHA · GQA · MQA</a></li>
     <li><a href="#flash"><b>06</b>FlashAttention</a></li>
     <li><a href="#paged"><b>07</b>PagedAttention</a></li>
@@ -452,21 +453,28 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 
 <section id="par-e2e">
-  <div class="sh"><span class="n">04.7</span><h2>End to end: one request on four GPUs</h2></div>
-  <p class="cap">Everything in this chapter at once. Llama 2 7B runs on <b>4 GPUs</b>: pipeline parallelism cuts its 32 layers into <b>2 stages</b> of 16, and inside each stage tensor parallelism splits every layer across <b>2 GPUs</b>. We follow one 512-token prompt through the whole forward pass, operation by operation, watching which GPU works, which waits, what crosses between them, and how memory fills.</p>
+  <div class="sh"><span class="n">04.7</span><h2>End to end: one request, your configuration</h2></div>
+  <p class="cap">Everything in this chapter at once. Pick a model, how many GPUs, and how to split them between tensor parallelism (TP, every layer split across GPUs) and pipeline parallelism (PP, layers cut into stages). Then follow one prompt through prefill and a few decode steps, watching which GPU works, which waits, what moves between them, and how the KV cache grows.</p>
   <ul class="cap">
-    <li>Each layer column stands for all 16 layers of a stage: attention, All-Reduce, MLP, All-Reduce, repeated 16 times.</li>
-    <li>Times are rough estimates for A100-class GPUs at about half of peak speed; they show proportions, not a benchmark.</li>
+    <li>Each stage's attention and MLP boxes stand for all of its layers. Times are rough estimates for A100-class GPUs at about half of peak speed; they show proportions, not a benchmark.</li>
+    <li>DP is not an option here: it helps only when there are many requests (section 04.2).</li>
   </ul>
   <div class="fig">
+    <div class="controls" style="row-gap:6px;column-gap:14px">
+      <span class="e2cfg"><span class="mono">model</span><div class="seg" id="e2-m"></div></span>
+      <span class="e2cfg"><span class="mono">GPUs</span><div class="seg" id="e2-g"></div></span>
+      <span class="e2cfg"><span class="mono">split</span><div class="seg" id="e2-tp"></div></span>
+      <span class="e2cfg"><span class="mono">prompt tokens</span><div class="seg" id="e2-s"></div></span>
+      <span class="e2cfg"><span class="mono">new tokens</span><div class="seg" id="e2-d"></div></span>
+    </div>
     <div class="controls">
       <button class="btn" id="e2-prev" type="button">◀ Prev</button>
       <button class="btn solid" id="e2-next" type="button">Next ▶</button>
-      <button class="btn" id="e2-play" type="button">Play all</button>
+      <button class="btn solid" id="e2-play" type="button">Play all</button><span class="spd" aria-label="Animation speed">speed</span>
       <button class="btn" id="e2-reset" type="button">Reset</button>
     </div>
     <div class="note" id="e2-note" style="margin:0 0 10px;min-height:76px"></div>
-    <div class="svgbox"><svg id="e2-svg" viewBox="0 0 760 470" role="img" aria-label="End-to-end prefill on 4 GPUs with pipeline and tensor parallelism"></svg></div>
+    <div class="svgbox"><svg id="e2-svg" viewBox="0 0 760 420" role="img" aria-label="End-to-end request across GPUs with tensor and pipeline parallelism"></svg></div>
     <div class="stats" id="e2-stats"></div>
   </div>
 </section>
@@ -692,7 +700,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <div class="sh"><span class="n">A4.3</span><h2>What happens during training</h2></div>
   <p class="cap">The forward pass runs both paths: the frozen W and the small A·B detour, added together. The backward pass still sends gradients <b>through</b> W, because earlier layers need them, but W itself is never updated. Only A and B receive updates, so only they need gradients kept and optimizer state (the extra numbers Adam stores for every trained weight). That is where the memory saving comes from. Step through it.</p>
   <div class="fig">
-    <div class="controls"><button class="btn" id="lt-prev" type="button">◀ Prev</button><button class="btn" id="lt-next" type="button">Next ▶</button><button class="btn" id="lt-play" type="button">Play</button></div>
+    <div class="controls"><button class="btn" id="lt-prev" type="button">◀ Prev</button><button class="btn" id="lt-next" type="button">Next ▶</button><button class="btn" id="lt-play" type="button">Play</button><span class="spd" aria-label="Animation speed">speed</span></div>
     <div class="chips" id="lt-chips"></div>
     <div class="note" id="lt-note" style="margin:0 0 10px"></div>
     <div class="svgbox"><svg id="lt-svg" viewBox="0 0 760 300" role="img" aria-label="LoRA training: forward through both paths, backward updates only A and B"></svg></div>
@@ -2170,69 +2178,107 @@ document.querySelectorAll('main section:not(#x-glossary) p.cap, main section:not
 
 /* ---------- 04.7 end to end ---------- */
 (function(){
-  const svg=$('#e2-svg'),{A}=makeKit(svg);
-  const NV=4/0.3/1000; // ms to send 4 MB over NVLink-class 300 GB/s (approx)
-  const OPS=[
-   {k:'Embed',s:0,t:'c',ms:0.01,f:'X = E[ids] (vocab split)',c:'Stage 0 starts. The 512 token IDs go to <b>GPU 0 and GPU 1</b>. Each holds half of the embedding table and returns its rows or zeros. GPUs 2 and 3 have nothing to do yet.'},
-   {k:'AR',s:0,t:'ar',ms:0.025,mb:4,f:'All-Reduce over NVLink, 4 MB',c:'GPU 0 and GPU 1 add their halves so both hold the full X [1, 512, 4096] (about 4 MB in 16-bit). This crosses <b>NVLink</b>, the fast link inside the server.'},
-   {k:'Attn',s:0,t:'c',ms:3.9,x16:1,kv:1,f:'×16: LN → Q,K,V → attention (16 heads each) → partial W_O',c:'Layers 1–16, attention part. Each GPU runs <b>half of the heads</b> (16 of 32) and writes their K and V into its own KV cache. Its share of W_O gives a partial result that still has to be added to the other GPU\'s.'},
-   {k:'AR',s:0,t:'ar',ms:0.4,mb:64,x16:1,f:'×16 All-Reduce, 4 MB each',c:'After attention in every layer, one All-Reduce adds the two partial outputs: 16 layers × 4 MB over NVLink.'},
-   {k:'MLP',s:0,t:'c',ms:7.4,x16:1,f:'×16: LN → W₁ (columns) → act → W₂ (rows)',c:'The MLP part of layers 1–16. Each GPU holds half of W₁\'s columns and half of W₂\'s rows, so it computes its half without talking. The MLP is the largest part of each layer, so this is the longest step.'},
-   {k:'AR',s:0,t:'ar',ms:0.4,mb:64,x16:1,f:'×16 All-Reduce, 4 MB each',c:'The second All-Reduce of every layer, after the MLP. Tensor parallelism costs two All-Reduces per layer, which is why it stays inside one server.'},
-   {k:'Send',s:0,t:'send',ms:0.16,nb:4,f:'stage 0 → stage 1: [1, 512, 4096] activations, 4 MB',c:'Pipeline hand-off. Stage 0 sends the activations after layer 16 to stage 1, over the <b>network between servers</b> (slower than NVLink). Only this 4 MB crosses; no weights move.'},
-   {k:'Attn',s:1,t:'c',ms:3.9,x16:1,kv:1,f:'×16: layers 17–32, attention, half the heads per GPU',c:'Stage 1 finally starts. GPUs 2 and 3 run attention for layers 17–32, each with half the heads, filling their own KV caches. <b>GPUs 0 and 1 are now idle</b>: that is the pipeline bubble with a single request.'},
-   {k:'AR',s:1,t:'ar',ms:0.4,mb:64,x16:1,f:'×16 All-Reduce, 4 MB each',c:'Same pattern as stage 0: one All-Reduce after attention in each of the 16 layers.'},
-   {k:'MLP',s:1,t:'c',ms:7.4,x16:1,f:'×16: layers 17–32, MLP split by columns then rows',c:'The MLP of layers 17–32, split the same way.'},
-   {k:'AR',s:1,t:'ar',ms:0.4,mb:64,x16:1,f:'×16 All-Reduce, 4 MB each',c:'The second All-Reduce of each layer.'},
-   {k:'LM',s:1,t:'c',ms:0.01,f:'logits = LN(x_last) · W_U  (vocab split)',c:'Only the <b>last token\'s</b> hidden state goes through the LM head. GPU 2 scores tokens 0–15,999 and GPU 3 scores 16,000–31,999.'},
-   {k:'Pick',s:1,t:'ar',ms:0.01,mb:0,f:'compare the two local winners → first new token',c:'Each GPU sends its best token and score; the higher one wins. The first new token is out. From here, decode repeats the same journey for one token at a time, reading the KV caches that this prefill just filled.'}];
-  const W_GB=3.4,KV_MB=64; let k=-1,timer=null;
-  const x0=110,cw=(740-x0)/OPS.length,y0=128,rh=40;
-  function render(){clear(svg);
-    T(svg,20,22,'STAGE 0 = layers 1–16 on GPU 0 + GPU 1',{class:'lbl'});T(svg,400,22,'STAGE 1 = layers 17–32 on GPU 2 + GPU 3',{class:'lbl'});
-    // stage bands
-    R(svg,x0,40,cw*7,18,`fill:${G(0)};opacity:.25`,{rx:4});T(svg,x0+cw*3.5,53,'stage 0',{'text-anchor':'middle',style:'font-size:11px;font-weight:700'});
-    R(svg,x0+cw*7,40,cw*6,18,`fill:${G(2)};opacity:.25`,{rx:4});T(svg,x0+cw*10,53,'stage 1',{'text-anchor':'middle',style:'font-size:11px;font-weight:700'});
-    OPS.forEach((o,i)=>{const x=x0+i*cw,cur=i===k;if(cur)R(svg,x,64,cw,rh*4+60,'fill:var(--accent-soft)',{rx:6});
-      T(svg,x+cw/2,82,o.k,{'text-anchor':'middle',style:`font-size:11.5px;font-weight:${cur?800:600};fill:${i<=k?'var(--ink)':'var(--muted)'}`});
-      if(o.x16)T(svg,x+cw/2,98,'×16',{'text-anchor':'middle',style:'font-size:10px;fill:var(--muted)'});});
-    for(let g=0;g<4;g++){const y=y0+g*rh,st=g<2?0:1;T(svg,20,y+22,'GPU '+g,{style:'font-weight:700'});T(svg,64,y+22,'S'+st,{style:'font-size:10.5px;fill:var(--muted)'});
-      OPS.forEach((o,i)=>{const x=x0+i*cw+2,w=cw-4,done=i<=k,mine=o.s===st;let fill;
-        if(!done)fill='fill:none;stroke:var(--line);stroke-dasharray:2 3';
-        else if(!mine)fill='fill:url(#hatch)';
-        else if(o.t==='c')fill=`fill:${G(g)}`;
-        else if(o.t==='ar')fill='fill:var(--accent);opacity:.8';
-        else fill=`fill:${G(g)};opacity:.5`;
-        R(svg,x,y+4,w,rh-10,fill,{rx:4});});}
-    // comm arrows for current op
-    if(k>=0){const o=OPS[k],x=x0+k*cw+cw/2;
-      if(o.t==='ar'){const a=o.s*2,yA=y0+a*rh+rh/2-2,yB=y0+(a+1)*rh+rh/2-2;S('line',{x1:x,x2:x,y1:yA,y2:yB,'marker-end':'url(#arr)','marker-start':'url(#arr)',style:`stroke:var(--ink);stroke-width:2.5;${A(.1)}`},svg);}
-      if(o.t==='send'){[[0,2],[1,3]].forEach(([a,b],j)=>S('line',{x1:x-6+j*12,x2:x+6+j*12,y1:y0+a*rh+rh/2,y2:y0+b*rh+rh/2-6,'marker-end':'url(#arr)',style:`stroke:var(--bad);stroke-width:2.5;${A(.1+j*.1)}`},svg));}}
-    [['computing',`fill:${G(0)}`],['All-Reduce / exchange','fill:var(--accent);opacity:.8'],['idle, waiting for the other stage','fill:url(#hatch)'],['not reached yet','fill:none;stroke:var(--line);stroke-dasharray:2 3']].reduce((x,[l,f])=>{R(svg,x,y0+4*rh-2,12,12,f,{rx:2});const t=T(svg,x+16,y0+4*rh+8,l,{style:'font-size:10.5px;fill:var(--muted)'});return x+16+t.getComputedTextLength()+16;},x0);
-    if(k>=0){const o=OPS[k],cx=x0+k*cw+cw/2,px=k>0?x0+(k-1)*cw+cw/2:x0-40,py=y0-24;const pg=S('g',{},svg);
-      R(pg,cx-26,py,52,18,'fill:var(--ink)',{rx:9});T(pg,cx,py+13,o.t==='send'?'4 MB →':'X',{'text-anchor':'middle',style:'fill:var(--surface);font-size:10.5px;font-weight:700'});
-      if(!RM){const an=S('animateTransform',{attributeName:'transform',type:'translate',from:`${px-cx} ${(k>0&&OPS[k-1].s!==o.s)?(y0-24)-py:0}`,to:'0 0',dur:'0.7s',fill:'freeze'},pg);}}
-    // memory panel
-    const my=y0+4*rh+34;T(svg,20,my,'MEMORY PER GPU (GB, out of 80)',{class:'lbl'});
-    const kvDone=g=>OPS.slice(0,k+1).filter(o=>o.kv&&o.s===(g<2?0:1)).length;
-    for(let g=0;g<4;g++){const y=my+12+g*24,sc=300/8;R(svg,20,y,300,16,'fill:var(--surface-2)',{rx:4});R(svg,20,y,W_GB*sc,16,`fill:${G(g)};opacity:.8`,{rx:4});
-      const kv=kvDone(g)*KV_MB/1000;if(kv>0)R(svg,20+W_GB*sc,y,Math.max(3,kv*sc),16,'fill:var(--g2);stroke:var(--ink);stroke-width:1',{rx:2});
-      T(svg,330,y+12,`GPU ${g}: weights ${W_GB} GB + KV ${kvDone(g)?KV_MB+' MB':'0'}`,{style:'font-size:11px'});}
-    T(svg,20,my+118,'axis shown to 8 GB of the 80 GB; the rest is free for more requests\' KV caches',{style:'font-size:10.5px;fill:var(--muted)'});
-    // counters
-    const upto=OPS.slice(0,k+1),ms=upto.reduce((a,o)=>a+o.ms,0),nv=upto.filter(o=>o.mb!==undefined).reduce((a,o)=>a+o.mb,0),net=upto.filter(o=>o.nb).reduce((a,o)=>a+o.nb,0);
-    const busy=upto.filter(o=>o.t==='c').reduce((a,o)=>a+o.ms,0),gpuBusy=k<0?0:100*busy/ms/2;
+  const svg=$('#e2-svg');
+  const MODELS={'7b':{n:'Llama 2 7B',L:32,h:4096,heads:32,kvh:32,V:32000,P:6.74e9,ffn:11008},
+                '70b':{n:'Llama 2 70B',L:80,h:8192,heads:64,kvh:8,V:32000,P:69e9,ffn:28672}};
+  const FLOPS=150e12,HBM=1.6e12,LINK=250e9,LAT=0.01; // A100-class at roughly half of peak; ms latency per collective
+  const cfg={m:'7b',gpus:4,tp:2,s:512,d:3};
+  let OPS=[],k=-1,timer=null;
+  const f1=v=>v>=100?Math.round(v).toString():v>=10?v.toFixed(1):v.toFixed(2);
+  const mb=b=>!b?'0':b>=1e9?f1(b/1e9)+' GB':b>=1e6?f1(b/1e6)+' MB':f1(b/1e3)+' KB';
+  function build(){
+    const M=MODELS[cfg.m],TP=cfg.tp,PP=cfg.gpus/cfg.tp,Ls=M.L/PP,hd=M.h/M.heads,kvw=Math.max(M.kvh/TP,1)*hd;
+    const attnP=2*M.h*M.h+2*M.h*M.kvh*hd,mlpP=3*M.h*M.ffn;
+    const ar=n=>TP>1?2*(TP-1)/TP*n*M.h*2/LINK*1e3+LAT:0;
+    const send=n=>n*M.h*2/LINK*1e3+LAT;
+    const heads=g=>TP>1?`heads ${g*M.heads/TP}–${(g+1)*M.heads/TP-1}`:'all heads';
+    OPS=[];const s=cfg.s,L0=st=>st*Ls+1,L1=st=>(st+1)*Ls;
+    const push=o=>OPS.push(o);
+    push({ph:'prefill',k:'Embed',s:0,t:TP>1?'ar':'c',ms:0.01+ar(s),nv:TP>1?s*M.h*2:0,f:`X = E[ids]   [1, ${s}, ${M.h}]`+(TP>1?'   then All-Reduce':''),
+      c:TP>1?`The ${s} token IDs go to the ${TP} GPUs of stage 0. Each holds 1/${TP} of the embedding table E, returns its rows or zeros, and an All-Reduce adds them into the full X on every GPU.`:`The ${s} token IDs become ${s} vectors of ${M.h} numbers by looking up rows of the embedding table E.`});
+    for(let st=0;st<PP;st++){
+      const cA=(2*s*attnP+2*s*s*M.h)*Ls/TP/FLOPS*1e3,cM=2*s*mlpP*Ls/TP/FLOPS*1e3;
+      push({ph:'prefill',k:'Attn',s:st,t:'c',ms:cA,kv:s,f:`×${Ls}: LN → Q,K,V → attention → W_O   (layers ${L0(st)}–${L1(st)})`,
+        c:`Stage ${st} runs the attention part of layers ${L0(st)}–${L1(st)}. `+(TP>1?`Each of its ${TP} GPUs runs ${M.heads/TP} of the ${M.heads} heads and keeps the K and V of those heads in its own KV cache.`:`One GPU runs all ${M.heads} heads and fills its KV cache.`)+` All ${s} prompt tokens go through at once, so this is matrix–matrix work.`+(st>0?' The stages before it are now idle: the pipeline bubble of a single request.':'')});
+      if(TP>1)push({ph:'prefill',k:'AR',s:st,t:'ar',ms:ar(s)*Ls,nv:s*M.h*2*Ls,f:`×${Ls} All-Reduce, ${mb(s*M.h*2)} each`,c:`Each GPU\'s slice of W_O gives a partial sum. One All-Reduce per layer adds them so every GPU of the stage holds the full [1, ${s}, ${M.h}].`});
+      push({ph:'prefill',k:'MLP',s:st,t:'c',ms:cM,f:`×${Ls}: LN → W₁ → act → W₂   (layers ${L0(st)}–${L1(st)})`,c:`The MLP of the same layers.`+(TP>1?` Each GPU holds 1/${TP} of W₁\'s columns and of W₂\'s rows, so it works without talking.`:'')+' The MLP holds about two thirds of the weights, so this is the longest step.'});
+      if(TP>1)push({ph:'prefill',k:'AR',s:st,t:'ar',ms:ar(s)*Ls,nv:s*M.h*2*Ls,f:`×${Ls} All-Reduce, ${mb(s*M.h*2)} each`,c:'The second All-Reduce of every layer, after the MLP. TP pays two per layer.'});
+      if(st<PP-1)push({ph:'prefill',k:'Send',s:st,to:st+1,t:'send',ms:send(s),nv:s*M.h*2,f:`stage ${st} → stage ${st+1}: [1, ${s}, ${M.h}], ${mb(s*M.h*2)}`,c:`Pipeline hand-off: only the activations after layer ${L1(st)} move to the next stage. No weights move.`});
+    }
+    push({ph:'prefill',k:'LM',s:PP-1,t:TP>1?'ar':'c',ms:M.h*M.V*2/TP/HBM*1e3+(TP>1?LAT:0),tok:1,f:'logits = LN(x_last) · W_U   then pick the best token',
+      c:`Only the last position\'s hidden state goes through the LM head W_U [${M.h}, ${M.V}].`+(TP>1?` Each GPU scores 1/${TP} of the vocabulary and they compare local winners.`:'')+' <b>Token 1 is out</b>: this moment is the time to first token.'});
+    for(let d=1;d<cfg.d+1;d++){const n=s+d;
+      for(let st=0;st<PP;st++){
+        const bytes=((attnP+mlpP)*2/TP+2*(n-1)*kvw*2)*Ls,ms=bytes/HBM*1e3+2*Ls*ar(1);
+        push({ph:'decode',dn:d,k:'Layers',s:st,t:'c',ms,kv:1,nv:TP>1?2*Ls*M.h*2:0,f:`×${Ls}: 1 new token, reads ${n-1} cached K,V + every weight, appends 1`,
+          c:`Decode step ${d}: one token goes through layers ${L0(st)}–${L1(st)}. It reads the K and V of all ${n-1} earlier tokens from the KV cache instead of recomputing them, then appends its own. Reading every weight for a single token makes this memory-bound.`+(TP>1?` The ${2*Ls} All-Reduces carry only ${mb(M.h*2)} each.`:'')});
+        if(st<PP-1)push({ph:'decode',dn:d,k:'Send',s:st,to:st+1,t:'send',ms:send(1),nv:M.h*2,f:`stage ${st} → stage ${st+1}: [1, 1, ${M.h}], ${mb(M.h*2)}`,c:'The hand-off is now one token\'s vector.'});}
+      push({ph:'decode',dn:d,k:'LM',s:PP-1,t:'c',ms:M.h*M.V*2/TP/HBM*1e3,tok:d+1,f:'logits = LN(x) · W_U   → next token',c:`<b>Token ${d+1} is out.</b> The cache now holds ${n} positions per layer.`});}
+    return {M,TP,PP,Ls,hd,kvw,heads,L0,L1};
+  }
+  let C=build();
+  function render(){clear(svg);const {M,TP,PP,Ls,kvw,heads,L0,L1}=C;
     const o=OPS[k]||null;
-    $('#e2-note').innerHTML=k<0?'<b class="mono" style="color:var(--accent)">READY</b><br>Press <b>Next</b> or <b>Play all</b> to send one 512-token prompt through the model.':`<b class="mono" style="color:var(--accent)">${k+1}/${OPS.length} · ${o.k}${o.x16?' ×16':''} · stage ${o.s}</b><div class="formula" style="margin:6px 0">${o.f}</div>${glink(o.c)}`;
-    stats($('#e2-stats'),[{v:fmt(ms,1)+' ms',l:'time so far (rough)'},{v:nv+' MB',l:'moved over NVLink'},{v:net+' MB',l:'moved between servers'},{v:k<0?'—':Math.round(gpuBusy)+'%',l:'average GPU utilisation'},{v:k<0?'—':(k>=7?'stage 0':'stage 1'),l:'stage sitting idle now'}]);
+    // progress strip
+    const sx=20,sw=720,cw=sw/OPS.length;T(svg,sx,16,'PROGRESS',{class:'lbl'});
+    OPS.forEach((op,i)=>{R(svg,sx+i*cw+.5,24,Math.max(cw-1,1),10,i<=k?(op.ph==='prefill'?'fill:var(--accent)':'fill:var(--g3)'):'fill:var(--surface-2)',{rx:2});});
+    const pre=OPS.filter(x=>x.ph==='prefill').length;
+    T(svg,sx,48,'prefill',{style:'font-size:11px;font-weight:700'});if(cfg.d)T(svg,sx+pre*cw+4,48,`decode, ${cfg.d} token${cfg.d>1?'s':''}`,{style:'font-size:11px;font-weight:700'});
+    if(k>=0)S('polygon',{points:`${sx+k*cw+cw/2-5},${21} ${sx+k*cw+cw/2+5},${21} ${sx+k*cw+cw/2},${27}`,style:'fill:var(--ink)'},svg);
+    // GPU grid
+    const top=86,gap=TP>1?8:0,colW=sw/PP,bw=colW-(PP>1?26:0),bh=TP===1?110:TP===2?92:TP===4?56:30,areaH=TP*bh+(TP-1)*gap;
+    const kvTok=st=>OPS.slice(0,k+1).filter(x=>x.kv&&x.s===st).reduce((a,x)=>a+x.kv,0);
+    const wPer=M.P*2/cfg.gpus;let maxMem=0;
+    for(let st=0;st<PP;st++)maxMem=Math.max(maxMem,wPer+(cfg.s+cfg.d)*Ls*2*kvw*2);
+    const axis=Math.max(maxMem*1.15,1e9);
+    for(let st=0;st<PP;st++){const cx=sx+st*colW;
+      T(svg,cx,top-10,PP>4?`S${st} · L${L0(st)}–${L1(st)}`:`stage ${st} · layers ${L0(st)}–${L1(st)}`,{style:'font-size:11px;font-weight:700'});
+      for(let g=0;g<TP;g++){const gi=st*TP+g,y=top+g*(bh+gap),here=o&&o.s===st;
+        let st8;if(!o)st8='fill:var(--surface-2)';else if(!here)st8='fill:url(#hatch)';else st8=o.t==='ar'?'fill:var(--accent);opacity:.85':o.t==='send'?`fill:${G(st%4)};opacity:.55`:`fill:${G(st%4)}`;
+        R(svg,cx,y,bw,bh,st8,{rx:6});R(svg,cx,y,bw,bh,`fill:none;stroke:${here?'var(--ink)':'var(--line)'};stroke-width:${here?1.5:1}`,{rx:6});
+        const fs=bw<90?9.5:11;T(svg,cx+6,y+(bh<34?bh/2+4:15),'GPU '+gi,{style:`font-weight:700;font-size:${fs}px;fill:${o&&here&&o.t==='ar'?'var(--on-fill)':'var(--ink)'}`});
+        if(bh>=44&&bw>=110)T(svg,bh>=70?cx+6:cx+bw-6,bh>=70?y+29:y+15,heads(g),{'text-anchor':bh>=70?'start':'end',style:`font-size:10px;fill:${o&&here&&o.t==='ar'?'var(--on-fill)':'var(--muted)'}`});
+        // memory bar
+        if(bh>=34){const by=y+bh-12,bx=cx+6,bwid=bw-12,kvB=kvTok(st)*Ls*2*kvw*2;
+          R(svg,bx,by,bwid,7,'fill:var(--surface)',{rx:3});R(svg,bx,by,bwid*wPer/axis,7,`fill:${wPer>80e9?'var(--bad)':'var(--ink)'};opacity:.55`,{rx:3});
+          if(kvB)R(svg,bx+bwid*wPer/axis,by,Math.max(2,bwid*kvB/axis),7,'fill:var(--bad)',{rx:2});
+          const r0=v=>!v?'0':v>=1e9?Math.round(v/1e9)+' GB':Math.round(v/1e6)+' MB';if(bh>=56&&bw>=120)T(svg,bx,by-6,bw>=190?`weights ${mb(wPer)} + KV ${mb(kvB)}`:`W ${r0(wPer)} · KV ${r0(kvB)}`,{style:`font-size:10px;fill:${o&&here&&o.t==='ar'?'var(--on-fill)':'var(--ink)'}`});}
+        else if(bw>=250){const kvB=kvTok(st)*Ls*2*kvw*2;T(svg,cx+bw-8,y+bh/2+4,`weights ${mb(wPer)} + KV ${mb(kvB)}`,{'text-anchor':'end',style:`font-size:10px;fill:${o&&here&&o.t==='ar'?'var(--on-fill)':'var(--ink)'}`});}}
+      if(o&&o.t==='ar'&&o.s===st&&TP>1){const ax=cx+bw+6;S('line',{x1:ax,x2:ax,y1:top+6,y2:top+TP*(bh+gap)-gap-6,'marker-end':'url(#arr)','marker-start':'url(#arr)',style:'stroke:var(--accent);stroke-width:2.5'},svg);}
+      if(o&&o.t==='send'&&o.s===st){const ay=top+(TP*(bh+gap)-gap)/2;S('line',{x1:cx+bw+2,x2:cx+colW-4,y1:ay,y2:ay,'marker-end':'url(#arr)',style:'stroke:var(--bad);stroke-width:3'},svg);}}
+    // legend
+    const ly=top+areaH+24;
+    [['computing',`fill:${G(0)}`],['All-Reduce','fill:var(--accent);opacity:.85'],['idle (waiting)','fill:url(#hatch)'],['weights','fill:var(--ink);opacity:.55'],['KV cache','fill:var(--bad)']].reduce((x,[l,f])=>{R(svg,x,ly-9,12,12,f,{rx:2});const t=T(svg,x+16,ly+1,l,{style:'font-size:10.5px;fill:var(--muted)'});return x+16+t.getComputedTextLength()+16;},sx);
+    T(svg,sx,ly+18,`memory bars per GPU: axis ${mb(axis)} (each GPU has 80 GB)`+(wPer>80e9?' · weights do NOT fit on one GPU: add GPUs':''),{style:`font-size:10.5px;fill:${wPer>80e9?'var(--bad)':'var(--muted)'}`});
+    // tokens strip
+    const ty=ly+44;T(svg,sx,ty,'TOKENS',{class:'lbl'});svg.setAttribute('viewBox',`0 0 760 ${ty+16}`);
+    R(svg,sx+60,ty-12,170,18,'fill:var(--surface-2)',{rx:4});T(svg,sx+145,ty+1,`prompt: ${cfg.s} tokens`,{'text-anchor':'middle',style:'font-size:11px'});
+    const out=OPS.slice(0,k+1).filter(x=>x.tok).length;
+    for(let t=0;t<cfg.d+1;t++){const x=sx+240+t*62;R(svg,x,ty-12,56,18,t<out?'fill:var(--g3)':'fill:none;stroke:var(--line);stroke-dasharray:2 3',{rx:4});T(svg,x+28,ty+1,'token '+(t+1),{'text-anchor':'middle',style:`font-size:10.5px;fill:${t<out?'var(--ink)':'var(--muted)'}`});}
+    // note + stats
+    $('#e2-note').innerHTML=!o?`<b class="mono" style="color:var(--accent)">READY</b><br>${M.n} on ${cfg.gpus} GPU${cfg.gpus>1?'s':''}: TP = ${TP} splits each layer across ${TP} GPU${TP>1?'s':''}, PP = ${PP} cuts the ${M.L} layers into ${PP} stage${PP>1?'s':''} of ${Ls}. Press <b>Next</b> or <b>Play all</b>.`:
+      `<b class="mono" style="color:var(--accent)">${k+1}/${OPS.length} · ${o.ph}${o.dn?' step '+o.dn:''} · ${o.k} · stage ${o.s}</b><div class="formula" style="margin:6px 0">${o.f}</div>${glink(o.c)}`;
+    const upto=OPS.slice(0,k+1),ms=upto.reduce((a,x)=>a+x.ms,0),busy=upto.filter(x=>x.t==='c').reduce((a,x)=>a+x.ms*TP,0);
+    const ttftI=OPS.findIndex(x=>x.tok===1),ttft=OPS.slice(0,ttftI+1).reduce((a,x)=>a+x.ms,0);
+    const dec=OPS.slice(ttftI+1).reduce((a,x)=>a+x.ms,0)/Math.max(cfg.d,1);
+    stats($('#e2-stats'),[{v:f1(ms)+' ms',l:'time so far (rough)'},{v:k>=ttftI?f1(ttft)+' ms':'—',l:'time to first token'},{v:cfg.d&&k>=OPS.length-1?f1(dec)+' ms':'—',l:'per decode token'},
+      {v:mb(upto.reduce((a,x)=>a+(x.nv||0),0)),l:'moved between GPUs'},{v:k<0?'—':Math.round(100*busy/(ms*cfg.gpus))+'%',l:'average GPU utilisation'}]);
     $('#e2-prev').disabled=k<0;$('#e2-next').disabled=k>=OPS.length-1;}
   function stop(){clearInterval(timer);timer=null;$('#e2-play').textContent='Play all';}
+  function rebuild(){stop();k=-1;C=build();render();}
+  const tpOpts=()=>[1,2,4,8].filter(t=>t<=cfg.gpus).map(t=>({l:`TP ${t} · PP ${cfg.gpus/t}`,v:t}));
+  seg($('#e2-m'),[{l:'Llama 2 7B',v:'7b'},{l:'Llama 2 70B',v:'70b'}],cfg.m,v=>{cfg.m=v;rebuild();});
+  seg($('#e2-g'),[1,2,4,8].map(v=>({l:String(v),v})),cfg.gpus,v=>{cfg.gpus=v;if(cfg.tp>v)cfg.tp=v;seg($('#e2-tp'),tpOpts(),cfg.tp,t=>{cfg.tp=t;rebuild();});rebuild();});
+  seg($('#e2-tp'),tpOpts(),cfg.tp,t=>{cfg.tp=t;rebuild();});
+  seg($('#e2-s'),[128,512,2048].map(v=>({l:String(v),v})),cfg.s,v=>{cfg.s=v;rebuild();});
+  seg($('#e2-d'),[0,1,3,5].map(v=>({l:String(v),v})),cfg.d,v=>{cfg.d=v;rebuild();});
   $('#e2-next').onclick=()=>{stop();if(k<OPS.length-1){k++;render();}};
   $('#e2-prev').onclick=()=>{stop();if(k>=0){k--;render();}};
   $('#e2-reset').onclick=()=>{stop();k=-1;render();};
-  $('#e2-play').onclick=()=>{if(timer){stop();return;}if(k>=OPS.length-1)k=-1;$('#e2-play').textContent='Pause';timer=setInterval(()=>{if(k>=OPS.length-1){stop();return;}k++;render();},RM?400:1800);};
+  $('#e2-play').onclick=()=>{if(timer){stop();return;}if(k>=OPS.length-1)k=-1;$('#e2-play').textContent='Pause';timer=setInterval(()=>{if(k>=OPS.length-1){stop();return;}k++;render();},RM?400:1600);};
   render();
 })();
+
 
 /* layout: split each figure section into a text column and a figure column */
 document.querySelectorAll('main section').forEach(sec=>{if(!sec.querySelector(':scope > .fig'))return;
