@@ -69,6 +69,7 @@ h2{font:700 26px/1.15 var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:
 .btn:disabled{opacity:.4;cursor:default}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .glossc{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 14px;margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--surface-2);font:400 12px/1.5 var(--f-body);color:var(--muted)}.glossc b{font:600 12px var(--f-mono);color:var(--ink);margin-right:6px}
+.gl-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px 22px;margin:16px 0 0}.gl-i{padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line);scroll-margin-top:20px}.gl-i:target{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}.gl-i dt{font-weight:700;margin-bottom:3px}.gl-i dd{margin:0;color:var(--muted);font-size:14px;line-height:1.5}a.gl{color:inherit;text-decoration:underline dotted;text-underline-offset:3px;text-decoration-color:var(--accent)}
 .stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .stat{background:var(--surface-2);border-radius:10px;padding:7px 12px;min-width:120px}
 .stat b{display:block;font:700 18px var(--f-mono);font-variant-numeric:tabular-nums}
@@ -209,6 +210,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <li><a href="#x-norm"><b>X2</b>LayerNorm vs RMSNorm</a></li>
     <li><a href="#x-softmax"><b>X3</b>Softmax &amp; temperature</a></li>
     <li><a href="#x-gemm"><b>X4</b>Dot product, matmul, GEMM</a></li>
+    <li><a href="#x-glossary"><b>X5</b>Glossary</a></li>
   </ol>
 </nav>
 
@@ -379,7 +381,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 <section id="par-pp">
   <div class="sh"><span class="n">04.3</span><h2>Pipeline parallelism: split the layers</h2></div>
   <p class="cap">Cut the stack of layers into stages, one per GPU. Each of the p GPUs stores 1/p of the weights and passes only a small activation tensor [b, s, h] to the next stage. But stages must wait on each other, and a single request still has to walk through every stage in turn.</p>
-  <p class="cap">Splitting the batch into <b>m microbatches</b> does not change the total work; each block just gets smaller (1/m of the batch). What changes is the waiting: GPU 1 can start on microbatch 1 while GPU 0 moves on to microbatch 2, so the stages overlap. Total time is (m + p − 1) small blocks, of size 1/m each, so the <b>done</b> line moves earlier as m grows. The idle bubble shrinks to (p − 1) / (m + p − 1) of the time, but never reaches zero.</p>
+  <p class="cap">More microbatches make each block smaller and let the stages overlap, so the run finishes earlier.</p>
   <div class="fig">
     <div id="par-pipe">
       <div class="controls"><span class="mono" style="font-size:12px;color:var(--muted)">microbatches</span><div class="seg" id="pp-m"></div></div>
@@ -741,6 +743,12 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   </div>
 </section>
 
+<section id="x-glossary">
+  <div class="sh"><span class="n">X5</span><h2>Glossary</h2></div>
+  <p class="cap">Short definitions of terms used across the page. Words with a dotted underline anywhere on the page link here.</p>
+  <dl class="gl-list"><div class="gl-i" id="g-bubble"><dt>pipeline bubble</dt><dd>Time in pipeline parallelism when a GPU sits idle, waiting for the stage before it (at the start) or after it (at the end). With p stages and m microbatches it is (p − 1) / (m + p − 1) of the total time.</dd></div><div class="gl-i" id="g-microbatch"><dt>microbatch</dt><dd>A small slice of a batch. Pipeline parallelism sends microbatches through the stages one after another, so different GPUs can work on different slices at the same time.</dd></div><div class="gl-i" id="g-latency"><dt>latency</dt><dd>How long one request takes from start to finish, as one user feels it.</dd></div><div class="gl-i" id="g-throughput"><dt>throughput</dt><dd>How much work the whole system finishes per second, for example tokens per second across all users. Batching raises throughput, often at some cost to latency.</dd></div><div class="gl-i" id="g-compute"><dt>compute-bound</dt><dd>The GPU's arithmetic units are the bottleneck: they are busy all the time. Prefill and training usually are.</dd></div><div class="gl-i" id="g-memory"><dt>memory-bound</dt><dd>Moving data from memory is the bottleneck: arithmetic units wait for numbers to arrive. Decode usually is, because every weight is read for very little work.</dd></div><div class="gl-i" id="g-hbm"><dt>HBM</dt><dd>High-bandwidth memory: the GPU's large main memory (tens of GB) where weights and the KV cache live. Fast, but far slower than on-chip SRAM.</dd></div><div class="gl-i" id="g-sram"><dt>SRAM</dt><dd>Tiny, very fast memory on the GPU chip itself (a few MB). FlashAttention keeps its working tiles here.</dd></div><div class="gl-i" id="g-nvlink"><dt>NVLink</dt><dd>NVIDIA's direct GPU-to-GPU link inside one server. Much faster than the network between servers, so heavy communication (tensor parallelism) is kept within it.</dd></div><div class="gl-i" id="g-ib"><dt>InfiniBand</dt><dd>A fast network that connects servers. Slower than NVLink, so lighter communication (pipeline or data parallelism) crosses it.</dd></div><div class="gl-i" id="g-allreduce"><dt>All-Reduce</dt><dd>A communication step where every GPU contributes a partial result and every GPU ends up with the sum of all of them.</dd></div><div class="gl-i" id="g-rs"><dt>Reduce-Scatter</dt><dd>Like All-Reduce, but each GPU ends up with only its own slice of the sum. Half of an All-Reduce.</dd></div><div class="gl-i" id="g-ag"><dt>All-Gather</dt><dd>Every GPU shares its slice and every GPU ends up with all slices joined together. The other half of an All-Reduce.</dd></div><div class="gl-i" id="g-replica"><dt>replica</dt><dd>A full copy of the model on another GPU or group of GPUs. Data parallelism runs several replicas side by side.</dd></div><div class="gl-i" id="g-act"><dt>activations</dt><dd>The in-between numbers that flow from one layer to the next, such as X, Q or the MLP's ffn-wide output. They depend on the input, unlike weights.</dd></div><div class="gl-i" id="g-actmem"><dt>activation memory</dt><dd>Memory used to keep activations from the forward pass so the backward pass can use them. A training cost; inference keeps only the KV cache.</dd></div><div class="gl-i" id="g-recompute"><dt>recomputation</dt><dd>Saving memory in training by not storing some activations and recomputing them during the backward pass instead. Trades extra compute for memory.</dd></div><div class="gl-i" id="g-residual"><dt>residual stream</dt><dd>The running total each token carries through the model. Every attention and MLP step adds its result to it instead of replacing it.</dd></div><div class="gl-i" id="g-logits"><dt>logits</dt><dd>The raw scores the LM head gives every vocabulary entry, before softmax turns them into probabilities.</dd></div><div class="gl-i" id="g-optstate"><dt>optimizer state</dt><dd>Extra numbers the optimizer keeps for every trained weight. Adam keeps two (running averages of the gradient and of its square).</dd></div><div class="gl-i" id="g-util"><dt>utilisation</dt><dd>The share of time the GPU's arithmetic units are actually doing work.</dd></div></dl>
+</section>
+
 <section id="next-vllm">
   <div class="sh"><span class="n">→</span><h2>Next: see it on a real server</h2></div>
   <nav class="parts" aria-label="Next page" style="grid-template-columns:minmax(0,1fr)">
@@ -764,7 +772,9 @@ const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const G=i=>`var(--g${i})`;
 const PAL=i=>`hsl(${(i*47+205)%360} 78% 76%)`;
 function seg(box,opts,init,cb){box.innerHTML='';opts.forEach(o=>{const b=document.createElement('button');b.type='button';b.className='btn';b.textContent=o.l;b.setAttribute('aria-pressed',String(o.v===init));b.onclick=()=>{[...box.children].forEach(c=>c.setAttribute('aria-pressed','false'));b.setAttribute('aria-pressed','true');cb(o.v);};box.appendChild(b);});}
-function stats(box,arr){box.innerHTML=arr.map(s=>`<div class="stat ${s.c||''}"><b>${s.v}</b><span>${s.l}</span></div>`).join('');}
+const GLT=[["activation memory", "actmem"], ["residual stream", "residual"], ["optimizer state", "optstate"], ["optimiser state", "optstate"], ["Reduce-Scatter", "rs"], ["compute-bound", "compute"], ["recomputation", "recompute"], ["microbatches", "microbatch"], ["memory-bound", "memory"], ["activations", "act"], ["utilisation", "util"], ["microbatch", "microbatch"], ["throughput", "throughput"], ["InfiniBand", "ib"], ["All-Reduce", "allreduce"], ["All-Gather", "ag"], ["recompute", "recompute"], ["replicas", "replica"], ["latency", "latency"], ["replica", "replica"], ["bubble", "bubble"], ["NVLink", "nvlink"], ["logits", "logits"], ["SRAM", "sram"], ["HBM", "hbm"]];
+function glink(s){s=String(s);const used=new Set();return s.split(/(<a\b[\s\S]*?<\/a>|<[^>]+>)/).map(part=>{if(part.startsWith('<'))return part;for(const [t,k] of GLT){if(used.has(k))continue;const esc=t.replace(/[-]/g,'\\-');const re=new RegExp('(^|[^A-Za-z-])('+esc+')(?![A-Za-z])',t===t.toUpperCase()?'':'i');const m=part.match(re);if(m){used.add(k);const i=m.index+m[1].length;part=part.slice(0,i)+'\u0000'+k+'\u0001'+m[2]+'\u0002'+part.slice(i+m[2].length);}}return part.replace(/\u0000([^\u0001]+)\u0001([^\u0002]+)\u0002/g,'<a class="gl" href="#g-$1">$2</a>');}).join('');}
+function stats(box,arr){box.innerHTML=arr.map(s=>`<div class="stat ${s.c||''}"><b>${s.v}</b><span>${glink(s.l)}</span></div>`).join('');}
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
 function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});}
 
@@ -889,7 +899,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       cand.forEach((c,i)=>{const y=62+i*30;T(g,600,y+15,c[0],{'text-anchor':'end',style:'font-weight:600'});R(g,610,y,95*c[1]/.62,20,`fill:${i?'var(--idle)':'var(--g3)'}`,{rx:4});T(g,616+95*c[1]/.62,y+15,Math.round(c[1]*100)+'%',{style:'font-size:11px'});});
       T(g,560,232,'"I saw a dog ride in"',{style:'font-weight:700'});T(g,560,250,'→ next token "the"',{style:'font-weight:700'});big(40,290,'logits  '+shp(['b','s','V']));}}];
   function render(){clear(svg);const st=ST[k];st.d();
-    $('#an-note').innerHTML=`<b class="mono" style="color:var(--accent)">${k+1}/${ST.length} · ${st.n}</b><div class="formula" style="margin:6px 0">${String(st.f).replace(/\s{3,}/g,'<br>')}</div>${st.c}`;
+    $('#an-note').innerHTML=`<b class="mono" style="color:var(--accent)">${k+1}/${ST.length} · ${st.n}</b><div class="formula" style="margin:6px 0">${String(st.f).replace(/\s{3,}/g,'<br>')}</div>${glink(st.c)}`;
     const ch=$('#an-chips');ch.innerHTML='';ST.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=(i+1)+' '+s.n;b.setAttribute('aria-pressed',String(i===k));b.onclick=()=>{stop();k=i;render();};ch.appendChild(b);});
     $('#an-prev').disabled=k===0;$('#an-next').disabled=k===ST.length-1;
     const m=M();$('#an-gloss').innerHTML=[['b','batch: sequences processed together',m.b],['s','sequence length: tokens per sequence',m.s],['h','hidden size (d_model): numbers per token',m.h],['n_heads','attention heads',m.nh],['d_head','h / n_heads: width of one head',m.dh],['L','transformer layers',m.L],['V','vocabulary size',m.V],['ffn','MLP width (≈4h; ≈8h/3 with SwiGLU)',m.f]]
@@ -958,7 +968,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     R(g[3],20,270,400,14,'fill:var(--surface-2)',{rx:7});
     R(g[3],20,270,400*u,14,`fill:${pre?'var(--ok)':'var(--bad)'};transition:width .8s`,{rx:7});
     T(g[3],430,282,step===0?'—':pre?'GEMM · compute-bound':'GEMV · memory-bound',{style:'font-weight:600'});
-    const [h,t]=cap();note.innerHTML=`<b class="mono" style="color:var(--accent)">${h}</b><br>${t}`;
+    const [h,t]=cap();note.innerHTML=`<b class="mono" style="color:var(--accent)">${h}</b><br>${glink(t)}`;
     nextB.textContent=step===0?'Run prefill':done()?'Done':sub===5?'Next: decode step':'Next: '+NAMES[sub+1];
     nextB.disabled=done();$('#pd-skip').disabled=done()||step===0;
     stats(box,[{v:step===0?'—':pre?'Prefill':'Decode '+(step-1),l:'phase'},{v:n||'—',l:'token rows in this matmul'},
@@ -1503,7 +1513,7 @@ const HCg=i=>`hsl(${[8,45,325,160][i%4]} 80% 76%)`;
 function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
   let k=0,timer=null;
   function render(){clear(o.svg);const st=o.stages[k];st.d();
-    o.note.innerHTML=`<b class="mono" style="color:var(--accent)">${k+1}/${o.stages.length} · ${st.n}</b><div class="formula" style="margin:6px 0">${String(st.f).replace(/\s{3,}/g,'<br>')}</div>${st.c}`;
+    o.note.innerHTML=`<b class="mono" style="color:var(--accent)">${k+1}/${o.stages.length} · ${st.n}</b><div class="formula" style="margin:6px 0">${String(st.f).replace(/\s{3,}/g,'<br>')}</div>${glink(st.c)}`;
     o.chips.innerHTML='';o.stages.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=(i+1)+' '+s.n;b.setAttribute('aria-pressed',String(i===k));b.onclick=()=>{stop();k=i;render();};o.chips.appendChild(b);});
     o.prev.disabled=k===0;o.next.disabled=k===o.stages.length-1;if(o.after)o.after(k);}
   function stop(){clearInterval(timer);timer=null;o.play.textContent='Play all';}
@@ -2081,6 +2091,7 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
     seg($('#xg-seg'),[{l:'Dot product',v:'dot'},{l:'Matrix multiply',v:'mm'},{l:'GEMM',v:'gemm'},{l:'GEMV',v:'gemv'}],'dot',v=>{mode=v;render();});render();})();
 })();
 
+document.querySelectorAll('main section:not(#x-glossary) p.cap, main section:not(#x-glossary) ul.cap li').forEach(el=>{el.innerHTML=glink(el.innerHTML);});
 /* layout: split each figure section into a text column and a figure column */
 document.querySelectorAll('main section').forEach(sec=>{if(!sec.querySelector(':scope > .fig'))return;
   const t=document.createElement('div'),f=document.createElement('div');t.className='col-text';f.className='col-fig';
