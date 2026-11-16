@@ -893,7 +893,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
 (function(){
   const svg=$('#pd-svg'),box=$('#pd-stats'),note=$('#pd-note'),nextB=$('#pd-next'),playB=$('#pd-play');
   const prompt=['I','saw','a','dog','ride'],gen=['in','the','car','and','barked'];
-  const NAMES=['tokens in','build X','stream W','compute Y','write KV','emit token'];
+  const NAMES=['tokens in','build X','stream W','compute Y','write + read KV','emit token'];
   const MAX=gen.length;let step=0,sub=5,timer=null,speed=2600;
   const done=()=>step===MAX&&sub===5;
   const op=i=>step===0?1:i===sub?1:i<sub?(sub===5?.95:.28):.05;
@@ -902,7 +902,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     if(step===0)return['READY','Press <b>Run prefill</b>. Each step plays in 6 short stages, and the current stage is highlighted while the rest dims.'];
     const pre=step===1,tk=pre?'':gen[step-2],out=gen[step-1],N=4+step;
     const P=['All 5 prompt tokens go in <b>together</b>.','They stack into X: <b>5 rows × h</b> (one row of h numbers per token). One matrix, not 5 vectors.','Every weight in W streams in from HBM, <b>once</b> for all 5 rows.','One GEMM (general matrix multiply, see Extras X4) produces Y with all 5 rows at once. The compute units are <b>busy</b>.','K and V for all 5 tokens are written to the KV cache.',`The last row predicts the first new token: <b>"${out}"</b>.`];
-    const D=[`Only the newest token <b>"${tk}"</b> goes in. Older tokens are already cached.`,'X is now <b>1 row × h</b>, a single vector.','W still streams in from HBM <b>in full</b>, for just 1 row. That is why decode is memory-bound.','GEMV (matrix-vector multiply, see Extras X4): 1 output row, so most compute units sit <b>idle</b>.',`Its K and V are appended. Attention reads all <b>${N}</b> cached entries.`,`Next token: <b>"${out}"</b>.`];
+    const D=[`Only the newest token <b>"${tk}"</b> goes in. Older tokens are already cached.`,'X is now <b>1 row × h</b>, a single vector.','W still streams in from HBM <b>in full</b>, for just 1 row. The KV cache will be read too (stage 5). That is why decode is memory-bound.','GEMV (matrix-vector multiply, see Extras X4): 1 output row, so most compute units sit <b>idle</b>.',`Its K and V are appended to the cache. Then attention <b>reads all ${N}</b> cached K and V rows from HBM to compare against. Like the weights, the whole KV cache is streamed every decode step, and it grows by one row per token.`,`Next token: <b>"${out}"</b>.`];
     return[`${pre?'PREFILL':'DECODE '+(step-1)} · ${sub+1}/6 · ${NAMES[sub]}`,(pre?P:D)[sub]];}
   function grid(par,x,y,rows,cols,cs,style,ghost,delayFn){
     for(let r=0;r<(ghost||rows);r++)for(let c=0;c<cols;c++){const on=r<rows;
@@ -926,14 +926,19 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     T(g[2],160,y0+122,'streamed from HBM every step',{class:'lbl'});
     T(g[3],275,y0+52,'=',{class:'big'});T(g[3],300,y0-12,`Y  [${n||'n'} × h]`,{class:'big'});
     grid(S('g',{style:anim(3,.1)},g[3]),300,y0,n,8,cs,'fill:var(--g3)',5);
-    const kx=470;T(g[4],kx,y0-12,'KV CACHE  [tokens × 2 × h]',{class:'lbl'});
+    const kx=470;T(g[4],kx,y0-12,'KV CACHE in HBM  [tokens × 2 × h]',{class:'lbl'});
     const filled=step===0?0:sub>=4?4+step:(pre?0:3+step),prev=pre?0:3+step;
     for(let i=0;i<10;i++){const yy=y0+i*15,on=i<filled,fresh=on&&i>=prev&&sub>=4,a=fresh?anim(4,(i-prev)*.12):'';
       const dash='fill:none;stroke:var(--line);stroke-dasharray:2 2';
-      R(g[4],kx,yy,120,12,on?`${a}fill:var(--g2);opacity:${fresh?1:.45}`:dash);
-      R(g[4],kx+124,yy,120,12,on?`${a}fill:var(--g1);opacity:${fresh?1:.45}`:dash);
+      const rd=on&&!fresh&&!pre&&step>0&&sub>=4,st=rd?';stroke:var(--accent);stroke-width:1.5':'';
+      R(g[4],kx,yy,120,12,on?`${a}fill:var(--g2);opacity:${fresh?1:rd?.8:.45}${st}`:dash);
+      R(g[4],kx+124,yy,120,12,on?`${a}fill:var(--g1);opacity:${fresh?1:rd?.8:.45}${st}`:dash);
       if(on)T(g[4],kx+252,yy+10,(prompt.concat(gen))[i],{style:'font-size:10.5px;fill:var(--muted)'});}
     T(g[4],kx+40,y0+162,'K',{class:'lbl'});T(g[4],kx+170,y0+162,'V',{class:'lbl'});
+    if(!pre&&step>0&&sub>=4){const rg=S('g',{style:anim(4,.4)},g[4]);
+      S('line',{x1:kx-6,y1:y0+70,x2:300+8*cs+8,y2:y0+70,'marker-end':'url(#arr)',style:'stroke:var(--accent);stroke-width:2.5'},rg);
+      T(rg,300,y0+92,`attention reads all ${filled}`,{style:'font-weight:700;fill:var(--accent);font-size:12px'});
+      T(rg,300,y0+108,'cached K, V rows from HBM',{style:'font-weight:700;fill:var(--accent);font-size:12px'});}
     const u=step===0?0:pre?.86:.12;
     T(g[3],20,262,'COMPUTE UTILISATION (illustrative)',{class:'lbl'});
     R(g[3],20,270,400,14,'fill:var(--surface-2)',{rx:7});
@@ -943,7 +948,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     nextB.textContent=step===0?'Run prefill':done()?'Done':sub===5?'Next: decode step':'Next: '+NAMES[sub+1];
     nextB.disabled=done();$('#pd-skip').disabled=done()||step===0;
     stats(box,[{v:step===0?'—':pre?'Prefill':'Decode '+(step-1),l:'phase'},{v:n||'—',l:'token rows in this matmul'},
-      {v:step===0?0:step-(sub>=2?0:1),l:'full weight reads so far'},{v:filled,l:'KV entries cached'},{v:step===0?0:step-1+(sub>=5?1:0),l:'tokens generated'}]);}
+      {v:step===0?0:step-(sub>=2?0:1),l:'full weight reads so far'},{v:filled,l:'KV entries cached'},{v:step===0?'—':pre?'0 (just written)':(sub>=4?filled:'—'),l:'KV rows read this step'},{v:step===0?0:step-1+(sub>=5?1:0),l:'tokens generated'}]);}
   function adv(){if(step===0){step=1;sub=0;}else if(sub<5)sub++;else if(step<MAX){step++;sub=0;}render();}
   function stop(){clearInterval(timer);timer=null;playB.textContent='Auto-play';}
   function start(){stop();playB.textContent='Pause';timer=setInterval(()=>{if(done()){stop();return;}adv();},RM?300:speed);}
