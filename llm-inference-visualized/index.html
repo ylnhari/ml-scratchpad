@@ -129,7 +129,7 @@ ul.cap{padding-left:20px}
 header.top{padding:40px 0 8px}
 .wrap{padding-top:0}
 nav.rail{margin-top:44px}
-.parts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:22px}
+.parts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:22px}
 .parts a{display:block;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;transition:border-color .15s,transform .15s}
 .parts a:hover{border-color:var(--accent);transform:translateY(-2px)}
 .parts span{font:700 11px var(--f-mono);letter-spacing:.12em;color:var(--accent)}
@@ -202,6 +202,11 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <li><a class="sub" href="#lora-where"><b>·</b>Which layers</a></li>
     <li><a class="sub" href="#lora-train"><b>·</b>Training</a></li>
     <li><a class="sub" href="#lora-serve"><b>·</b>Merged vs separate</a></li>
+    <li class="grp">EXTRAS</li>
+    <li><a href="#x-act"><b>X1</b>Activation functions</a></li>
+    <li><a href="#x-norm"><b>X2</b>LayerNorm vs RMSNorm</a></li>
+    <li><a href="#x-softmax"><b>X3</b>Softmax &amp; temperature</a></li>
+    <li><a href="#x-gemm"><b>X4</b>Dot product, matmul, GEMM</a></li>
   </ol>
 </nav>
 
@@ -214,6 +219,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
       <a href="#architecture"><span>PART I</span><b>Foundations</b><small>The transformer, attention, and the tensor shapes everything else is built on.</small></a>
       <a href="#phases"><span>PART II</span><b>Inference optimizations</b><small>Prefill and decode, KV cache, batching, parallelism, attention variants and more.</small></a>
       <a href="#backward"><span>PART III</span><b>Deeper dive</b><small>The backward pass, training memory, what modern LLMs change, how RoPE encodes word order, and fine-tuning with LoRA.</small></a>
+      <a href="#x-act"><span>EXTRAS</span><b>Terms, up close</b><small>Activation functions, LayerNorm vs RMSNorm, softmax, and what a matmul or GEMM is. Read them only if you want to.</small></a>
     </nav>
   </div>
 </header>
@@ -229,7 +235,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
         <dt>s</dt><dd><b>sequence length</b>: how many tokens each text has. For example, 6 tokens: "I saw a dog ride in".</dd>
         <dt>h</dt><dd><b>hidden size</b>: how many numbers describe one token. For example, 4,096 in Llama 2 7B (drawn as 8 here).</dd>
       </dl>
-      <p class="cap" style="margin:8px 0 0">So the input is b texts of s tokens each, and once inside the model every one of those tokens is h numbers long: a block of b × s × h numbers. Other letters are introduced where they first appear. In formulas, <b>A·B</b> between two matrices means <b>matrix multiplication</b> (each row of A combined with each column of B), and a name followed by brackets, like act(U) or LN(X), means a <b>function applied</b> to that block, not a multiplication.</p>
+      <p class="cap" style="margin:8px 0 0">So the input is b texts of s tokens each, and once inside the model every one of those tokens is h numbers long: a block of b × s × h numbers. Other letters are introduced where they first appear. In formulas, <b>A·B</b> between two matrices means <b>matrix multiplication</b> (each row of A combined with each column of B; <a href="#x-gemm">Extras X4</a> explains it, along with the terms GEMM and GEMV), and a name followed by brackets, like act(U) or LN(X), means a <b>function applied</b> to that block, not a multiplication.</p>
     </div>
   </div>
 </div>
@@ -252,7 +258,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <li>a <b>key</b>: what do I contain?</li>
     <li>a <b>value</b>: what will I pass on if someone picks me?</li>
   </ul>
-  <p class="cap">The query is compared with every earlier key using a dot product. The scores are divided by √d, where d is the length of the query and key vectors, to keep them in a sensible range, then turned into weights with softmax. The token's new vector is the weighted mix of the values.</p>
+  <p class="cap">The query is compared with every earlier key using a dot product. The scores are divided by √d, where d is the length of the query and key vectors, to keep them in a sensible range, then turned into weights with softmax (<a href="#x-softmax">Extras X3</a> shows how). The token's new vector is the weighted mix of the values.</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="ax-head"></div></div>
     <div class="svgbox"><svg id="ax-svg" viewBox="0 0 760 520" role="img" aria-label="Attention weights for a chosen word"></svg></div>
@@ -661,6 +667,66 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   </div>
 </section>
 
+<section id="x-act">
+  <div class="sh"><span class="n">X1</span><h2>Activation functions: ReLU, GeLU, SiLU, SwiGLU</h2></div>
+  <p class="cap">An <b>activation function</b> (written <b>act</b>) is a simple curve applied to each number on its own, between two matrix multiplies in the MLP. It is not a multiplication. Without it, two matrix multiplies in a row collapse into one (W₁ then W₂ is the same as the single matrix W₁·W₂), and the model could only learn straight-line relationships, however many layers it had.</p>
+  <ul class="cap">
+    <li><b>ReLU</b>: keep positive numbers, set negative ones to 0. Simple, and the original choice.</li>
+    <li><b>GeLU</b>: like ReLU but smooth around 0, and lets small negative values leak through a little. Used by GPT-2 and BERT.</li>
+    <li><b>SiLU</b> (also called Swish): x times a smooth on/off switch, very close to GeLU in shape. Used inside Llama-style models.</li>
+    <li><b>SwiGLU</b> is not a single curve but a <b>gated</b> MLP: one matrix produces values, a second produces a gate passed through SiLU, and the two are multiplied number by number before W₂ shrinks the result. That is why Llama-style MLPs have three matrices (gate, up, down); section A2 draws it.</li>
+  </ul>
+  <div class="fig">
+    <div class="controls">
+      <span class="mono" style="font-size:12px;color:var(--muted)">show</span><div class="seg" id="xa-seg"></div>
+      <label class="ctl">input x <span class="mono" id="xa-xv"></span><input type="range" id="xa-x" min="-40" max="40" value="-8"></label>
+    </div>
+    <div class="svgbox"><svg id="xa-svg" viewBox="0 0 760 300" role="img" aria-label="Activation function curves"></svg></div>
+    <div class="stats" id="xa-stats"></div>
+  </div>
+</section>
+
+<section id="x-norm">
+  <div class="sh"><span class="n">X2</span><h2>LayerNorm vs RMSNorm</h2></div>
+  <p class="cap">Normalisation rescales each token's h numbers so they stay in a steady range from layer to layer. Both versions work on one token at a time.</p>
+  <ul class="cap">
+    <li><b>LayerNorm</b>: subtract the mean μ of the token's numbers, divide by their spread σ, then apply a learned scale γ and shift β. Result: centred on 0, spread of 1.</li>
+    <li><b>RMSNorm</b> (root-mean-square normalisation): skip the mean. Divide by the root mean square (the typical size of the numbers), then apply γ. One less step, and it trains just as well, so Llama, Mistral and most recent models use it.</li>
+  </ul>
+  <p class="cap">ε is a tiny number added before the square root so nothing is ever divided by zero. Below, γ = 1 and β = 0 so you see the normalisation itself.</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="xn-seg"></div><div class="seg" id="xn-in"></div></div>
+    <div class="svgbox"><svg id="xn-svg" viewBox="0 0 760 300" role="img" aria-label="One token's numbers before and after normalisation"></svg></div>
+    <div class="stats" id="xn-stats"></div>
+  </div>
+</section>
+
+<section id="x-softmax">
+  <div class="sh"><span class="n">X3</span><h2>Softmax and temperature</h2></div>
+  <p class="cap"><b>Softmax</b> turns a list of scores (any numbers, positive or negative) into weights that are all positive and add up to 1. Two steps: raise e to the power of each score, so bigger scores grow much bigger and everything becomes positive; then divide each result by their total. Attention uses it to turn match scores into shares (section 00.2), and the LM head uses it to turn logits into next-token probabilities.</p>
+  <p class="cap"><b>Temperature</b> divides the scores before softmax. Below 1 it sharpens the weights towards the top score; above 1 it flattens them. Dividing attention scores by √d_head works the same way: it keeps scores from growing with d_head, so softmax does not put almost all the weight on one token.</p>
+  <div class="fig">
+    <div class="controls"><label class="ctl">temperature <span class="mono" id="xs-tv"></span><input type="range" id="xs-t" min="1" max="30" value="10"></label></div>
+    <div class="svgbox"><svg id="xs-svg" viewBox="0 0 760 300" role="img" aria-label="Scores turned into softmax weights"></svg></div>
+    <div class="stats" id="xs-stats"></div>
+  </div>
+</section>
+
+<section id="x-gemm">
+  <div class="sh"><span class="n">X4</span><h2>Dot product, matrix multiplication, GEMM and GEMV</h2></div>
+  <ul class="cap">
+    <li>A <b>dot product</b> takes two lists of the same length, multiplies them number by number and adds the results: one number out. q · k in attention is a dot product.</li>
+    <li>A <b>matrix multiplication</b> (matmul, written A·B) does a dot product for every row of A with every column of B. If A is [m, n] and B is [n, p], the result is [m, p], and the inner sizes (n) must match. A transpose (ᵀ) only flips a matrix so those sizes line up.</li>
+    <li><b>GEMM</b> (general matrix-matrix multiply) is the name of the library routine that does this on a GPU. When many tokens are processed together, as in prefill or training, the work is a GEMM and the GPU's arithmetic units stay busy.</li>
+    <li><b>GEMV</b> (general matrix-vector multiply) is the special case where one side is a single row. Decode for one sequence is a GEMV: every weight is read from memory for just one row of work, which is why decode is limited by memory, not arithmetic (section 01).</li>
+  </ul>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="xg-seg"></div></div>
+    <div class="svgbox"><svg id="xg-svg" viewBox="0 0 760 300" role="img" aria-label="Dot product, matrix multiply, GEMM and GEMV"></svg></div>
+    <div class="note" id="xg-note" style="margin-top:10px"></div>
+  </div>
+</section>
+
 <section id="next-vllm">
   <div class="sh"><span class="n">→</span><h2>Next: see it on a real server</h2></div>
   <nav class="parts" aria-label="Next page" style="grid-template-columns:minmax(0,1fr)">
@@ -738,7 +804,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       T(svg,tx,ty+12*cs+18,`V = ${M().V.toLocaleString()} rows, h = ${M().h.toLocaleString()} cols`,{class:'lbl'});
       used.forEach((r,i)=>arrow(tx+8*cs+6,ty+r*cs+7,470,96+i*12,null,.2+i*.08));
       iso(560,110,8,6,2,12,'var(--accent)',{an:A(.9),title:'X'});big(440,280,'X  '+shp(['b','s','h']));}},
-   {n:'LayerNorm',f:'LN(x) = γ ⊙ (x − μ) / √(σ² + ε) + β',c:'<b>LayerNorm</b> (written <b>LN</b> in the formulas from here on) rescales each token\'s h numbers so they stay in a steady range. For one token: subtract μ, the mean of its h numbers; divide by σ, their spread (ε is a tiny number that avoids dividing by zero); then apply a learned scale γ and shift β. It works on each token\'s row on its own (the dark row), so it is <b>independent across tokens</b>, which is why sequence parallelism (section 04.5) can split it along s. So <b>LN(X)</b> simply means "X after this normalisation". The shape does not change. (Llama-style models use RMSNorm, which skips subtracting the mean.)',
+   {n:'LayerNorm',f:'LN(x) = γ ⊙ (x − μ) / √(σ² + ε) + β',c:'<b>LayerNorm</b> (written <b>LN</b> in the formulas from here on) rescales each token\'s h numbers so they stay in a steady range. For one token: subtract μ, the mean of its h numbers; divide by σ, their spread (ε is a tiny number that avoids dividing by zero); then apply a learned scale γ and shift β. It works on each token\'s row on its own (the dark row), so it is <b>independent across tokens</b>, which is why sequence parallelism (section 04.5) can split it along s. So <b>LN(X)</b> simply means "X after this normalisation". The shape does not change. (Llama-style models use RMSNorm, which skips subtracting the mean; <a href="#x-norm">Extras X2</a> compares the two.)',
     d(){iso(300,86,8,6,2,17,'var(--accent)',{hl:2,an:A(0),title:'X  [b, s, h]'});
       const g=S('g',{style:A(.4)},svg);T(g,500,120,'one token = one h-vector',{style:'font-weight:700'});T(g,500,142,'normalise across its h values',{style:'fill:var(--muted)'});T(g,500,164,'every token on its own',{style:'fill:var(--muted)'});
       big(40,290,'in & out  '+shp(['b','s','h']));}},
@@ -791,7 +857,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     d(){iso(130,110,8,6,2,11,'var(--accent)',{title:'X'});big(255,160,'+');
       iso(370,110,8,6,2,11,'',{title:'Attention(LN(X))',an:A(.2),segs:[0,1,2,3].map(i=>({x0:i*2,x1:i*2+2,col:HC(i)}))});big(495,160,'=');
       iso(610,110,8,6,2,11,'var(--accent)',{title:'X (updated)',an:A(.5)});big(40,290,shp(['b','s','h'])+'  in and out');}},
-   {n:'MLP',f:'U = LN(X)·W₁  [b, s, ffn]      G = act(U)      X ← X + G·W₂  [b, s, h]',c:'The MLP (multi-layer perceptron) works on each token on its own, in three steps:<ul class="rows"><li><b>Expand</b>: matrix-multiply the token\'s normalised h numbers by W₁ [h, ffn] (written LN(X)·W₁) to get ffn numbers, more room to compute in. Classically ffn = 4h; Llama 2 7B uses 11,008.</li><li><b>act</b> (short for activation function) is not a multiplication: it is a simple nonlinear function, such as GeLU or SiLU, applied to each of the ffn numbers separately. Roughly, it keeps positive numbers and squashes negative ones towards zero. Without it, the two multiplies would collapse into a single one.</li><li><b>Shrink</b>: matrix-multiply by W₂ [ffn, h] to get back to h numbers, then add them to the residual stream.</li></ul>Llama-style models use SwiGLU, which adds a third matrix that gates the expanded numbers. Tensor parallelism splits W₁ by columns and W₂ by rows.',
+   {n:'MLP',f:'U = LN(X)·W₁  [b, s, ffn]      G = act(U)      X ← X + G·W₂  [b, s, h]',c:'The MLP (multi-layer perceptron) works on each token on its own, in three steps:<ul class="rows"><li><b>Expand</b>: matrix-multiply the token\'s normalised h numbers by W₁ [h, ffn] (written LN(X)·W₁) to get ffn numbers, more room to compute in. Classically ffn = 4h; Llama 2 7B uses 11,008.</li><li><b>act</b> (short for activation function) is not a multiplication: it is a simple nonlinear function, such as GeLU or SiLU, applied to each of the ffn numbers separately. Roughly, it keeps positive numbers and squashes negative ones towards zero. <a href="#x-act">Extras X1</a> compares them. Without it, the two multiplies would collapse into a single one.</li><li><b>Shrink</b>: matrix-multiply by W₂ [ffn, h] to get back to h numbers, then add them to the residual stream.</li></ul>Llama-style models use SwiGLU, which adds a third matrix that gates the expanded numbers. Tensor parallelism splits W₁ by columns and W₂ by rows.',
     d(){iso(100,120,8,6,2,10,'var(--accent)',{title:'[b, s, h]'});arrow(192,150,265,150,'× W₁',.1);T(svg,228,176,'matrix multiply',{'text-anchor':'middle',style:'font-size:10.5px;fill:var(--muted)'});
       iso(330,120,20,6,2,10,'var(--g3)',{an:A(.3),title:'[b, s, ffn]',lab:{x:'ffn',y:'s',z:'b'}});arrow(515,150,590,150,'act, then × W₂',.6);T(svg,552,176,'act on each number,',{'text-anchor':'middle',style:'font-size:10.5px;fill:var(--muted)'});T(svg,552,190,'then matrix multiply',{'text-anchor':'middle',style:'font-size:10.5px;fill:var(--muted)'});
       iso(660,120,8,6,2,10,'var(--accent)',{an:A(.8),title:'[b, s, h]'});big(40,290,shp(['b','s','f'])+'  inside the MLP');}},
@@ -835,8 +901,8 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
   function cap(){
     if(step===0)return['READY','Press <b>Run prefill</b>. Each step plays in 6 short stages, and the current stage is highlighted while the rest dims.'];
     const pre=step===1,tk=pre?'':gen[step-2],out=gen[step-1],N=4+step;
-    const P=['All 5 prompt tokens go in <b>together</b>.','They stack into X: <b>5 rows × h</b> (one row of h numbers per token). One matrix, not 5 vectors.','Every weight in W streams in from HBM, <b>once</b> for all 5 rows.','One GEMM produces Y with all 5 rows at once. The compute units are <b>busy</b>.','K and V for all 5 tokens are written to the KV cache.',`The last row predicts the first new token: <b>"${out}"</b>.`];
-    const D=[`Only the newest token <b>"${tk}"</b> goes in. Older tokens are already cached.`,'X is now <b>1 row × h</b>, a single vector.','W still streams in from HBM <b>in full</b>, for just 1 row. That is why decode is memory-bound.','GEMV: 1 output row, so most compute units sit <b>idle</b>.',`Its K and V are appended. Attention reads all <b>${N}</b> cached entries.`,`Next token: <b>"${out}"</b>.`];
+    const P=['All 5 prompt tokens go in <b>together</b>.','They stack into X: <b>5 rows × h</b> (one row of h numbers per token). One matrix, not 5 vectors.','Every weight in W streams in from HBM, <b>once</b> for all 5 rows.','One GEMM (general matrix multiply, see Extras X4) produces Y with all 5 rows at once. The compute units are <b>busy</b>.','K and V for all 5 tokens are written to the KV cache.',`The last row predicts the first new token: <b>"${out}"</b>.`];
+    const D=[`Only the newest token <b>"${tk}"</b> goes in. Older tokens are already cached.`,'X is now <b>1 row × h</b>, a single vector.','W still streams in from HBM <b>in full</b>, for just 1 row. That is why decode is memory-bound.','GEMV (matrix-vector multiply, see Extras X4): 1 output row, so most compute units sit <b>idle</b>.',`Its K and V are appended. Attention reads all <b>${N}</b> cached entries.`,`Next token: <b>"${out}"</b>.`];
     return[`${pre?'PREFILL':'DECODE '+(step-1)} · ${sub+1}/6 · ${NAMES[sub]}`,(pre?P:D)[sub]];}
   function grid(par,x,y,rows,cols,cs,style,ghost,delayFn){
     for(let r=0;r<(ghost||rows);r++)for(let c=0;c<cols;c++){const on=r<rows;
@@ -1866,6 +1932,77 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
         T(svg,560,90,'✓ one base, many tasks',{style:'font-weight:700;fill:var(--ok)'});T(svg,560,114,'✓ adapters are small files',{style:'font-weight:700;fill:var(--ok)'});T(svg,560,138,'✓ mix adapters in one batch',{style:'font-weight:700;fill:var(--ok)'});T(svg,560,162,'✗ a little extra work',{style:'font-weight:700;fill:var(--bad)'});T(svg,574,180,'per token',{style:'font-weight:700;fill:var(--bad)'});
         stats($('#lv-stats'),[{v:'small',l:'extra work per token (the A·B detour)'},{v:'≈ 34 MB',l:'per adapter (all attention, r = 16)'},{v:'many',l:'tasks per loaded base'}]);}}
     seg($('#lv-seg'),[{l:'Merged adapter',v:'merged'},{l:'Separate adapters',v:'separate'}],'merged',v=>{mode=v;render();});render();})();
+})();
+
+
+/* ---------- Extras ---------- */
+(function(){
+  /* X1 activations */
+  (function(){const svg=$('#xa-svg');const erf=x=>{const t=1/(1+0.3275911*Math.abs(x));const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return x>=0?y:-y;};
+    const F={relu:{n:'ReLU',f:x=>Math.max(0,x),c:'var(--g0)'},gelu:{n:'GeLU',f:x=>0.5*x*(1+erf(x/Math.SQRT2)),c:'var(--accent)'},silu:{n:'SiLU',f:x=>x/(1+Math.exp(-x)),c:'var(--g3)'}};
+    let show='all';const x0=80,x1=520,y0=40,y1=260,X=v=>x0+(v+4)/8*(x1-x0),Y=v=>y1-(v+1)/5*(y1-y0);
+    function render(){clear(svg);const xv=+$('#xa-x').value/10;$('#xa-xv').textContent=xv.toFixed(1);
+      S('line',{x1:x0,x2:x1,y1:Y(0),y2:Y(0),style:'stroke:var(--line);stroke-width:1.5'},svg);S('line',{x1:X(0),x2:X(0),y1:y0,y2:y1,style:'stroke:var(--line);stroke-width:1.5'},svg);
+      [-4,-2,2,4].forEach(v=>T(svg,X(v),Y(0)+16,v,{'text-anchor':'middle',style:'font-size:10.5px;fill:var(--muted)'}));[1,2,3,4].forEach(v=>T(svg,X(0)-6,Y(v)+4,v,{'text-anchor':'end',style:'font-size:10.5px;fill:var(--muted)'}));
+      T(svg,x1,Y(0)-6,'input',{'text-anchor':'end',style:'font-size:11px;fill:var(--muted)'});T(svg,X(0)+6,y0+4,'output',{style:'font-size:11px;fill:var(--muted)'});
+      const keys=show==='all'?['relu','gelu','silu']:[show];const out=[];
+      keys.forEach((k,i)=>{const pts=[];for(let v=-4;v<=4.001;v+=0.05)pts.push(X(v).toFixed(1)+','+Y(F[k].f(v)).toFixed(1));
+        S('polyline',{points:pts.join(' '),style:`fill:none;stroke:${F[k].c};stroke-width:${keys.length>1?2.5:3.5}`},svg);
+        const yv=F[k].f(xv);S('circle',{cx:X(xv),cy:Y(yv),r:5,style:`fill:${F[k].c}`},svg);out.push({v:yv.toFixed(2),l:`${F[k].n}(${xv.toFixed(1)})`});});
+      S('line',{x1:X(xv),x2:X(xv),y1:y0,y2:y1,style:'stroke:var(--muted);stroke-dasharray:3 3'},svg);
+      keys.forEach((k,i)=>{R(svg,560,60+i*30,14,14,`fill:${F[k].c}`,{rx:3});T(svg,582,72+i*30,F[k].n,{style:'font-weight:700'});});
+      T(svg,560,200,'applied to each number',{style:'font-size:12px;fill:var(--muted)'});T(svg,560,218,'on its own: [b, s, ffn] in,',{style:'font-size:12px;fill:var(--muted)'});T(svg,560,236,'[b, s, ffn] out',{style:'font-size:12px;fill:var(--muted)'});
+      stats($('#xa-stats'),out);}
+    $('#xa-x').oninput=render;seg($('#xa-seg'),[{l:'all three',v:'all'},{l:'ReLU',v:'relu'},{l:'GeLU',v:'gelu'},{l:'SiLU',v:'silu'}],'all',v=>{show=v;render();});render();})();
+
+  /* X2 norms */
+  (function(){const svg=$('#xn-svg');const INS={a:[2.0,4.5,3.0,5.5,1.0,6.0],b:[0.2,-0.4,0.9,-1.1,0.3,0.1]};let mode='ln',ik='a';
+    function bars(vals,x,lab,col,sc){T(svg,x,40,lab,{class:'lbl'});const zy=160;S('line',{x1:x,x2:x+300,y1:zy,y2:zy,style:'stroke:var(--line)'},svg);
+      vals.forEach((v,i)=>{const hgt=v*sc;R(svg,x+10+i*48,hgt>=0?zy-hgt:zy,34,Math.abs(hgt),`fill:${col}`,{rx:3});T(svg,x+27+i*48,hgt>=0?zy-hgt-6:zy-hgt+14,v.toFixed(2),{'text-anchor':'middle',style:'font-size:10.5px'});});}
+    function render(){clear(svg);const x=INS[ik],n=x.length,mu=x.reduce((a,b)=>a+b,0)/n,sd=Math.sqrt(x.reduce((a,b)=>a+(b-mu)**2,0)/n+1e-5),rms=Math.sqrt(x.reduce((a,b)=>a+b*b,0)/n+1e-5);
+      const y=mode==='ln'?x.map(v=>(v-mu)/sd):x.map(v=>v/rms);const sc=Math.min(18,95/Math.max(...x.map(Math.abs)));
+      bars(x,20,'one token, before (h = 6)','var(--idle)',sc);bars(y,420,mode==='ln'?'after LayerNorm':'after RMSNorm','var(--accent)',45);
+      S('line',{x1:330,x2:410,y1:160,y2:160,'marker-end':'url(#arr)',style:'stroke:var(--muted);stroke-width:2'},svg);
+      T(svg,20,270,mode==='ln'?`(x − μ) / σ, with μ = ${mu.toFixed(2)} and σ = ${sd.toFixed(2)}`:`x / RMS, with RMS = √(mean of x²) = ${rms.toFixed(2)}`,{style:'font-weight:700'});
+      const ym=y.reduce((a,b)=>a+b,0)/n;
+      T(svg,20,290,mode==='ln'?'centred on 0 and spread of 1, whatever the input':'same direction as the input, typical size 1; the mean is not removed',{style:'font-size:12px;fill:var(--muted)'});
+      stats($('#xn-stats'),mode==='ln'?[{v:mu.toFixed(2),l:'μ, mean of the input'},{v:sd.toFixed(2),l:'σ, spread of the input'},{v:ym.toFixed(2),l:'mean after'}]:[{v:rms.toFixed(2),l:'RMS of the input'},{v:ym.toFixed(2),l:'mean after (not forced to 0)'},{v:'1 fewer',l:'statistic to compute'}]);}
+    seg($('#xn-seg'),[{l:'LayerNorm',v:'ln'},{l:'RMSNorm',v:'rms'}],'ln',v=>{mode=v;render();});
+    seg($('#xn-in'),[{l:'large positive numbers',v:'a'},{l:'small mixed numbers',v:'b'}],'a',v=>{ik=v;render();});render();})();
+
+  /* X3 softmax */
+  (function(){const svg=$('#xs-svg');const lab=['cat','dog','car','sky','tree'],sc=[2.0,1.0,0.5,-0.5,-1.5];
+    function render(){clear(svg);const t=+$('#xs-t').value/10;$('#xs-tv').textContent=t.toFixed(1);
+      const z=sc.map(v=>v/t),ex=z.map(Math.exp),tot=ex.reduce((a,b)=>a+b,0),p=ex.map(v=>v/tot);
+      const cols=[[30,'scores',sc.map(v=>v.toFixed(1))],[200,'÷ temperature',z.map(v=>v.toFixed(2))],[370,'e to the power',ex.map(v=>v.toFixed(2))]];
+      cols.forEach(([x,ttl,vals],ci)=>{T(svg,x,40,ttl,{class:'lbl'});vals.forEach((v,i)=>{R(svg,x,52+i*40,120,30,'fill:var(--surface-2)',{rx:6});T(svg,x+8,72+i*40,lab[i],{style:'font-size:11px;fill:var(--muted)'});T(svg,x+112,72+i*40,v,{'text-anchor':'end',style:'font-weight:700'});});
+        if(ci<2)S('line',{x1:x+126,x2:x+166,y1:150,y2:150,'marker-end':'url(#arr)',style:'stroke:var(--muted);stroke-width:2'},svg);});
+      S('line',{x1:496,x2:536,y1:150,y2:150,'marker-end':'url(#arr)',style:'stroke:var(--muted);stroke-width:2'},svg);
+      T(svg,540,40,'÷ total = weights',{class:'lbl'});p.forEach((v,i)=>{R(svg,540,52+i*40,200*v,30,'fill:var(--accent)',{rx:6});T(svg,546+200*v,72+i*40,(100*v).toFixed(1)+'%',{style:'font-weight:700'});});
+      T(svg,30,272,`total of the e-powers = ${tot.toFixed(2)}; each weight = its e-power ÷ total, so all weights add to 100%`,{style:'font-size:12px;fill:var(--muted)'});
+      stats($('#xs-stats'),[{v:(100*p[0]).toFixed(0)+'%',l:'weight on the top score'},{v:t.toFixed(1),l:'temperature'},{v:t<1?'sharper':t>1?'flatter':'unchanged',l:'compared with plain softmax'}]);}
+    $('#xs-t').oninput=render;render();})();
+
+  /* X4 dot / matmul / gemm / gemv */
+  (function(){const svg=$('#xg-svg');let mode='dot';
+    function grid(x,y,r,c,cs,col,hlr,hlc,lab){for(let i=0;i<r;i++)for(let j=0;j<c;j++){const on=(hlr===i)||(hlc===j);R(svg,x+j*cs,y+i*cs,cs-2,cs-2,`fill:${on?col:'var(--idle)'}`,{rx:2});}if(lab)T(svg,x+c*cs/2,y+r*cs+16,lab,{'text-anchor':'middle',style:'font-size:11.5px;font-weight:700'});}
+    function render(){clear(svg);
+      if(mode==='dot'){T(svg,30,40,'two lists of the same length → one number',{class:'lbl'});const a=[1,2,3,4],b=[2,0,1,3];
+        a.forEach((v,i)=>{R(svg,60+i*56,70,48,40,'fill:var(--g0)',{rx:6});T(svg,84+i*56,96,v,{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700'});R(svg,60+i*56,140,48,40,'fill:var(--g3)',{rx:6});T(svg,84+i*56,166,b[i],{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700'});T(svg,84+i*56,130,'×',{'text-anchor':'middle',style:'fill:var(--muted)'});});
+        T(svg,60,220,'1×2 + 2×0 + 3×1 + 4×3 = 17',{class:'big'});T(svg,60,250,'q · k in attention is exactly this, with d_head numbers each',{style:'font-size:12px;fill:var(--muted)'});
+        $('#xg-note').innerHTML='A <b>dot product</b> multiplies matching positions and adds them up. Big when the two lists point the same way, near 0 when unrelated, negative when opposite.';}
+      else if(mode==='mm'){T(svg,30,40,'A [3, 4] · B [4, 2] = C [3, 2]',{class:'lbl'});grid(40,70,3,4,30,'var(--g0)',1,null,'A [3, 4]');T(svg,175,120,'·',{class:'big'});grid(200,55,4,2,30,'var(--g3)',null,1,'B [4, 2]');T(svg,290,120,'=',{class:'big'});
+        grid(320,70,3,2,30,'var(--accent)',null,null,'C [3, 2]');R(svg,350,100,28,28,'fill:var(--accent);stroke:var(--ink);stroke-width:2',{rx:2});
+        T(svg,420,90,'outlined cell = coloured row of A',{style:'font-weight:700'});T(svg,420,108,'· coloured column of B',{style:'font-weight:700'});T(svg,420,132,'one dot product per output cell:',{style:'font-size:12px;fill:var(--muted)'});T(svg,420,150,'3 × 2 = 6 dot products of length 4',{style:'font-size:12px;fill:var(--muted)'});
+        T(svg,420,190,'inner sizes must match: [3, 4] · [4, 2]',{style:'font-weight:700'});T(svg,420,210,'a transpose only flips a matrix so they do',{style:'font-size:12px;fill:var(--muted)'});
+        $('#xg-note').innerHTML='A <b>matrix multiplication</b> is a grid of dot products: every row of A against every column of B. Every "·" between two weight-sized blocks on this page means this.';}
+      else{const gemm=mode==='gemm';T(svg,30,40,gemm?'GEMM: many rows (tokens) × the weight matrix':'GEMV: one row (one token) × the weight matrix',{class:'lbl'});
+        grid(40,70,gemm?6:1,6,22,'var(--g0)',null,null,gemm?'X [6 tokens, h]':'x [1 token, h]');T(svg,190,140,'·',{class:'big'});
+        grid(215,70,6,6,22,'var(--g1)',null,null,'W [h, h], read from memory');T(svg,365,140,'=',{class:'big'});grid(390,70,gemm?6:1,6,22,'var(--accent)',null,null,gemm?'Y [6, h]':'y [1, h]');
+        T(svg,540,90,gemm?'each weight read once,':'each weight read once,',{style:'font-weight:700'});T(svg,540,110,gemm?'used for 6 tokens':'used for 1 token',{style:'font-weight:700;fill:'+(gemm?'var(--ok)':'var(--bad)')});
+        T(svg,540,150,gemm?'arithmetic units busy:':'arithmetic units idle,',{style:'font-size:12px;fill:var(--muted)'});T(svg,540,168,gemm?'compute-bound':'waiting on memory:',{style:'font-size:12px;fill:var(--muted)'});T(svg,540,186,gemm?'(prefill, training)':'memory-bound (decode)',{style:'font-size:12px;fill:var(--muted)'});
+        $('#xg-note').innerHTML=gemm?'<b>GEMM</b> (general matrix-matrix multiply) is the GPU library routine for a full matrix multiply. With many token rows, each weight fetched from memory is reused many times, so the GPU is limited by arithmetic. Prefill and training run as GEMMs.':'<b>GEMV</b> (general matrix-vector multiply) is the single-row case. Each weight is fetched for one row of work, so the GPU waits on memory. Decode of one sequence is a GEMV; batching many sequences turns it back into a GEMM (section 03).';}}
+    seg($('#xg-seg'),[{l:'Dot product',v:'dot'},{l:'Matrix multiply',v:'mm'},{l:'GEMM',v:'gemm'},{l:'GEMV',v:'gemv'}],'dot',v=>{mode=v;render();});render();})();
 })();
 
 /* layout: split each figure section into a text column and a figure column */
