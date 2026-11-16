@@ -60,6 +60,7 @@ h2{font:700 26px/1.15 var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:
 .fig svg{width:100%;height:auto;display:block}
 .svgbox{overflow-x:auto}
 .svgbox svg{min-width:640px}
+.spd{display:inline-flex;align-items:center;gap:2px;font:500 11px var(--f-mono,monospace);color:var(--muted)}.spd button{font:600 11px var(--f-mono,monospace);padding:2px 5px;border-radius:6px;border:1px solid var(--surface-2);background:transparent;color:var(--muted);cursor:pointer}.spd button[aria-pressed=true]{background:var(--accent);color:var(--on-fill);border-color:var(--accent)}
 .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
 .seg{display:inline-flex;flex-wrap:wrap;gap:4px;background:var(--surface-2);padding:3px;border-radius:10px}
 .btn{font:500 13.5px var(--f-body);padding:6px 12px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--ink);cursor:pointer}
@@ -249,7 +250,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <p class="cap">Every large language model you have used, including GPT, Llama, Claude, Gemini and Mistral, is built from this one diagram. Data flows from the bottom to the top. Press play to follow it, or click any part.</p>
   <p class="cap">The 2017 Transformer was built for translation. It had two stacks: an <b>encoder</b> that read the source sentence, and a <b>decoder</b> that wrote the translation. GPT-style language models keep only the decoder stack, because their one job is to continue text. That decoder-only design is what you see here.</p>
   <div class="fig">
-    <div class="controls"><button class="btn solid" id="ar-prev" type="button">◀ Prev</button><button class="btn solid" id="ar-next" type="button">Next ▶</button><button class="btn solid" id="ar-play" type="button">Play the data flow</button></div>
+    <div class="controls"><button class="btn solid" id="ar-prev" type="button">◀ Prev</button><button class="btn solid" id="ar-next" type="button">Next ▶</button><button class="btn solid" id="ar-play" type="button">Play the data flow</button><span class="spd" aria-label="Animation speed">speed</span></div>
     <div class="note" id="ar-note" style="margin:0 0 10px;min-height:96px"></div>
     <div class="svgbox"><svg id="ar-svg" viewBox="0 0 760 640" role="img" aria-label="Decoder-only transformer architecture"></svg></div>
   </div>
@@ -279,7 +280,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <div class="controls">
       <button class="btn solid" id="an-prev" type="button">◀ Prev</button>
       <button class="btn solid" id="an-next" type="button">Next ▶</button>
-      <button class="btn solid" id="an-play" type="button">Play all</button>
+      <button class="btn solid" id="an-play" type="button">Play all</button><span class="spd" aria-label="Animation speed">speed</span>
       <span class="mono" style="font-size:12px;color:var(--muted)">numbers</span><div class="seg" id="an-mode"></div>
     </div>
     <div class="chips" id="an-chips"></div>
@@ -331,7 +332,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <div class="sh"><span class="n">03</span><h2>Static vs in-flight batching</h2></div>
   <p class="cap">Four batch slots and twelve requests of different lengths. With static batching, a slot that finishes early sits idle. With in-flight batching, the next request takes over that slot straight away.</p>
   <div class="fig">
-    <div class="controls"><button class="btn solid" id="bt-play" type="button">Replay</button></div>
+    <div class="controls"><button class="btn solid" id="bt-play" type="button">Replay</button><span class="spd" aria-label="Animation speed">speed</span></div>
     <div class="svgbox"><svg id="bt-svg" viewBox="0 0 760 300" role="img" aria-label="Batching timelines"></svg></div>
     <div class="stats" id="bt-stats"></div>
   </div>
@@ -339,7 +340,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <div class="fig">
     <div class="controls">
       <div class="seg" id="bl-mode"></div>
-      <button class="btn solid" id="bl-play" type="button">Play</button>
+      <button class="btn solid" id="bl-play" type="button">Play</button><span class="spd" aria-label="Animation speed">speed</span>
       <button class="btn" id="bl-step" type="button">Step</button>
       <button class="btn" id="bl-reset" type="button">Reset</button>
     </div>
@@ -374,7 +375,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <div class="sh"><span class="n">04.2</span><h2>Data parallelism: copy the model, split the batch</h2></div>
   <p class="cap">The simplest strategy: every GPU holds a full copy, and requests are spread across them. It scales throughput almost perfectly, but only if the model fits on one GPU.</p>
   <div class="fig">
-    <div class="controls"><div class="seg" id="dp-model"></div><button class="btn solid" id="dp-replay" type="button">Send requests</button></div>
+    <div class="controls"><div class="seg" id="dp-model"></div><button class="btn solid" id="dp-replay" type="button">Send requests</button><span class="spd" aria-label="Animation speed">speed</span></div>
     <div class="svgbox"><svg id="dp-svg" viewBox="0 0 760 300" role="img" aria-label="Data parallelism replicas"></svg></div>
     <div class="stats" id="dp-stats"></div>
     <div class="note">In training, the copies also add up their gradients across GPUs after every step, a step called an All-Reduce (section 04.4 shows it; section A1 covers training). At inference there is nothing to sync: replicas sit behind a load balancer.</div>
@@ -397,7 +398,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <div class="sh"><span class="n">04.4</span><h2>Tensor parallelism: split inside each layer</h2></div>
   <p class="cap">TP splits the <b>weight matrices themselves</b>, so every GPU works on every layer, for the same sequences, with part of the weights. Step through what gets split, how, and what it costs.</p>
   <div class="fig">
-    <div class="controls"><button class="btn solid" id="tpc-prev" type="button">◀ Prev</button><button class="btn solid" id="tpc-next" type="button">Next ▶</button><button class="btn solid" id="tpc-play" type="button">Play all</button></div>
+    <div class="controls"><button class="btn solid" id="tpc-prev" type="button">◀ Prev</button><button class="btn solid" id="tpc-next" type="button">Next ▶</button><button class="btn solid" id="tpc-play" type="button">Play all</button><span class="spd" aria-label="Animation speed">speed</span></div>
     <div class="chips" id="tpc-chips"></div>
     <div class="note" id="tpc-note" style="margin:10px 0"></div>
     <div class="svgbox"><svg id="tpc-svg" viewBox="0 0 760 300" role="img" aria-label="Tensor parallelism component by component"></svg></div>
@@ -407,7 +408,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <div class="sh"><span class="n">04.5</span><h2>Sequence parallelism: remove TP's copies</h2></div>
   <p class="cap">TP leaves LayerNorm and Dropout (a training-only step that randomly zeroes some values) copied on every GPU. These ops treat each token on its own, so they can be split along the sequence s instead. Inside <b>every</b> layer, TP + SP switches layout op by op: split s at LayerNorm, Dropout and the residual add; plain TP inside attention and the MLP. Compare the layouts of the same [b, s, h] tensor on two GPUs:</p>
   <div class="fig">
-    <div class="controls"><div class="seg" id="cube-seg"></div><button class="btn solid" id="cube-replay" type="button">Replay cut</button></div>
+    <div class="controls"><div class="seg" id="cube-seg"></div><button class="btn solid" id="cube-replay" type="button">Replay cut</button><span class="spd" aria-label="Animation speed">speed</span></div>
     <div class="svgbox"><svg id="cube-svg" viewBox="0 0 760 346" role="img" aria-label="3D activation tensor split across GPUs"></svg></div>
     <div class="note" id="cube-note"></div>
   </div>
@@ -418,7 +419,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
       <div class="controls">
         <button class="btn solid" id="tp-prev" type="button">◀ Prev</button>
         <button class="btn solid" id="tp-next" type="button">Next ▶</button>
-        <button class="btn solid" id="tp-play" type="button">Play layer</button>
+        <button class="btn solid" id="tp-play" type="button">Play layer</button><span class="spd" aria-label="Animation speed">speed</span>
       </div>
       <div class="chips" id="tp-chips"></div>
       <div class="svgbox" style="margin-top:10px"><svg id="tp-svg" viewBox="0 0 760 370" role="img" aria-label="Tensor parallel tensor ownership"></svg></div>
@@ -484,7 +485,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <div class="sh"><span class="n">06</span><h2>FlashAttention: tiling in SRAM</h2></div>
   <p class="cap">A GPU has two kinds of memory: a large but slow main memory (<b>HBM</b>) and a tiny but very fast on-chip memory (<b>SRAM</b>). Standard attention writes the full s × s table of scores to HBM and reads it back. FlashAttention computes it one small tile at a time in SRAM and never stores the whole table. The output is exactly the same.</p>
   <div class="fig">
-    <div class="controls"><div class="seg" id="fa-seg"></div><button class="btn solid" id="fa-play" type="button">Play</button></div>
+    <div class="controls"><div class="seg" id="fa-seg"></div><button class="btn solid" id="fa-play" type="button">Play</button><span class="spd" aria-label="Animation speed">speed</span></div>
     <div class="svgbox"><svg id="fa-svg" viewBox="0 0 760 290" role="img" aria-label="FlashAttention tiling"></svg></div>
     <div class="stats" id="fa-stats"></div>
   </div>
@@ -565,7 +566,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <div class="sh"><span class="n">A1</span><h2>Backward pass &amp; training memory</h2></div>
   <p class="cap">Inference only ever runs forward. Training runs the gradient back through every stage, and that is where the activation memory in section 04 (Model parallelism) comes from.</p>
   <div class="fig">
-    <div class="controls"><button class="btn solid" id="bw-prev" type="button">◀ Prev</button><button class="btn solid" id="bw-next" type="button">Next ▶</button><button class="btn solid" id="bw-play" type="button">Play all</button>
+    <div class="controls"><button class="btn solid" id="bw-prev" type="button">◀ Prev</button><button class="btn solid" id="bw-next" type="button">Next ▶</button><button class="btn solid" id="bw-play" type="button">Play all</button><span class="spd" aria-label="Animation speed">speed</span>
       <span id="bw-extra" style="display:none"><span class="seg" id="bw-rc"></span></span></div>
     <div class="chips" id="bw-chips"></div>
     <div class="note" id="bw-note" style="margin:10px 0"></div>
@@ -792,6 +793,15 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 <footer>Source: <a href="https://developer.nvidia.com/blog/mastering-llm-techniques-inference-optimization/">NVIDIA Technical Blog — Mastering LLM Techniques: Inference Optimization</a>. Shapes and formulas follow the article. Grid sizes are scaled down for drawing, and utilisation bars are illustrative. Go deeper with the runnable notebooks in this repo: <a href="https://ylnhari.github.io/ml-scratchpad/attention-transformer/">attention</a> · <a href="https://ylnhari.github.io/ml-scratchpad/rope/">RoPE</a> · <a href="https://ylnhari.github.io/ml-scratchpad/nanogpt-from-scratch/">nanoGPT + backprop</a> · <a href="https://ylnhari.github.io/ml-scratchpad/kv-cache/">KV cache</a> · <a href="https://ylnhari.github.io/ml-scratchpad/continuous-batching/">continuous batching</a> · <a href="https://ylnhari.github.io/ml-scratchpad/inference-engine/">paged KV + speculative decoding</a> · <a href="https://ylnhari.github.io/ml-scratchpad/vllm-memory/">vLLM memory</a> (and its <a href="https://ylnhari.github.io/ml-scratchpad/vllm-memory/visual/">visual version</a>).</footer>
 
 <script>
+let SPEED=1;const _st=setTimeout,_ct=clearTimeout,_ci=clearInterval;
+window.setInterval=(f,ms)=>{const hd={x:0};const run=()=>{hd.t=_st(()=>{if(hd.x)return;f();if(!hd.x)run();},ms/SPEED);};run();return hd;};
+window.clearInterval=hd=>{if(hd&&typeof hd==='object'){hd.x=1;_ct(hd.t);}else _ci(hd);};
+const rateAll=()=>document.getAnimations().forEach(a=>{a.playbackRate=SPEED;});
+['animationstart','transitionrun'].forEach(ev=>document.addEventListener(ev,e=>{e.target.getAnimations().forEach(a=>{a.playbackRate=SPEED;});},true));
+document.addEventListener('DOMContentLoaded',()=>{const SP=[0.5,1,2,3];const all=[...document.querySelectorAll('.spd')];
+  all.forEach(sp=>SP.forEach(v=>{const b=document.createElement('button');b.type='button';b.textContent=v+'×';b.dataset.v=v;b.setAttribute('aria-pressed',String(v===1));
+    b.onclick=()=>{SPEED=v;all.forEach(s=>s.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(+x.dataset.v===v))));rateAll();};sp.appendChild(b);}));});
+
 const NS="http://www.w3.org/2000/svg";
 const $=q=>document.querySelector(q);
 function S(tag,a,p){const e=document.createElementNS(NS,tag);if(a)for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
