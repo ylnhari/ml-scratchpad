@@ -408,7 +408,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <p class="cap">TP leaves LayerNorm and Dropout (a training-only step that randomly zeroes some values) copied on every GPU. These ops treat each token on its own, so they can be split along the sequence s instead. Compare the possible layouts of the same [b, s, h] tensor on two GPUs:</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="cube-seg"></div><button class="btn solid" id="cube-replay" type="button">Replay cut</button></div>
-    <div class="svgbox"><svg id="cube-svg" viewBox="0 0 760 290" role="img" aria-label="3D activation tensor split across GPUs"></svg></div>
+    <div class="svgbox"><svg id="cube-svg" viewBox="0 0 760 306" role="img" aria-label="3D activation tensor split across GPUs"></svg></div>
     <div class="note" id="cube-note"></div>
   </div>
   <p class="cap" style="margin-top:22px">Now walk one whole layer under TP and under TP + SP. Watch the grid each GPU holds, the collective between stages, and the running memory total.</p>
@@ -1173,7 +1173,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
   const TP=[
     {n:'Input X',t:dup,sh:'[s, h]',note:'Both GPUs hold the full input [s, h], so the memory is duplicated.'},
     {n:'LayerNorm',t:dup,sh:'[s, h]',note:'LayerNorm needs a whole hidden vector per token, so it can\'t split along h. Each GPU stores a full copy.'},
-    {n:'Attention',t:hs,sh:'[s, h/2]',w:{k:'col',l:'W_QKV column-split'},note:'Heads are split: GPU 0 runs heads 0–3 and GPU 1 runs heads 4–7. Each holds [s, h/2], with no duplication.'},
+    {n:'Attention',t:hs,sh:'[s, h/2]',w:{k:'col',l:'W_QKV column-split'},note:'Heads are split (4 heads in this picture): GPU 0 runs heads 0–1 and GPU 1 runs heads 2–3, each over all 8 tokens. Each holds [s, h/2], with no duplication.'},
     {n:'Out-proj',t:part,sh:'[s, h] partial',w:{k:'row',l:'W_O row-split'},comm:'All-Reduce',note:'A row-split W_O gives each GPU a partial sum of the full [s, h]. All-Reduce adds them, leaving a full copy on every GPU.'},
     {n:'Dropout + add',t:dup,sh:'[s, h]',note:'Dropout and residual run on the full [s, h], duplicated on both GPUs.'},
     {n:'LayerNorm',t:dup,sh:'[s, h]',note:'Full copy again on each GPU.'},
@@ -1183,13 +1183,13 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
   const SP=[
     {n:'Input X',t:sq,sh:'[s/2, h]',note:'The sequence is split: GPU 0 holds tokens 0–3 and GPU 1 holds tokens 4–7.'},
     {n:'LayerNorm',t:sq,sh:'[s/2, h]',note:'LayerNorm is per token, so each GPU normalises only its own tokens. Nothing is duplicated.'},
-    {n:'Attention',t:hs,sh:'[s, h/2]',w:{k:'col',l:'W_QKV column-split'},comm:'All-Gather',note:'All-Gather rebuilds the full sequence, then the heads split as in plain TP.'},
+    {n:'Attention',t:hs,sh:'[s, h/2]',gath:1,w:{k:'col',l:'W_QKV column-split'},comm:'All-Gather',note:'Attention needs every token, so All-Gather first copies the other GPU\'s tokens in (shaded rows). Now each GPU has all 8 tokens again and runs its 2 heads exactly as in plain TP. Only activations are copied; the weights stay split.'},
     {n:'Out-proj',t:sq,sh:'[s/2, h]',w:{k:'row',l:'W_O row-split'},comm:'Reduce-Scatter',note:'Reduce-Scatter sums the partials and leaves each GPU only its own token slice.'},
     {n:'Dropout + add',t:sq,sh:'[s/2, h]',note:'Dropout runs on [s/2, h] per GPU.'},
     {n:'LayerNorm',t:sq,sh:'[s/2, h]',note:'Still sharded by sequence.'},
-    {n:'MLP up',t:ms,sh:'[s, 4h/2]',w:{k:'col',l:'A column-split'},comm:'All-Gather',note:'All-Gather the tokens, then split A by columns.'},
+    {n:'MLP up',t:ms,sh:'[s, 4h/2]',gath:1,w:{k:'col',l:'A column-split'},comm:'All-Gather',note:'All-Gather copies the other GPU\'s tokens in again (shaded rows), then A is split by columns as in TP.'},
     {n:'MLP down',t:sq,sh:'[s/2, h]',w:{k:'row',l:'B row-split'},comm:'Reduce-Scatter',note:'Reduce-Scatter, so each GPU holds its token slice. All-Reduce = Reduce-Scatter + All-Gather, so communication volume stays the same.'},
-    {n:'Dropout + add',t:sq,sh:'[s/2, h]',note:'Every activation is now either head-split or token-split. Nothing is duplicated.'}];
+    {n:'Dropout + add',t:sq,sh:'[s/2, h]',note:'Every activation is now either head-split or token-split. This is not a memory-for-speed trade: the two collectives move the same data as TP\'s All-Reduce, so the memory saving is free.'}];
   const units=sp=>(sp.r[1]-sp.r[0])*(sp.c[1]-sp.c[0])/64;
   const total=arr=>arr.reduce((a,s)=>a+units(s.t(0)),0);
   let mode='tp',k=0,timer=null;
@@ -1198,15 +1198,20 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
   const stages=()=>mode==='sp'?SP:mode==='one'?ONE:TP;
   function drawTensor(px,g,spec,stg,gpus){
     const gx=px+34,gy=86,gw=290,rh=15,cw=gw/spec.W;
-    T(svg,gx,gy-8,spec.W===32?'← 4h →':'← h →',{class:'lbl'});
+    if(stg.n==='Attention'&&spec.W===8){for(let hd=0;hd<4;hd++){const own=hd*2>=spec.c[0]&&hd*2<spec.c[1];
+      S('line',{x1:gx+hd*2*cw+2,x2:gx+(hd*2+2)*cw-3,y1:gy-5,y2:gy-5,style:`stroke:${own?(gpus===1?'var(--accent)':G(g)):'var(--muted)'};stroke-width:2`});
+      T(svg,gx+(hd*2+1)*cw,gy-10,'head '+hd,{'text-anchor':'middle',style:`font-size:10.5px;${own?'font-weight:700':'fill:var(--muted)'}`});}}
+    else T(svg,gx,gy-8,spec.W===32?'← 4h →':'← h →',{class:'lbl'});
     for(let r=0;r<8;r++){T(svg,px,gy+r*rh+11,'t'+r,{style:'font-size:10px;fill:var(--muted)'});
       for(let c=0;c<spec.W;c++){const own=r>=spec.r[0]&&r<spec.r[1]&&c>=spec.c[0]&&c<spec.c[1];
         const st=own?(spec.partial?`fill:url(#part${g})`:`fill:${gpus===1?'var(--accent)':G(g)}`):'fill:var(--surface-2)';
         R(svg,gx+c*cw,gy+r*rh,cw-1,rh-1,st);}}
+    let gl='';if(stg.gath&&gpus>1){const o0=g?0:4;R(svg,gx+spec.c[0]*cw-2,gy+o0*rh-1,(spec.c[1]-spec.c[0])*cw+2,4*rh+1,`fill:${G(1-g)};fill-opacity:.45;stroke:${G(1-g)};stroke-width:2;stroke-dasharray:5 3`,{rx:3});gl=`t${o0}–t${o0+3} copied in from GPU ${1-g}`;}
     if(spec.dup&&gpus>1){R(svg,gx-2,gy-2,gw+3,8*rh+3,'fill:none;stroke:var(--bad);stroke-width:2;stroke-dasharray:5 3',{rx:3});}
     const y2=gy+8*rh;
     T(svg,gx,y2+18,stg.sh,{class:'big'});
     if(spec.dup&&gpus>1)T(svg,gx+gw,y2+18,'DUPLICATE',{'text-anchor':'end',style:'fill:var(--bad);font-weight:700;font-size:11px'});
+    if(gl)T(svg,gx+gw,y2+18,gl,{'text-anchor':'end',style:"font-weight:700;font-size:11px"});
     if(spec.partial)T(svg,gx+gw,y2+18,'PARTIAL SUM',{'text-anchor':'end',style:'fill:var(--muted);font-weight:700;font-size:11px'});
     // weight glyph
     if(stg.w){const wx=gx,wy=y2+34,ws=44;T(svg,wx+ws+10,wy+16,stg.w.l,{style:'font-size:11px'});
@@ -1235,8 +1240,8 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       T(svg,px+20,20,gpus===1?'SINGLE GPU':'GPU '+g,{style:'font-weight:700'});
       T(svg,px+20,40,`step ${k+1}: ${stg.n}`,{style:'fill:var(--muted)'});
       drawTensor(px,g,stg.t(g),stg,gpus);}
-    if(stg.comm&&gpus>1){R(svg,280,50,200,26,'fill:var(--accent)',{rx:13});
-      T(svg,380,68,'⇄ '+stg.comm,{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700'});}
+    if(stg.comm&&gpus>1){R(svg,250,30,160,24,'fill:var(--accent)',{rx:12});
+      T(svg,330,47,'⇄ '+stg.comm,{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700'});}
     $('#tp-note').textContent=stg.note;
     $('#tp-prev').disabled=k===0;$('#tp-next').disabled=k===arr.length-1;
     stats($('#tp-stats'),[
@@ -1271,7 +1276,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
   }
   const MODES={
     one:{note:'One GPU holds all b sequences, all s tokens, and every weight.',pieces:[{b:[0,0,0,8,8,2],c:'var(--accent)',dx:0,lab:'[b, s, h]',mem:'100%',w:'all'}]},
-    dp:{note:'Data parallelism (DP): each GPU runs <b>different whole prompts</b> with its own full copy of the model, like two separate servers. Nothing is split or shared.',pieces:[{b:[0,0,1,8,8,1],c:G(0),dx:-190,lab:'GPU 0  [b/2, s, h]  prompt A, whole',mem:'50%',w:'all',sub:'its own prompts, full activations  ·  weights: full copy'},{b:[0,0,0,8,8,1],c:G(1),dx:190,lab:'GPU 1  [b/2, s, h]  prompt B, whole',mem:'50%',w:'all',sub:'its own prompts, full activations  ·  weights: full copy'}]},
+    dp:{note:'Data parallelism (DP): each GPU runs <b>different whole prompts</b> with its own full copy of the model, like two separate servers. The 50% means half of the batch (one of the two prompts), not half of any prompt: each prompt\'s activations are complete on its GPU.',pieces:[{b:[0,0,1,8,8,1],c:G(0),dx:-190,lab:'GPU 0  [b/2, s, h]  prompt A, whole',mem:'50%',w:'all',sub:'activations 50% = 1 of 2 prompts, whole|weights: full copy'},{b:[0,0,0,8,8,1],c:G(1),dx:190,lab:'GPU 1  [b/2, s, h]  prompt B, whole',mem:'50%',w:'all',sub:'activations 50% = 1 of 2 prompts, whole|weights: full copy'}]},
     tph:{note:'TP inside attention and the MLP splits the weights: each GPU owns half the heads or half the MLP columns, so it produces only its half of the activation, [b, s, h/2]. Both GPUs still see all b sequences and all s tokens.',pieces:[{b:[0,0,0,4,8,2],c:G(0),dx:-190,lab:'GPU 0  [b, s, h/2]',mem:'50%',w:'1/2'},{b:[4,0,0,4,8,2],c:G(1),dx:190,lab:'GPU 1  [b, s, h/2]',mem:'50%',w:'1/2'}]},
     rep:{note:'Between those blocks (LayerNorm, Dropout, the residual add), TP has nothing to split, because LayerNorm has almost no weights. Both GPUs are working on the same sequences, so after the All-Reduce each holds an identical full [b, s, h] and runs the same LayerNorm on it: the same memory and the same work, twice. This is not data parallelism. DP would give each GPU different sequences.',pieces:[{b:[0,0,0,8,8,2],c:G(0),dx:-200,lab:'GPU 0  [b, s, h]',mem:'100%',w:'1/2',dup:1},{b:[0,0,0,8,8,2],c:G(1),dx:200,lab:'GPU 1  [b, s, h]',mem:'100%',w:'1/2',dup:1}]},
     sps:{note:'Sequence parallelism fixes that waste. LayerNorm and Dropout work on each token on its own, so cut along s instead: each GPU normalises half the tokens, with no copies. All-Gather rebuilds the full sequence before the next attention or MLP block.',pieces:[{b:[0,4,0,8,4,2],c:G(0),dx:-190,lab:'GPU 0  [b, s/2, h]  tokens 0–3',mem:'50%',w:'1/2'},{b:[0,0,0,8,4,2],c:G(1),dx:190,lab:'GPU 1  [b, s/2, h]  tokens 4–7',mem:'50%',w:'1/2'}]}};
@@ -1289,8 +1294,8 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       box(inner,...p.b,p.c);const lab=S('g',{style:'opacity:0;transition:opacity .5s .7s'},inner);
       const ctr=P(p.b[0]+p.b[3]/2,p.b[1]+p.b[4]/2,0);
       T(lab,ctr[0],150,p.lab,{'text-anchor':'middle',style:'font-weight:700'});
-      if(!p.sub){R(lab,ctr[0]-70,162,140,10,'fill:var(--surface-2)',{rx:5});R(lab,ctr[0]-70,162,140*parseFloat(p.mem)/100,10,`fill:${p.c}`,{rx:5});}
-      T(lab,ctr[0],p.sub?172:190,p.sub||('activations '+p.mem+'  ·  weights '+p.w),{'text-anchor':'middle',style:'font-size:11px;fill:var(--muted)'});
+      {R(lab,ctr[0]-70,162,140,10,'fill:var(--surface-2)',{rx:5});R(lab,ctr[0]-70,162,140*parseFloat(p.mem)/100,10,`fill:${p.c}`,{rx:5});}
+      (p.sub||('activations '+p.mem+'  ·  weights '+p.w)).split('|').forEach((ln,li)=>T(lab,ctr[0],190+li*15,ln,{'text-anchor':'middle',style:'font-size:11px;fill:var(--muted)'}));
       if(p.dup)T(lab,ctr[0],-58,'DUPLICATE',{'text-anchor':'middle',style:'fill:var(--bad);font-weight:700'});
       return {inner,lab,dx:p.dx};});
     const go=()=>groups.forEach(o=>{o.inner.style.transform=`translate(${o.dx}px,0px)`;o.lab.style.opacity=1;});
