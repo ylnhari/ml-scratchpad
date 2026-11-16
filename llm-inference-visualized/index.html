@@ -61,6 +61,7 @@ h2{font:700 26px/1.15 var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:
 .svgbox{overflow-x:auto}
 .svgbox svg{min-width:640px}
 .e2cfg{display:inline-flex;align-items:center;gap:6px}.e2cfg>.mono{font-size:11.5px;color:var(--muted)}.e2cfg .seg .btn{font-size:12px;padding:3px 8px}
+.backbtn{position:fixed;right:18px;bottom:18px;z-index:50;font:600 12px var(--f-mono,monospace);padding:6px 12px;border-radius:999px;border:1px solid var(--accent);background:var(--accent);color:var(--on-fill);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.15)}a.xref{color:var(--accent);text-decoration:underline dotted;text-underline-offset:3px}
 .spd{display:inline-flex;align-items:center;gap:2px;font:500 11px var(--f-mono,monospace);color:var(--muted)}.spd button{font:600 11px var(--f-mono,monospace);padding:2px 5px;border-radius:6px;border:1px solid var(--surface-2);background:transparent;color:var(--muted);cursor:pointer}.spd button[aria-pressed=true]{background:var(--accent);color:var(--on-fill);border-color:var(--accent)}
 .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
 .seg{display:inline-flex;flex-wrap:wrap;gap:4px;background:var(--surface-2);padding:3px;border-radius:10px}
@@ -487,6 +488,11 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <div class="svgbox"><svg id="at-svg" viewBox="0 0 760 290" role="img" aria-label="Query heads sharing KV heads"></svg></div>
     <div class="stats" id="at-stats"></div>
   </div>
+  <p class="cap" style="margin-top:22px">Where do fewer K and V heads come from? From smaller weight matrices. Section 00.2 used standard MHA, where W_Q, W_K and W_V are all [h, h]: each head owns a d_head-wide slice of columns. GQA keeps every slice of W_Q but gives W_K and W_V only one slice per group, so they are narrower and K and V come out smaller. You can also read each slice as one head's own small matrix: 8 W_Q matrices but only 2 W_K and 2 W_V for GQA with 2 groups. Same picked variant as above:</p>
+  <div class="fig">
+    <div class="svgbox"><svg id="at-w" viewBox="0 0 760 250" role="img" aria-label="Weight matrices W_Q, W_K, W_V under MHA, GQA, MQA"></svg></div>
+    <div class="note" id="at-wnote"></div>
+  </div>
 </section>
 
 <section id="flash">
@@ -821,7 +827,10 @@ const G=i=>`var(--g${i})`;
 const PAL=i=>`hsl(${(i*47+205)%360} 78% 76%)`;
 function seg(box,opts,init,cb){box.innerHTML='';opts.forEach(o=>{const b=document.createElement('button');b.type='button';b.className='btn';b.textContent=o.l;b.setAttribute('aria-pressed',String(o.v===init));b.onclick=()=>{[...box.children].forEach(c=>c.setAttribute('aria-pressed','false'));b.setAttribute('aria-pressed','true');cb(o.v);};box.appendChild(b);});}
 const GLT=[["W_U","wu"],["activation memory", "actmem"], ["residual stream", "residual"], ["optimizer state", "optstate"], ["optimiser state", "optstate"], ["Reduce-Scatter", "rs"], ["compute-bound", "compute"], ["recomputation", "recompute"], ["microbatches", "microbatch"], ["memory-bound", "memory"], ["activations", "act"], ["utilisation", "util"], ["microbatch", "microbatch"], ["throughput", "throughput"], ["InfiniBand", "ib"], ["All-Reduce", "allreduce"], ["All-Gather", "ag"], ["recompute", "recompute"], ["replicas", "replica"], ["latency", "latency"], ["replica", "replica"], ["bubble", "bubble"], ["NVLink", "nvlink"], ["logits", "logits"], ["SRAM", "sram"], ["HBM", "hbm"]];
-function glink(s){s=String(s);const used=new Set();return s.split(/(<a\b[\s\S]*?<\/a>|<[^>]+>)/).map(part=>{if(part.startsWith('<'))return part;for(const [t,k] of GLT){if(used.has(k))continue;const esc=t.replace(/[-]/g,'\\-');const re=new RegExp('(^|[^A-Za-z-])('+esc+')(?![A-Za-z])',t===t.toUpperCase()?'':'i');const m=part.match(re);if(m){used.add(k);const i=m.index+m[1].length;part=part.slice(0,i)+'\u0000'+k+'\u0001'+m[2]+'\u0002'+part.slice(i+m[2].length);}}return part.replace(/\u0000([^\u0001]+)\u0001([^\u0002]+)\u0002/g,'<a class="gl" href="#g-$1">$2</a>');}).join('');}
+function secLink(s){return String(s).replace(/(<a\b[\s\S]*?<\/a>)|\b([Ss]ection|Extras) ((?:0\d|1\d|A\d|X\d)(?:\.\d)?)\b/g,(m,a,w,n)=>{if(a)return a;const id=SECID[n];return id?`<a class="xref" href="#${id}">${w} ${n}</a>`:m;});}
+const SECID={};document.querySelectorAll('section[id] .sh .n').forEach(n=>{SECID[n.textContent.trim()]=n.closest('section').id;});
+function glink(s){return secLink(glink0(s));}
+function glink0(s){s=String(s);const used=new Set();return s.split(/(<a\b[\s\S]*?<\/a>|<[^>]+>)/).map(part=>{if(part.startsWith('<'))return part;for(const [t,k] of GLT){if(used.has(k))continue;const esc=t.replace(/[-]/g,'\\-');const re=new RegExp('(^|[^A-Za-z-])('+esc+')(?![A-Za-z])',t===t.toUpperCase()?'':'i');const m=part.match(re);if(m){used.add(k);const i=m.index+m[1].length;part=part.slice(0,i)+'\u0000'+k+'\u0001'+m[2]+'\u0002'+part.slice(i+m[2].length);}}return part.replace(/\u0000([^\u0001]+)\u0001([^\u0002]+)\u0002/g,'<a class="gl" href="#g-$1">$2</a>');}).join('');}
 function stats(box,arr){box.innerHTML=arr.map(s=>`<div class="stat ${s.c||''}"><b>${s.v}</b><span>${glink(s.l)}</span></div>`).join('');}
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
 function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});}
@@ -1351,7 +1360,17 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     const name=kv===8?'MHA':kv===1?'MQA':'GQA';
     stats($('#at-stats'),[{v:name,l:'variant'},{v:`${kv} × [s, d_head] × 2`,l:'KV cached per layer'},
       {v:Math.round(kv/8*1000)/10+'%',l:'KV cache vs MHA',c:kv<8?'good':''},{v:gs,l:'query heads per KV head'},
-      {v:'12.5%',l:'Llama 2 70B: 64 Q → 8 KV'}]);}
+      {v:'12.5%',l:'Llama 2 70B: 64 Q → 8 KV'}]);
+    const w=$('#at-w');clear(w);const D=40,y0=44,rh=54;
+    T(w,20,20,'Q = X · W_Q   |   K = X · W_K   |   V = X · W_V   |   X: [s, h], toy h = 8 × d_head',{style:'font-size:12px;font-weight:700'});
+    [['W_Q','Q',H,i=>Math.floor(i/gs)],['W_K','K',kv,j=>j],['W_V','V',kv,j=>j]].forEach(([nm,o,n,grp],r)=>{const y=y0+r*(rh+20);
+      T(w,20,y+22,`${nm}  [h, ${n} × d_head]`,{style:'font-weight:700;font-size:12px'});
+      T(w,20,y+40,n===H?'one slice per query head':kv===1?'one slice shared by all':`one slice per group of ${gs}`,{style:'font-size:10.5px;fill:var(--muted)'});
+      R(w,228,y,H*D,rh,'fill:none;stroke:var(--line);stroke-dasharray:3 3',{rx:4});
+      for(let i=0;i<n;i++){R(w,228+i*D+1,y,D-2,rh,`fill:${PAL(grp(i))}${o==='V'?';opacity:.7':''}`,{rx:3});T(w,228+i*D+D/2,y+rh/2+4,o+i,{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700;font-size:11px'});}
+      T(w,228+H*D+14,y+22,`→ ${o}: ${n} head${n>1?'s':''} of [s, d_head]`,{style:'font-size:11.5px;font-weight:700'});
+      T(w,228+H*D+14,y+40,o==='Q'?'not cached':'stored in the KV cache',{style:'font-size:10.5px;fill:var(--muted)'});});
+    $('#at-wnote').innerHTML=glink(kv===H?'MHA: W_Q, W_K and W_V are the same size, [h, h]. Every query head has its own K and V slice.':`${name}: W_Q stays [h, 8 × d_head], but W_K and W_V shrink to [h, ${kv} × d_head]. Query heads ${kv===1?'all':'in the same colour'} read the same K and V. In Llama 2 70B: W_Q is [8192, 8192], W_K and W_V are [8192, 1024] (8 KV heads of 128).`);}
   seg($('#at-seg'),[{l:'MHA · 8 KV',v:8},{l:'GQA · 4 KV',v:4},{l:'GQA · 2 KV',v:2},{l:'MQA · 1 KV',v:1}],8,render);render(8);
 })();
 
@@ -2288,6 +2307,17 @@ document.querySelectorAll('main section').forEach(sec=>{if(!sec.querySelector(':
 (function(){const links=[...document.querySelectorAll('nav.rail a')];
   const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){links.forEach(l=>l.classList.toggle('on',l.getAttribute('href')==='#'+e.target.id));const on=links.find(l=>l.classList.contains('on'));const rail=document.querySelector('nav.rail');if(on&&rail){const r=on.getBoundingClientRect(),rr=rail.getBoundingClientRect();if(r.top<rr.top+40||r.bottom>rr.bottom-40)rail.scrollTo({top:rail.scrollTop+(r.top-rr.top)-rr.height/2,behavior:RM?'auto':'smooth'});}}});},{rootMargin:'-40% 0px -55% 0px'});
   document.querySelectorAll('main section').forEach(s=>io.observe(s));})();
+
+(function(){
+  const skip=el=>el.closest('a,svg,script,style,nav,button,.formula');
+  const walk=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{acceptNode:n=>/([Ss]ection|Extras) (0\d|1\d|A\d|X\d)/.test(n.nodeValue)&&!skip(n.parentElement)?1:2});
+  const list=[];while(walk.nextNode())list.push(walk.currentNode);
+  list.forEach(n=>{const span=document.createElement('span');span.innerHTML=secLink(n.nodeValue.replace(/&/g,'&amp;').replace(/</g,'&lt;'));n.replaceWith(...span.childNodes);});
+  const back=document.createElement('button');back.type='button';back.className='backbtn';back.textContent='← back';back.hidden=true;document.body.appendChild(back);
+  let ret=null;
+  document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#"]');if(!a||a.closest('nav'))return;ret=window.scrollY;back.hidden=false;},true);
+  back.onclick=()=>{if(ret!==null)window.scrollTo({top:ret,behavior:'smooth'});ret=null;back.hidden=true;};
+})();
 </script>
 </body>
 </html>
