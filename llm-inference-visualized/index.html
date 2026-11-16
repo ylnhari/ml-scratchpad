@@ -405,7 +405,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 </section>
 <section id="par-sp">
   <div class="sh"><span class="n">04.5</span><h2>Sequence parallelism: remove TP's copies</h2></div>
-  <p class="cap">TP leaves LayerNorm and Dropout (a training-only step that randomly zeroes some values) copied on every GPU. These ops treat each token on its own, so they can be split along the sequence s instead. Compare the possible layouts of the same [b, s, h] tensor on two GPUs:</p>
+  <p class="cap">TP leaves LayerNorm and Dropout (a training-only step that randomly zeroes some values) copied on every GPU. These ops treat each token on its own, so they can be split along the sequence s instead. Inside <b>every</b> layer, TP + SP switches layout op by op: split s at LayerNorm, Dropout and the residual add; plain TP inside attention and the MLP. Compare the layouts of the same [b, s, h] tensor on two GPUs:</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="cube-seg"></div><button class="btn solid" id="cube-replay" type="button">Replay cut</button></div>
     <div class="svgbox"><svg id="cube-svg" viewBox="0 0 760 346" role="img" aria-label="3D activation tensor split across GPUs"></svg></div>
@@ -1313,7 +1313,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       return {inner,lab,dx:p.dx};});
     const go=()=>groups.forEach(o=>{o.inner.style.transform=`translate(${o.dx}px,0px)`;o.lab.style.opacity=1;});
     if(RM)go();else requestAnimationFrame(()=>requestAnimationFrame(go));}
-  seg($('#cube-seg'),[{l:'One GPU',v:'one'},{l:'DP · split b',v:'dp'},{l:'TP · attention/MLP',v:'tph'},{l:'TP · LayerNorm (copied)',v:'rep'},{l:'TP+SP · LayerNorm',v:'sps'}],'tph',v=>{mode=v;render();});
+  seg($('#cube-seg'),[{l:'One GPU · every op',v:'one'},{l:'DP · every op',v:'dp'},{l:'TP · at attention / MLP',v:'tph'},{l:'TP · at LayerNorm (copied)',v:'rep'},{l:'TP + SP · at LayerNorm (split s)',v:'sps'}],'tph',v=>{mode=v;render();});
   $('#cube-replay').onclick=render;render();
 })();
 
