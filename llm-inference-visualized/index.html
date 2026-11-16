@@ -985,13 +985,18 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     R(svg,X0,122,cap*scale,46,'fill:var(--surface-2);stroke:var(--line)',{rx:8});
     R(svg,X0,122,w*scale,46,'fill:var(--g0)',{rx:6});
     const kvx=X0+w*scale;
-    R(svg,kvx,122,kv*scale,46,tot>cap?'fill:var(--g2)':'fill:var(--g2)');
+    const kvw=Math.max(5,kv*scale);R(svg,kvx,122,kvw,46,'fill:var(--g2);stroke:var(--ink);stroke-width:1');
     if(tot>cap)R(svg,X0+cap*scale,122,(tot-cap)*scale,46,'fill:url(#hatchBad);opacity:.8');
-    if(w*scale>70)T(svg,X0+8,150,`weights ${fmt(w,1)} GB`,{style:'fill:var(--on-fill);font-weight:600'});
-    if(kv*scale>70)T(svg,kvx+8,150,`KV ${fmt(kv,2)} GB`,{style:'fill:var(--on-fill);font-weight:600'});
+    const inside=(x,wd,txt)=>{const t=T(svg,x+8,150,txt,{style:'fill:var(--on-fill);font-weight:600'});if(t.getComputedTextLength()+14>wd){t.remove();return false;}return true;};
+    const wIn=inside(X0,w*scale,`weights ${fmt(w,1)} GB`);
+    if(!inside(kvx,kvw,`KV ${fmt(kv,2)} GB`)){const ax=kvx+Math.min(kvw,20)/2,small=kv*scale<6;
+      const t=T(svg,0,104,`KV cache ${kv<0.1?fmt(kv*1000,0)+' MB':fmt(kv,2)+' GB'}${small?` (too small to see at this scale: ${fmt(100*kv/tot,kv/tot<0.01?2:1)}% of used memory)`:''}`,{style:'font-weight:700;font-size:12px;fill:var(--ink)'});
+      const len=t.getComputedTextLength();let tx=Math.max(ax-20,170);if(tx+len>738)tx=738-len;t.setAttribute('x',tx);
+      S('line',{x1:ax,x2:Math.min(Math.max(ax,tx+10),tx+len),y1:122,y2:108,style:'stroke:var(--g2);stroke-width:2'},svg);}
+    if(!wIn){T(svg,X0+4,210,`weights ${fmt(w,1)} GB (left end of the bar)`,{style:'font-weight:700;font-size:12px'});}
     const cx=X0+cap*scale;S('line',{x1:cx,x2:cx,y1:114,y2:178,style:'stroke:var(--ink);stroke-width:2'},svg);
-    T(svg,cx,192,`${cap} GB capacity`,{'text-anchor':cx>600?'end':'middle',style:'font-weight:600'});
-    T(svg,20,228,tot>cap?`Does not fit: ${fmt(tot-cap,1)} GB over`:`Free: ${fmt(cap-tot,1)} GB`,{style:`font-weight:700;fill:${tot>cap?'var(--bad)':'var(--ok)'}`});
+    T(svg,cx,192,`${cap} GB capacity`,{'text-anchor':cx>600?'end':cx<120?'start':'middle',style:'font-weight:600'});
+    T(svg,20,234,tot>cap?`Does not fit: ${fmt(tot-cap,1)} GB over`:`Free: ${fmt(cap-tot,1)} GB`,{style:`font-weight:700;fill:${tot>cap?'var(--bad)':'var(--ok)'}`});
     $('#kv-formula').innerHTML=`KV = batch × seq × 2 × layers × (kv_heads × d_head) × bytes = ${b} × ${seq.toLocaleString()} × 2 × ${p.L} × (${p.kv} × ${hd}) × ${kb} = <b>${fmt(kv,2)} GB</b>`;
     const mb=Math.floor((cap-w)*1e9/(seq*perTok));
     stats($('#kv-stats'),[
