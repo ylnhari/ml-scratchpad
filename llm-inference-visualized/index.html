@@ -408,7 +408,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <p class="cap">TP leaves LayerNorm and Dropout (a training-only step that randomly zeroes some values) copied on every GPU. These ops treat each token on its own, so they can be split along the sequence s instead. Compare the possible layouts of the same [b, s, h] tensor on two GPUs:</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="cube-seg"></div><button class="btn solid" id="cube-replay" type="button">Replay cut</button></div>
-    <div class="svgbox"><svg id="cube-svg" viewBox="0 0 760 306" role="img" aria-label="3D activation tensor split across GPUs"></svg></div>
+    <div class="svgbox"><svg id="cube-svg" viewBox="0 0 760 346" role="img" aria-label="3D activation tensor split across GPUs"></svg></div>
     <div class="note" id="cube-note"></div>
   </div>
   <p class="cap" style="margin-top:22px">Now walk one whole layer under TP and under TP + SP. Watch the grid each GPU holds, the collective between stages, and the running memory total.</p>
@@ -425,6 +425,14 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
       <div class="note" id="tp-note"></div>
       <div class="stats" id="tp-stats"></div>
     </div>
+    <div class="svgbox" style="margin-top:14px"><svg viewBox="0 0 760 92" role="img" aria-label="All-Reduce equals Reduce-Scatter plus All-Gather">
+      <text x="10" y="28" style="font-weight:700;font-size:12px">TP, per block</text>
+      <rect x="170" y="12" width="420" height="24" rx="6" style="fill:var(--g1)"/><text x="380" y="29" text-anchor="middle" style="font-weight:700;font-size:12px">All-Reduce</text>
+      <text x="10" y="70" style="font-weight:700;font-size:12px">TP + SP, per block</text>
+      <rect x="170" y="54" width="208" height="24" rx="6" style="fill:var(--g2)"/><text x="274" y="71" text-anchor="middle" style="font-weight:700;font-size:12px">Reduce-Scatter</text>
+      <rect x="382" y="54" width="208" height="24" rx="6" style="fill:var(--g3)"/><text x="486" y="71" text-anchor="middle" style="font-weight:700;font-size:12px">All-Gather</text>
+      <text x="604" y="44" style="font-size:12px;font-weight:700;fill:var(--ok)">same data moved,</text><text x="604" y="60" style="font-size:12px;font-weight:700;fill:var(--ok)">so the memory</text><text x="604" y="76" style="font-size:12px;font-weight:700;fill:var(--ok)">saving is free</text>
+    </svg></div>
   </div>
 </section>
 <section id="par-combo">
@@ -1261,7 +1269,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
 
 /* ---------- 04a isometric tensor cut ---------- */
 (function(){
-  const svg=$('#cube-svg'),u=12,c30=Math.cos(Math.PI/6),OX=380,OY=92;
+  const svg=$('#cube-svg'),u=12,c30=Math.cos(Math.PI/6),OX=380,OY=132;
   const P=(x,y,z)=>[(x-y)*c30*u,(x+y)*.5*u-z*u];
   const pts=a=>a.map(p=>P(...p).map(v=>v.toFixed(1)).join(',')).join(' ');
   function box(g,x0,y0,z0,dx,dy,dz,col,ghost){
@@ -1277,11 +1285,16 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
   const MODES={
     one:{note:'One GPU holds all b sequences, all s tokens, and every weight.',pieces:[{b:[0,0,0,8,8,2],c:'var(--accent)',dx:0,lab:'[b, s, h]',mem:'100%',w:'all'}]},
     dp:{note:'Data parallelism (DP): each GPU runs <b>different whole prompts</b> with its own full copy of the model, like two separate servers. The 50% means half of the batch (one of the two prompts), not half of any prompt: each prompt\'s activations are complete on its GPU.',pieces:[{b:[0,0,1,8,8,1],c:G(0),dx:-190,lab:'GPU 0  [b/2, s, h]  prompt A, whole',mem:'50%',w:'all',sub:'activations 50% = 1 of 2 prompts, whole|weights: full copy'},{b:[0,0,0,8,8,1],c:G(1),dx:190,lab:'GPU 1  [b/2, s, h]  prompt B, whole',mem:'50%',w:'all',sub:'activations 50% = 1 of 2 prompts, whole|weights: full copy'}]},
-    tph:{note:'TP inside attention and the MLP splits the weights: each GPU owns half the heads or half the MLP columns, so it produces only its half of the activation, [b, s, h/2]. Both GPUs still see all b sequences and all s tokens.',pieces:[{b:[0,0,0,4,8,2],c:G(0),dx:-190,lab:'GPU 0  [b, s, h/2]',mem:'50%',w:'1/2'},{b:[4,0,0,4,8,2],c:G(1),dx:190,lab:'GPU 1  [b, s, h/2]',mem:'50%',w:'1/2'}]},
-    rep:{note:'Between those blocks (LayerNorm, Dropout, the residual add), TP has nothing to split, because LayerNorm has almost no weights. Both GPUs are working on the same sequences, so after the All-Reduce each holds an identical full [b, s, h] and runs the same LayerNorm on it: the same memory and the same work, twice. This is not data parallelism. DP would give each GPU different sequences.',pieces:[{b:[0,0,0,8,8,2],c:G(0),dx:-200,lab:'GPU 0  [b, s, h]',mem:'100%',w:'1/2',dup:1},{b:[0,0,0,8,8,2],c:G(1),dx:200,lab:'GPU 1  [b, s, h]',mem:'100%',w:'1/2',dup:1}]},
-    sps:{note:'Sequence parallelism fixes that waste. LayerNorm and Dropout work on each token on its own, so cut along s instead: each GPU normalises half the tokens, with no copies. All-Gather rebuilds the full sequence before the next attention or MLP block.',pieces:[{b:[0,4,0,8,4,2],c:G(0),dx:-190,lab:'GPU 0  [b, s/2, h]  tokens 0–3',mem:'50%',w:'1/2'},{b:[0,0,0,8,4,2],c:G(1),dx:190,lab:'GPU 1  [b, s/2, h]  tokens 4–7',mem:'50%',w:'1/2'}]}};
+    tph:{strip:'blk',slab:'shown below: the filled ops (inside attention and the MLP), with TP or TP + SP alike',note:'TP inside attention and the MLP splits the weights: each GPU owns half the heads or half the MLP columns, so it produces only its half of the activation, [b, s, h/2]. Both GPUs still see all b sequences and all s tokens.',pieces:[{b:[0,0,0,4,8,2],c:G(0),dx:-190,lab:'GPU 0  [b, s, h/2]',mem:'50%',w:'1/2'},{b:[4,0,0,4,8,2],c:G(1),dx:190,lab:'GPU 1  [b, s, h/2]',mem:'50%',w:'1/2'}]},
+    rep:{strip:'ln',slab:'shown below: the filled ops between the blocks, under plain TP',note:'Between those blocks (LayerNorm, Dropout, the residual add), TP has nothing to split, because LayerNorm has almost no weights. Both GPUs are working on the same sequences, so after the All-Reduce each holds an identical full [b, s, h] and runs the same LayerNorm on it: the same memory and the same work, twice. This is not data parallelism. DP would give each GPU different sequences.',pieces:[{b:[0,0,0,8,8,2],c:G(0),dx:-200,lab:'GPU 0  [b, s, h]',mem:'100%',w:'1/2',dup:1},{b:[0,0,0,8,8,2],c:G(1),dx:200,lab:'GPU 1  [b, s, h]',mem:'100%',w:'1/2',dup:1}]},
+    sps:{strip:'ln',slab:'shown below: the filled ops between the blocks, under TP + SP',note:'Sequence parallelism is always used together with TP, and it fixes that waste. LayerNorm and Dropout work on each token on its own, so cut along s instead: each GPU normalises half the tokens, with no copies. All-Gather rebuilds the full sequence before the next attention or MLP block, which then runs as plain TP, [b, s, h/2].',pieces:[{b:[0,4,0,8,4,2],c:G(0),dx:-190,lab:'GPU 0  [b, s/2, h]  tokens 0–3',mem:'50%',w:'1/2'},{b:[0,0,0,8,4,2],c:G(1),dx:190,lab:'GPU 1  [b, s/2, h]  tokens 4–7',mem:'50%',w:'1/2'}]}};
   let mode='tph';
   function render(){clear(svg);const m=MODES[mode];$('#cube-note').innerHTML=glink(m.note);
+    if(m.strip){const OPS=['LayerNorm','Attention','+ residual','LayerNorm','MLP','+ residual'];
+      OPS.forEach((o,i)=>{const blk=o==='Attention'||o==='MLP',on=m.strip==='blk'?blk:!blk,x=26+i*119;
+        R(svg,x,6,111,26,on?'fill:var(--accent)':'fill:none;stroke:var(--muted);stroke-dasharray:3 3',{rx:6});
+        T(svg,x+55.5,23,o,{'text-anchor':'middle',style:on?'fill:var(--on-fill);font-weight:700;font-size:12px':'fill:var(--muted);font-size:12px'});});
+      T(svg,380,52,m.slab,{'text-anchor':'middle',style:'font-size:12px;font-weight:700'});}
     // ghost of the original tensor
     const gg=S('g',{transform:`translate(${OX},${OY})`},svg);if(mode!=='one')box(gg,0,0,0,8,8,2,null,true);
     // axis labels on the ghost / tensor
@@ -1300,7 +1313,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       return {inner,lab,dx:p.dx};});
     const go=()=>groups.forEach(o=>{o.inner.style.transform=`translate(${o.dx}px,0px)`;o.lab.style.opacity=1;});
     if(RM)go();else requestAnimationFrame(()=>requestAnimationFrame(go));}
-  seg($('#cube-seg'),[{l:'One GPU',v:'one'},{l:'DP · split b',v:'dp'},{l:'TP · split h',v:'tph'},{l:'TP · LayerNorm (copied)',v:'rep'},{l:'SP · split s',v:'sps'}],'tph',v=>{mode=v;render();});
+  seg($('#cube-seg'),[{l:'One GPU',v:'one'},{l:'DP · split b',v:'dp'},{l:'TP · attention/MLP',v:'tph'},{l:'TP · LayerNorm (copied)',v:'rep'},{l:'TP+SP · LayerNorm',v:'sps'}],'tph',v=>{mode=v;render();});
   $('#cube-replay').onclick=render;render();
 })();
 
