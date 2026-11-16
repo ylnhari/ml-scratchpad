@@ -68,6 +68,7 @@ h2{font:700 26px/1.15 var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:
 .btn[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
 .btn:disabled{opacity:.4;cursor:default}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.glossc{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 14px;margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--surface-2);font:400 12px/1.5 var(--f-body);color:var(--muted)}.glossc b{font:600 12px var(--f-mono);color:var(--ink);margin-right:6px}
 .stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .stat{background:var(--surface-2);border-radius:10px;padding:7px 12px;min-width:120px}
 .stat b{display:block;font:700 18px var(--f-mono);font-variant-numeric:tabular-nums}
@@ -84,8 +85,8 @@ input[type=range]{padding:0;accent-color:var(--accent);width:170px}
 svg text{font-family:var(--f-mono);fill:var(--ink);font-size:12px}
 svg .lbl{font-size:10.5px;fill:var(--muted);letter-spacing:.06em}
 svg .big{font-size:15px;font-weight:700}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.chip{font:500 12.5px var(--f-mono);padding:4px 9px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.chip{font:500 11.5px var(--f-mono);padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);cursor:pointer}
 .chip[aria-pressed="true"]{outline:2px solid var(--ink)}
 .chip.q{opacity:.45}
 .spec{display:grid;gap:10px}
@@ -280,7 +281,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <div class="chips" id="an-chips"></div>
     <div class="note" id="an-note" style="margin:10px 0"></div>
     <div class="svgbox"><svg id="an-svg" viewBox="0 0 760 310" role="img" aria-label="Transformer forward pass, stage by stage"></svg></div>
-    <div class="stats" id="an-gloss"></div>
+    <div class="glossc" id="an-gloss" aria-label="Sizes used in this figure"></div>
   </div>
 </section>
 
@@ -879,8 +880,8 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     $('#an-note').innerHTML=`<b class="mono" style="color:var(--accent)">${k+1}/${ST.length} · ${st.n}</b><div class="formula" style="margin:6px 0">${String(st.f).replace(/\s{3,}/g,'<br>')}</div>${st.c}`;
     const ch=$('#an-chips');ch.innerHTML='';ST.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=(i+1)+' '+s.n;b.setAttribute('aria-pressed',String(i===k));b.onclick=()=>{stop();k=i;render();};ch.appendChild(b);});
     $('#an-prev').disabled=k===0;$('#an-next').disabled=k===ST.length-1;
-    const m=M();$('#an-gloss').innerHTML=[['b','batch: sequences processed together',m.b],['s','sequence length: tokens per sequence',m.s],['h','hidden size (d_model): numbers per token',m.h],['n_heads','attention heads',m.nh],['d_head','h / n_heads: width of one head',m.dh],['L','transformer layers',m.L],['V','vocabulary size',m.V],['ffn','MLP inner width: a hyperparameter, ≈4h classic, ≈8h/3 with SwiGLU',m.f]]
-      .map(g=>`<div class="stat"><b>${g[0]} = ${g[2].toLocaleString()}</b><span>${g[1]}</span></div>`).join('');}
+    const m=M();$('#an-gloss').innerHTML=[['b','batch: sequences processed together',m.b],['s','sequence length: tokens per sequence',m.s],['h','hidden size (d_model): numbers per token',m.h],['n_heads','attention heads',m.nh],['d_head','h / n_heads: width of one head',m.dh],['L','transformer layers',m.L],['V','vocabulary size',m.V],['ffn','MLP width (≈4h; ≈8h/3 with SwiGLU)',m.f]]
+      .map(g=>`<span><b>${g[0]} = ${g[2].toLocaleString()}</b>${g[1]}</span>`).join('');}
   function stop(){clearInterval(timer);timer=null;$('#an-play').textContent='Play all';}
   $('#an-prev').onclick=()=>{stop();if(k>0){k--;render();}};
   $('#an-next').onclick=()=>{stop();if(k<ST.length-1){k++;render();}};
