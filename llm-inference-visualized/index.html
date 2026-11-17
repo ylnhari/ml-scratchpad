@@ -9,7 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  /* layout: sticky left rail + one wide column of live figures; text is captions only */
+  
+/* layout: sticky left rail + one wide column of live figures; text is captions only */
   --bg:#f6f5f9; --surface:#ffffff; --surface-2:#efedf5; --ink:#1c1a2b; --muted:#66637d; --line:#e2dfeb;
   --accent:#7b61d9; --accent-soft:#ece6ff; --on-accent:#ffffff; --on-fill:#1c1a2b;
   --g0:#ffaa9c; --g1:#ffd073; --g2:#f5a3d6; --g3:#86dbbf;
@@ -196,6 +197,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <li><a href="#sparsity"><b>09</b>2:4 sparsity</a></li>
     <li><a href="#distill"><b>10</b>Distillation</a></li>
     <li><a href="#spec"><b>11</b>Speculative decoding</a></li>
+    <li><a href="#disagg"><b>12</b>Disaggregated serving</a></li>
     <li class="grp">DEEPER</li>
     <li><a href="#backward"><b>A1</b>Backward &amp; training</a></li>
     <li><a href="#modern"><b>A2</b>Modern LLM changes</a></li>
@@ -295,7 +297,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 <div class="part"><span>PART II</span><h3>Inference optimizations</h3><p class="cap">How serving systems make inference fast and cheap, and which of those shapes or memory costs each technique attacks.</p></div>
 <section id="phases">
   <div class="sh"><span class="n">01</span><h2>Prefill vs decode</h2></div>
-  <p class="cap">Answering a request has two phases. <b>Prefill</b> reads the whole prompt at once, as one matrix–matrix product. <b>Decode</b> then writes the reply one token per step, a matrix–vector product that still reads every weight.</p>
+  <p class="cap">Answering a request has two phases. <b>Prefill</b> reads the whole prompt at once, as one matrix–matrix product. <b>Decode</b> then writes the reply one token per step, a matrix–vector product that still reads every weight. It stops when the model emits an end-of-sequence token or reaches a length limit. Long prompts, such as retrieved documents added by RAG (retrieval-augmented generation), make prefill longer. Tokens per second compare fairly only between models with the same tokenizer, since tokenizers cut text differently.</p>
   <div class="fig">
     <div class="controls">
       <button class="btn solid" id="pd-next" type="button">Run prefill</button>
@@ -312,7 +314,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="kv">
   <div class="sh"><span class="n">02</span><h2>KV cache memory</h2></div>
-  <p class="cap">Each token's keys and values (K and V, from section 00.2, Attention) are saved so later tokens do not recompute them. That store is the <b>KV cache</b>, and it grows linearly with batch × sequence length. Drag the sliders to see how it crowds the weights out of GPU memory. <b>Precision</b> is how many bytes store each number: FP16 is a 16-bit floating-point number (2 bytes), FP8 an 8-bit one (1 byte), and INT8 or INT4 are 8- or 4-bit integers.</p>
+  <p class="cap">Each token's keys and values (K and V, from section 00.2, Attention) are saved so later tokens do not recompute them. That store is the <b>KV cache</b>, and it grows linearly with batch × sequence length. Size per token = 2 (K and V) × layers × KV heads × d_head × bytes per number. For Llama 2 7B in FP16 that is 2 × 32 × 32 × 128 × 2 bytes = 0.5 MB per token, so one 4,096-token sequence needs about 2 GB next to 13.5 GB of weights. Drag the sliders to see how it crowds the weights out of GPU memory. <b>Precision</b> is how many bytes store each number: FP16 is a 16-bit floating-point number (2 bytes), FP8 an 8-bit one (1 byte), and INT8 or INT4 are 8- or 4-bit integers.</p>
   <div class="fig">
     <div class="controls">
       <label class="ctl">Model<select id="kv-preset">
@@ -482,7 +484,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="attention">
   <div class="sh"><span class="n">05</span><h2>MHA → GQA → MQA</h2></div>
-  <p class="cap">In standard multi-head attention (<b>MHA</b>), every query head has its own key and value head. Grouped-query attention (<b>GQA</b>) lets a group of query heads share one, and multi-query attention (<b>MQA</b>) shares one across all of them. Fewer KV heads means a smaller KV cache and fewer memory reads.</p>
+  <p class="cap">In standard multi-head attention (<b>MHA</b>), every query head has its own key and value head. Grouped-query attention (<b>GQA</b>) lets a group of query heads share one, and multi-query attention (<b>MQA</b>) shares one across all of them. Fewer KV heads means a smaller KV cache and fewer memory reads. The sharing must be learned: a model is trained with GQA or MQA, or an existing MHA model is <i>uptrained</i> with a small fraction of its original training compute. MQA can lose some quality, which is why most current models use GQA (Llama 2 70B: 64 query heads, 8 KV heads).</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="at-seg"></div></div>
     <div class="svgbox"><svg id="at-svg" viewBox="0 0 760 290" role="img" aria-label="Query heads sharing KV heads"></svg></div>
@@ -507,7 +509,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="paged">
   <div class="sh"><span class="n">07</span><h2>PagedAttention: KV cache in blocks</h2></div>
-  <p class="cap">There are 256 token slots of KV memory. Contiguous allocation reserves the maximum length (64) for every request. Paging hands out 8-token blocks on demand, from anywhere in memory.</p>
+  <p class="cap">There are 256 token slots of KV memory. Contiguous allocation reserves the maximum length (64) for every request. Paging hands out 8-token blocks on demand, from anywhere in memory. Reserving the maximum wastes memory three ways: <b>over-provisioning</b> (slots kept for tokens that are never generated), <b>internal fragmentation</b> (the unused tail of a reservation) and <b>external fragmentation</b> (free gaps too small for a new request). With paging, each request keeps a <b>block table</b> that maps its blocks, in order, to wherever they sit in memory.</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="pg-seg"></div></div>
     <div class="svgbox"><svg id="pg-svg" viewBox="0 0 760 250" role="img" aria-label="KV memory map"></svg></div>
@@ -544,7 +546,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="distill">
   <div class="sh"><span class="n">10</span><h2>Distillation: soft targets</h2></div>
-  <p class="cap">The student learns from the teacher's full probability distribution, not just the one right answer. Raise the temperature (a setting that flattens the probabilities) to see the information carried by the "wrong" answers. In the loss below, CE (cross-entropy) scores the student against the right answer, and KL (Kullback–Leibler divergence) measures how far its probabilities are from the teacher's.</p>
+  <p class="cap">The student learns from the teacher's full probability distribution, not just the one right answer. Raise the temperature (a setting that flattens the probabilities) to see the information carried by the "wrong" answers. In the loss below, CE (cross-entropy) scores the student against the right answer, and KL (Kullback–Leibler divergence) measures how far its probabilities are from the teacher's. Note that many model licences forbid training other models on their outputs, which limits which teachers you can use.</p>
   <div class="fig">
     <div class="controls"><label class="ctl">Temperature T = <span class="mono" id="ds-tv"></span><input type="range" id="ds-t" min="5" max="50" value="10"></label></div>
     <div class="svgbox"><svg id="ds-svg" viewBox="0 0 760 250" role="img" aria-label="Hard label vs soft targets"></svg></div>
@@ -558,7 +560,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="spec">
   <div class="sh"><span class="n">11</span><h2>Speculative decoding</h2></div>
-  <p class="cap">A small draft model guesses several tokens. The big model checks all of them in a single parallel pass and keeps the matching prefix, plus one token of its own.</p>
+  <p class="cap">A small draft model guesses several tokens. The big model checks all of them in a single parallel pass and keeps the matching prefix, plus one token of its own. It is also called speculative sampling or assisted generation. The draft can be a separate small model, or extra prediction heads added to the big model itself (as in Medusa).</p>
   <div class="fig">
     <div class="controls">
       <button class="btn solid" id="sd-next" type="button">Next step</button>
@@ -573,6 +575,22 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <div class="note" id="sd-note"></div>
     <div class="stats" id="sd-stats"></div>
   </div>
+</section>
+
+<section id="disagg">
+  <div class="sh"><span class="n">12</span><h2>Disaggregated serving: prefill and decode on different GPUs</h2></div>
+  <p class="cap">Section 01 showed the two phases need different things: prefill is compute-bound, decode is memory-bound. When both run on the same GPU, a new prompt's prefill takes the GPU over and every running request stops getting tokens until it finishes. <b>Disaggregated serving</b> gives prefill and decode their own GPUs and ships each request's KV cache (section 02) from the prefill GPU to the decode GPU once its prompt is done.</p>
+  <ul class="cap">
+    <li><b>Aggregated</b> (the usual setup, with in-flight batching from section 03): both GPUs do both jobs.</li>
+    <li><b>Disaggregated</b>: GPU 0 only prefills, GPU 1 only decodes. Same two GPUs, so the comparison is fair.</li>
+  </ul>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="dg-seg"></div><button class="btn solid" id="dg-play" type="button">Play</button><span class="spd" aria-label="Animation speed">speed</span></div>
+    <div class="svgbox"><svg id="dg-svg" viewBox="0 0 760 272" role="img" aria-label="Aggregated versus disaggregated prefill and decode timeline"></svg></div>
+    <div class="note" id="dg-note"></div>
+    <div class="stats" id="dg-stats"></div>
+  </div>
+  <p class="cap">What you trade: the KV-cache transfer adds a little to the time to first token and needs a fast link (NVLink inside a server, InfiniBand between servers), and the gain depends on load and on that link. In return, decode runs without stalls, so the time per output token stays steady, and each pool can be sized, split (section 04) and even built from different GPUs for its own job. It pays off most for long prompts with moderate-length answers. It was introduced by research systems such as DistServe and Splitwise and is supported today by NVIDIA Dynamo, TensorRT-LLM, vLLM and SGLang.</p>
 </section>
 
 <div class="part"><span>PART III</span><h3>Deeper dive</h3><p class="cap">Optional. Why the architecture looks the way it does (training), and what current LLMs change.</p></div>
@@ -2295,6 +2313,46 @@ document.querySelectorAll('main section:not(#x-glossary) p.cap, main section:not
   $('#e2-prev').onclick=()=>{stop();if(k>=0){k--;render();}};
   $('#e2-reset').onclick=()=>{stop();k=-1;render();};
   $('#e2-play').onclick=()=>{if(timer){stop();return;}if(k>=OPS.length-1)k=-1;$('#e2-play').textContent='Pause';timer=setInterval(()=>{if(k>=OPS.length-1){stop();return;}k++;render();},RM?400:1600);};
+  render();
+})();
+
+
+/* ---------- 12 disaggregated serving ---------- */
+(function(){
+  const svg=$('#dg-svg'),N=40,X0=110,W=620,cw=W/N;let mode='agg',t=N,timer=null;
+  const REQ={C:{arr:6,len:7},D:{arr:20,len:7}},XF=1;
+  function plan(){const lanes=[[],[]],tok={A:[],B:[],C:[],D:[]};
+    if(mode==='agg'){const busy=[[REQ.C.arr,REQ.C.arr+REQ.C.len],[REQ.D.arr,REQ.D.arr+REQ.D.len]];
+      [['A','C',0],['B','D',1]].forEach(([run,nw,g])=>{const [a,b]=busy[g];lanes[g].push({s:a,e:b,k:'p',r:nw});
+        for(let s=0;s<N;s++){if(s>=a&&s<b)continue;const who=s>=b?[run,nw]:[run];lanes[g].push({s,e:s+1,k:'d',r:who.join('')});who.forEach(r=>tok[r].push(s+1));}});}
+    else{[['C',REQ.C],['D',REQ.D]].forEach(([r,q])=>{lanes[0].push({s:q.arr,e:q.arr+q.len,k:'p',r});lanes[0].push({s:q.arr+q.len,e:q.arr+q.len+XF,k:'x',r});});
+      for(let s=0;s<N;s++){const who=['A','B'].concat(['C','D'].filter(r=>s>=REQ[r].arr+REQ[r].len+XF));lanes[1].push({s,e:s+1,k:'d',r:who.join('')});who.forEach(r=>tok[r].push(s+1));}}
+    return {lanes,tok};}
+  function render(){clear(svg);const {lanes,tok}=plan();
+    T(svg,X0,16,'TIME →  (one block = one decode step)',{class:'lbl'});
+    const names=mode==='agg'?['GPU 0 · prefill + decode','GPU 1 · prefill + decode']:['GPU 0 · prefill only','GPU 1 · decode only'];
+    lanes.forEach((ln,g)=>{const y=34+g*62;T(svg,X0-8,y+24,names[g].split(' · ')[0],{'text-anchor':'end',style:'font-weight:700;font-size:12px'});T(svg,X0-8,y+39,names[g].split(' · ')[1],{'text-anchor':'end',style:'font-size:10.5px;fill:var(--muted)'});
+      R(svg,X0,y,W,46,'fill:var(--surface-2)',{rx:6});
+      ln.forEach(b=>{if(b.s>=t)return;const e=Math.min(b.e,t),x=X0+b.s*cw,w=(e-b.s)*cw;
+        if(b.k==='p'){R(svg,x+1,y+3,w-2,40,'fill:var(--g1)',{rx:4});if(w>40)T(svg,x+w/2,y+28,'prefill '+b.r,{'text-anchor':'middle',style:'font-size:11px;font-weight:700'});}
+        else if(b.k==='x'){R(svg,x+1,y+3,w-2,40,'fill:var(--bad)',{rx:4});}
+        else R(svg,x+1,y+12,w-2,22,'fill:var(--g3)',{rx:3});});
+      if(mode==='dis'&&g===0)['C','D'].forEach(r=>{const s=REQ[r].arr+REQ[r].len;if(t>s){const x=X0+(s+.5)*cw;S('line',{x1:x,x2:x,y1:y+46,y2:y+62+10,'marker-end':'url(#arr)',style:'stroke:var(--bad);stroke-width:2.5'},svg);T(svg,x+6,y+58,'KV of '+r,{style:'font-size:10.5px;font-weight:700;fill:var(--bad)'});}});});
+    // token rows
+    const ty0=172;T(svg,X0,ty0-8,'TOKENS EACH REQUEST RECEIVES',{class:'lbl'});
+    ['A','B','C','D'].forEach((r,i)=>{const y=ty0+i*24;T(svg,X0-8,y+12,'request '+r+(r>'B'?' (new)':''),{'text-anchor':'end',style:'font-size:11px'});
+      S('line',{x1:X0,x2:X0+W,y1:y+8,y2:y+8,style:'stroke:var(--line)'},svg);
+      if(REQ[r]&&REQ[r].arr<t){const ax=X0+REQ[r].arr*cw;S('circle',{cx:ax,cy:y+8,r:5,style:'fill:var(--surface);stroke:var(--ink);stroke-width:2'},svg);T(svg,ax-9,y+12,'arrives',{'text-anchor':'end',style:'font-size:10px;fill:var(--muted)'});}
+      tok[r].filter(s=>s<=t).forEach(s=>S('circle',{cx:X0+(s-.5)*cw,cy:y+8,r:4,style:`fill:${PAL(i)}`},svg));});
+    if(t<N)S('line',{x1:X0+t*cw,x2:X0+t*cw,y1:28,y2:ty0+92,style:'stroke:var(--accent);stroke-width:2'},svg);
+    const gap=r=>{const a=tok[r].filter(s=>s<=t);let g=0;for(let i=1;i<a.length;i++)g=Math.max(g,a[i]-a[i-1]-1);return g;};
+    const ttft=r=>{const f=tok[r][0];return f<=t?f-REQ[r].arr:null;};
+    $('#dg-note').innerHTML=glink(mode==='agg'?'Aggregated: when prompt C arrives, GPU 0 spends 7 steps on its prefill, so request A receives nothing for 7 steps (the gap in its dots). The same happens to B when D arrives.':'Disaggregated: GPU 0 only prefills. When a prompt is done, its KV cache (red) is sent to GPU 1, which keeps one batch decoding every step, so A and B never wait. C and D get their first token one step later because of the transfer. GPU 0 idles between prompts here; real systems size each pool to its load.');
+    stats($('#dg-stats'),[{v:Math.max(gap('A'),gap('B'))+' steps',l:'longest stall for A or B (no token)',c:mode==='dis'?'good':'bad'},{v:ttft('C')===null?'—':ttft('C')+' steps',l:'C: time to first token'},
+      {v:mode==='dis'?'1 step':'none',l:'KV transfer per new request'},{v:mode==='dis'?'1 batch, 4 requests':'2 batches',l:'decode batching'}]);}
+  function stop(){clearInterval(timer);timer=null;$('#dg-play').textContent='Play';}
+  seg($('#dg-seg'),[{l:'Aggregated',v:'agg'},{l:'Disaggregated',v:'dis'}],'agg',v=>{mode=v;stop();t=N;render();});
+  $('#dg-play').onclick=()=>{if(timer){stop();return;}t=0;$('#dg-play').textContent='Pause';render();timer=setInterval(()=>{t++;render();if(t>=N)stop();},RM?60:260);};
   render();
 })();
 
