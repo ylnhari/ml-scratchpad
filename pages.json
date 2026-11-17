@@ -14,7 +14,7 @@
   },
   {
     "path": "gpu-stack-visualized/",
-    "title": "From API Call to GPU Silicon",
+    "title": "The GPU Stack, Visualized",
     "kind": "interactive",
     "date": "2026-11-17",
     "tags": [
@@ -23,7 +23,7 @@
       "cuda",
       "serving"
     ],
-    "desc": "One LLM request followed down every layer: Ray Serve, vLLM, PyTorch, cuBLAS, CUDA, PTX/SASS, then SMs, warps, tensor cores and the memory hierarchy."
+    "desc": "From your code to the silicon for training and inference: kernels, CUDA, SMs, warps, tensor cores, HBM/L2 and coalescing, kernel optimization and fusion, NVLink, All-Reduce, racks."
   },
   {
     "path": "vllm-memory/visual/",
