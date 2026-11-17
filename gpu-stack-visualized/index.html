@@ -252,7 +252,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="frameworks">
   <div class="sh"><span class="n">02</span><h2>From a framework call to a kernel launch</h2></div>
-  <p class="cap">Model code never touches the GPU's numbers itself. Follow one matrix multiply, <span class="mono">y = x @ W</span>, from Python to the GPU. The example is PyTorch; JAX and TensorFlow differ mainly in the middle, where a compiler (XLA) first turns the whole program into a graph and then into kernels.</p>
+  <p class="cap">Model code never touches the GPU's numbers itself. Follow one matrix multiply, <span class="mono">y = x @ W</span>, from Python to the GPU. The example is PyTorch in its default eager mode. JAX (and TensorFlow with jit_compile=True) differs mainly in the middle: it traces the whole function into a graph and the XLA compiler turns that into kernels.</p>
   <ul class="cap">
     <li>Launches are <b>asynchronous</b>: the CPU puts each one in a queue called a <b>CUDA stream</b> and moves on at once. It waits only when it needs a result back.</li>
     <li><b>Compilers</b> (torch.compile, XLA, TensorRT) look at many ops together and <b>fuse</b> chains of small ones into one kernel, so fewer kernels run and less data moves (section 14).</li>
@@ -289,7 +289,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <p class="cap">A <b>kernel</b> runs as thousands of <b>threads</b>, all executing the same code on different data, grouped in two levels:</p>
   <ul class="cap">
     <li>a <b>thread block</b> (up to 1,024 threads) always runs on one SM, and its threads can share fast on-chip memory and wait for each other;</li>
-    <li>the <b>grid</b> is all the blocks of one launch. Blocks cannot rely on each other: the hardware may run them in any order, on any SM. (Hopper adds thread block clusters: a few blocks on neighbouring SMs that can share memory.)</li>
+    <li>the <b>grid</b> is all the blocks of one launch. Blocks cannot rely on each other: the hardware may run them in any order, on any SM. (Hopper adds thread block clusters: a few blocks scheduled together on SMs of the same GPC, which can read each other's shared memory.) An <b>SM</b> (streaming multiprocessor) is one of the GPU's 132 processors; section 07 opens one up.</li>
   </ul>
   <p class="cap">The launch states both sizes: <span class="mono">kernel&lt;&lt;&lt;grid, block, shared_mem, stream&gt;&gt;&gt;(args)</span>. The hardware then cuts every block into <b>warps</b> of 32 consecutive threads (section 08).</p>
   <div class="fig">
@@ -301,7 +301,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="compile">
   <div class="sh"><span class="n">05</span><h2>From C++ to GPU instructions: PTX and SASS</h2></div>
-  <p class="cap">GPU code is compiled in two stages. The compiler <b>nvcc</b> turns CUDA C++ into <b>PTX</b> (Parallel Thread Execution), a virtual instruction set that stays stable across GPU generations. A second assembler, <b>ptxas</b>, turns PTX into <b>SASS</b>, the real machine code of one GPU generation (sm_90 for the H100). Libraries ship SASS for the GPUs they support plus PTX, which the driver can compile just in time for a newer GPU (except architecture-specific targets such as sm_90a, which Hopper's fastest kernels use).</p>
+  <p class="cap">GPU code is compiled in two stages. The compiler <b>nvcc</b> turns CUDA C++ into <b>PTX</b> (Parallel Thread Execution), a virtual instruction set that stays stable across GPU generations. The assembler <b>ptxas</b>, which nvcc calls for you, turns PTX into <b>SASS</b>, the real machine code of one GPU generation (sm_90 for the H100). Libraries ship SASS for the GPUs they support plus PTX, which the driver can compile just in time for a newer GPU (except architecture-specific targets such as sm_90a, which Hopper's fastest kernels use).</p>
   <div class="fig">
     <div class="controls"><button class="btn solid" id="cp-prev" type="button">◀ Prev</button><button class="btn solid" id="cp-next" type="button">Next ▶</button><span class="spd" aria-label="Animation speed">speed</span></div>
     <div class="chips" id="cp-chips"></div>
@@ -312,7 +312,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="streams">
   <div class="sh"><span class="n">06</span><h2>Streams, launches and copies</h2></div>
-  <p class="cap">The CPU and GPU run side by side. The CPU fills <b>streams</b>, queues of work; the GPU takes work from them in order. Kernels in <i>different</i> streams may run at the same time, and data copies between CPU memory and GPU memory are done by separate <b>copy engines</b>, so they can overlap with computation.</p>
+  <p class="cap">The CPU and GPU run side by side. The CPU fills <b>streams</b>, queues of work; the GPU takes work from them in order. Kernels in <i>different</i> streams may run at the same time, and data copies between CPU memory and GPU memory are done by separate <b>copy engines</b>, so they can overlap with computation. One condition: the CPU-side buffer must be <b>pinned</b> (page-locked) memory and the copy asynchronous; ordinary pageable memory is staged through a pinned buffer and does not overlap. This is why data loaders offer a pin_memory option.</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="sm-seg"></div><button class="btn solid" id="sm-play" type="button">Play</button><span class="spd" aria-label="Animation speed">speed</span></div>
     <div class="svgbox"><svg id="sm-svg" viewBox="0 0 760 260" role="img" aria-label="One stream versus two streams overlapping copies and compute"></svg></div>
@@ -348,7 +348,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="memory">
   <div class="sh"><span class="n">09</span><h2>The memory hierarchy</h2></div>
-  <p class="cap">Data reaches the tensor cores through a ladder of memories. Each step up is smaller but closer and faster. Fast kernels are built around one idea: load each number from far memory <b>once</b>, keep it close, and reuse it as many times as possible. Click a level.</p>
+  <p class="cap">Data reaches the tensor cores through a ladder of memories. Each step up is closer to the cores and faster. Fast kernels are built around one idea: load each number from far memory <b>once</b>, keep it close, and reuse it as many times as possible. Click a level.</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="mh-seg"></div></div>
     <div class="svgbox"><svg id="mh-svg" viewBox="0 0 760 330" role="img" aria-label="GPU memory hierarchy"></svg></div>
@@ -358,7 +358,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="hbm">
   <div class="sh"><span class="n">10</span><h2>How a load reaches HBM: coalescing and bank conflicts</h2></div>
-  <p class="cap">When a warp loads data, the hardware gathers the 32 threads' addresses and fetches whole aligned pieces of memory: 32-byte <b>sectors</b>, grouped into 128-byte cache lines. If the 32 threads read 32 neighbouring 4-byte numbers, that is exactly one 128-byte line: the load is <b>coalesced</b> and every byte fetched is used. Scattered addresses fetch many sectors and waste most of them. Shared memory has its own rule: it is split into 32 <b>banks</b>, and two threads hitting different addresses in the same bank must take turns.</p>
+  <p class="cap">When a warp loads data, the hardware gathers the 32 threads' addresses and fetches whole aligned pieces of memory: 32-byte <b>sectors</b>, grouped into 128-byte cache lines. If the 32 threads read 32 neighbouring 4-byte numbers starting at a 128-byte-aligned address, that is exactly one 128-byte line: the load is <b>coalesced</b> and every byte fetched is used. Scattered addresses fetch many sectors and waste most of them. Shared memory has its own rule: it is split into 32 <b>banks</b>, and two threads hitting different addresses in the same bank must take turns.</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="co-seg"></div></div>
     <div class="svgbox"><svg id="co-svg" viewBox="0 0 760 300" role="img" aria-label="Memory coalescing and shared memory banks"></svg></div>
@@ -404,7 +404,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="fusion">
   <div class="sh"><span class="n">14</span><h2>Kernel fusion: stop the round trips to HBM</h2></div>
-  <p class="cap">Small element-wise ops do only a few FLOPs per number, so they are memory-bound: their time is the time to read and write HBM. Run three of them as separate kernels and every intermediate result is written to HBM and read back. <b>Fuse</b> them into one kernel and the data is read once, kept in registers through all three steps, and written once. Example: a residual add, then RMSNorm (rescale each token's numbers), then a multiply by one scale factor, on a [tokens × 4,096] BF16 tensor.</p>
+  <p class="cap">Small element-wise ops do only a few FLOPs per number, so they are memory-bound: their time is the time to read and write HBM. Run three of them as separate kernels and every intermediate result is written to HBM and read back. <b>Fuse</b> them into one kernel and the data is read once, kept in registers through all three steps, and only the results someone needs later are written. Example: a residual add, then RMSNorm (rescale each token's numbers), then a multiply by one scale factor, on a [tokens × 4,096] BF16 tensor.</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="fu-seg"></div><label class="ctl">tokens = <span class="mono" id="fu-nv"></span><input type="range" id="fu-n" min="0" max="5" value="3"></label></div>
     <div class="svgbox"><svg id="fu-svg" viewBox="0 0 760 270" role="img" aria-label="Unfused versus fused kernels and HBM traffic"></svg></div>
@@ -420,7 +420,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <ul class="cap">
     <li><b>NVLink</b>: each H100 has 18 NVLink connections, 900 GB/s in total (450 GB/s each way), going to <b>NVSwitch</b> chips (4 in a DGX H100) that let every GPU talk to every other at full speed.</li>
     <li><b>PCIe</b>: the slower link to the CPUs and their memory, used for loading data and model weights.</li>
-    <li><b>Network cards</b> (ConnectX-7, 400 Gb/s each, one per GPU) on <b>InfiniBand</b> or Ethernet: the only way out of the server, about 9 times slower per GPU than NVLink.</li>
+    <li><b>Network cards</b> (ConnectX-7, 400 Gb/s each, one per GPU) on <b>InfiniBand</b> or Ethernet: the way to reach GPUs in other servers, about 9 times slower per GPU than NVLink.</li>
   </ul>
   <div class="fig">
     <div class="controls"><div class="seg" id="sr-seg"></div></div>
@@ -431,7 +431,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="allreduce">
   <div class="sh"><span class="n">16</span><h2>How GPUs add up their results: ring All-Reduce</h2></div>
-  <p class="cap">In training, every GPU computes gradients on its own data, and all of them need the <b>sum</b>. In tensor-parallel inference, every GPU holds part of a layer's output and all need the total. Both use <b>All-Reduce</b>. NCCL's ring version splits the data into one chunk per GPU and passes chunks around a ring in two phases: <b>reduce-scatter</b> (each GPU ends up owning the full sum of one chunk) then <b>all-gather</b> (everyone receives every finished chunk). Each GPU sends and receives about 2 × (N−1)/N of the data, no matter how many GPUs there are.</p>
+  <p class="cap">In training, every GPU computes gradients on its own data, and all of them need the <b>sum</b>. In tensor-parallel inference, every GPU holds part of a layer's output and all need the total. Both use <b>All-Reduce</b>. NCCL's ring version splits the data into one chunk per GPU and passes chunks around a ring in two phases: <b>reduce-scatter</b> (each GPU ends up owning the full sum of one chunk) then <b>all-gather</b> (everyone receives every finished chunk). Each GPU sends and receives 2 × (N−1)/N of the data: just under twice the data, almost independent of how many GPUs there are.</p>
   <div class="fig">
     <div class="controls"><button class="btn solid" id="ar-prev" type="button">◀ Prev</button><button class="btn solid" id="ar-next" type="button">Next ▶</button><button class="btn solid" id="ar-play" type="button">Play</button><span class="spd" aria-label="Animation speed">speed</span></div>
     <div class="chips" id="ar-chips"></div>
@@ -515,6 +515,11 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <div class="gl-i" id="g-ddp"><dt>DDP</dt><dd>PyTorch DistributedDataParallel: every GPU holds a full model copy and gradients are All-Reduced.</dd></div>
     <div class="gl-i" id="g-gradient"><dt>gradient</dt><dd>How much the loss would change for a small change in each weight; computed in the backward pass.</dd></div>
     <div class="gl-i" id="g-cutlass"><dt>CUTLASS</dt><dd>NVIDIA&#x27;s open-source C++ templates for writing fast GEMM and attention kernels.</dd></div>
+    <div class="gl-i" id="g-tp"><dt>tensor parallelism</dt><dd>Splitting each weight matrix across GPUs so every GPU computes part of every layer; partial results are summed with All-Reduce.</dd></div>
+    <div class="gl-i" id="g-tpc"><dt>TPC</dt><dd>Texture processing cluster: a pair of SMs. An H100 SXM5 has 66.</dd></div>
+    <div class="gl-i" id="g-warpgroup"><dt>warp group</dt><dd>4 consecutive warps (128 threads) that issue one Hopper wgmma instruction together.</dd></div>
+    <div class="gl-i" id="g-fma"><dt>FMA</dt><dd>Fused multiply-add: a × b + c in one instruction.</dd></div>
+    <div class="gl-i" id="g-pinned"><dt>pinned memory</dt><dd>Page-locked CPU memory that the GPU&#x27;s copy engines can read directly, needed for copies that overlap compute.</dd></div>
     <div class="gl-i" id="g-triton"><dt>Triton</dt><dd>A Python-like language and compiler for writing GPU kernels.</dd></div>
     <div class="gl-i" id="g-memory"><dt>memory-bound</dt><dd>Limited by how fast data arrives from memory, not by arithmetic.</dd></div>
     <div class="gl-i" id="g-compute"><dt>compute-bound</dt><dd>Limited by arithmetic speed; data arrives fast enough.</dd></div>
@@ -560,7 +565,7 @@ const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const G=i=>`var(--g${i})`;
 const PAL=i=>`hsl(${(i*47+205)%360} 78% 76%)`;
 function seg(box,opts,init,cb){box.innerHTML='';opts.forEach(o=>{const b=document.createElement('button');b.type='button';b.className='btn';b.textContent=o.l;b.setAttribute('aria-pressed',String(o.v===init));b.onclick=()=>{[...box.children].forEach(c=>c.setAttribute('aria-pressed','false'));b.setAttribute('aria-pressed','true');cb(o.v);};box.appendChild(b);});}
-const GLT=[["streaming multiprocessor","sm"],["thread block","block"],["tensor cores","tc"],["tensor core","tc"],["shared memory","smem"],["CUDA stream","stream"],["CUDA graph","graph"],["memory-bound","memory"],["compute-bound","compute"],["All-Reduce","allreduce"],["KV cache","kv"],["dispatcher","dispatcher"],["arithmetic intensity","intensity"],["bank conflict","bank"],["coalesced","coalesced"],["sectors","sector"],["NVSwitch","nvswitch"],["NVLink","nvlink"],["PCIe","pcie"],["InfiniBand","ib"],["GPUDirect RDMA","rdma"],["fat tree","fattree"],["fat-tree","fattree"],["occupancy","occupancy"],["SIMT","simt"],["GPCs","gpc"],["copy engines","copyeng"],["NIC","nic"],["DDP","ddp"],["gradients","gradient"],["CUTLASS","cutlass"],["Triton","triton"],["Fuse","fusion"],["fuse","fusion"],["warps","warp"],["warp","warp"],["GEMM","gemm"],["HBM","hbm"],["L2","l2"],["TMA","tma"],["PTX","ptx"],["SASS","sass"],["cuBLAS","cublas"],["NCCL","nccl"],["FLOPs","flops"],["logits","logits"],["SM","sm"]];
+const GLT=[["streaming multiprocessor","sm"],["thread block","block"],["tensor cores","tc"],["tensor core","tc"],["shared memory","smem"],["CUDA stream","stream"],["CUDA graph","graph"],["memory-bound","memory"],["compute-bound","compute"],["All-Reduce","allreduce"],["KV cache","kv"],["dispatcher","dispatcher"],["arithmetic intensity","intensity"],["bank conflict","bank"],["coalesced","coalesced"],["sectors","sector"],["NVSwitch","nvswitch"],["NVLink","nvlink"],["PCIe","pcie"],["InfiniBand","ib"],["GPUDirect RDMA","rdma"],["fat tree","fattree"],["fat-tree","fattree"],["occupancy","occupancy"],["SIMT","simt"],["GPCs","gpc"],["copy engines","copyeng"],["NIC","nic"],["DDP","ddp"],["gradients","gradient"],["CUTLASS","cutlass"],["Triton","triton"],["warp group","warpgroup"],["TPCs","tpc"],["FMA","fma"],["pinned","pinned"],["tensor parallelism","tp"],["tensor-parallel","tp"],["prefill","prefill"],["decode","decode"],["Fuse","fusion"],["fuse","fusion"],["warps","warp"],["warp","warp"],["GEMM","gemm"],["HBM","hbm"],["L2","l2"],["TMA","tma"],["PTX","ptx"],["SASS","sass"],["cuBLAS","cublas"],["NCCL","nccl"],["FLOPs","flops"],["logits","logits"],["SM","sm"]];
 function secLink(s){return String(s).replace(/(<a\b[\s\S]*?<\/a>)|\b([Ss]ection|Extras) ((?:0\d|1\d|A\d|X\d)(?:\.\d)?)\b/g,(m,a,w,n)=>{if(a)return a;const id=SECID[n];return id?`<a class="xref" href="#${id}">${w} ${n}</a>`:m;});}
 const SECID={};document.querySelectorAll('section[id] .sh .n').forEach(n=>{SECID[n.textContent.trim()]=n.closest('section').id;});
 function glink(s){return secLink(glink0(s));}
@@ -659,12 +664,12 @@ function stepper(pre,steps,draw,ms){const svg=$('#'+pre+'-svg');let k=0,timer=nu
 
 /* ---------- 02 frameworks ---------- */
 (function(){
-  const LV=[['Python','y = x @ W','your model code'],['Framework core (C++)','PyTorch: ATen · JAX / TF: an XLA graph','leave Python'],['Dispatcher','keys {CUDA, …} → CUDA kernel','pick the implementation'],['Kernel library','cublasLtMatmul(...)','choose a tuned GEMM kernel'],['CUDA runtime','cudaLaunchKernel(grid, block, args, stream)','enqueue and return'],['GPU','the kernel runs later','taken from the stream']];
+  const LV=[['Python','y = x @ W','your model code'],['Framework core (C++)','PyTorch: ATen (JAX: an XLA graph)','leave Python'],['Dispatcher','keys {CUDA, …} → CUDA kernel','pick the implementation'],['Kernel library','cublasGemmEx(...) / cuBLASLt','choose a tuned GEMM kernel'],['CUDA runtime','cudaLaunchKernel(grid, block, args, stream)','enqueue and return'],['GPU','the kernel runs later','taken from the stream']];
   const ST=[
     {n:'Python call',c:'The model code multiplies two tensors. In Python this is one line; nothing has run on the GPU yet.'},
-    {n:'Into C++',c:'The call leaves Python for the framework\'s C++ core. In PyTorch\'s default (eager) mode each op goes through one at a time. JAX and TensorFlow usually trace the whole function first and hand it to the XLA compiler, which plans all the kernels at once.'},
+    {n:'Into C++',c:'The call leaves Python for the framework\'s C++ core. In PyTorch\'s default (eager) mode each op goes through one at a time. JAX (and TensorFlow with jit_compile=True) traces the whole function first and hands it to the XLA compiler, which plans all the kernels at once.'},
     {n:'Dispatch',c:'The <b>dispatcher</b> reads the tensors\' dispatch keys: the CUDA backend, plus features such as autograd when they are active. It routes the call to the CUDA implementation, which then picks code for the data type (for example bfloat16). On a CPU tensor the same call would reach a CPU kernel instead.'},
-    {n:'Library',c:'The CUDA implementation of a matrix multiply hands the work to <b>cuBLAS</b> (here its cuBLASLt interface), which picks one of many pre-tuned GEMM kernels for these shapes: tile size, number of thread blocks, tensor cores or not.'},
+    {n:'Library',c:'The CUDA implementation of a matrix multiply hands the work to <b>cuBLAS</b> (or its cuBLASLt interface, used for example when a bias add is fused), which picks one of many pre-tuned GEMM kernels for these shapes: tile size, number of thread blocks, tensor cores or not.'},
     {n:'Launch',c:'<b>cudaLaunchKernel</b> puts the kernel, its grid and block sizes and its arguments on the current CUDA stream and returns at once. The CPU goes back to Python and launches the next op while the GPU is still busy.'},
     {n:'CPU runs ahead',c:'The normal state: the CPU is several kernels ahead, filling the stream, and the GPU drains it. If the CPU falls behind (many tiny kernels), the GPU sits idle between kernels; section 18 shows the fix.'}];
   stepper('pt',ST,(svg,st,k)=>{svg.setAttribute('viewBox',`0 0 760 ${k>=4?400:300}`);
@@ -678,21 +683,21 @@ function stepper(pre,steps,draw,ms){const svg=$('#'+pre+'-svg');let k=0,timer=nu
   },3400);
 })();
 
-/* ---------- 04 libraries ---------- */
+/* ---------- 03 libraries ---------- */
 (function(){
   const svg=$('#lb-svg');
   const OPS=[
     {k:'norm',n:'RMSNorm',lib:'Triton or custom CUDA',kind:'element-wise / reduction',bound:'memory',d:'Reads each token\'s h numbers, computes their root-mean-square and rescales them. Little arithmetic per byte, so it is limited by memory speed. Inference engines and compilers often fuse it with the residual add (section 14).'},
     {k:'qkv',n:'QKV GEMM',lib:'cuBLAS / CUTLASS',kind:'GEMM on tensor cores',bound:'compute in prefill, memory in decode',d:'One matrix multiply produces Q, K and V for every token. This is where the weights are, so it dominates time. Section 12 shows why it is fast in prefill but memory-bound in decode.'},
     {k:'rope',n:'RoPE',lib:'custom CUDA or Triton',kind:'element-wise',bound:'memory',d:'Rotates pairs of numbers in Q and K by an angle set by the token\'s position. Pure element-wise work.'},
-    {k:'attn',n:'Attention',lib:'FlashAttention / FlashInfer',kind:'fused attention kernel',bound:'memory in decode (reads the KV cache)',d:'One fused kernel computes scores, softmax and the weighted sum of values in on-chip memory, never writing the full score table to HBM. In decode it mostly streams the KV cache, block by block through the block table.'},
+    {k:'attn',n:'Attention',lib:'FlashAttention / FlashInfer',kind:'fused attention kernel',bound:'memory in decode (reads the KV cache)',d:'One fused kernel computes scores, softmax and the weighted sum of values in on-chip memory, never writing the full score table to HBM. In decode it mostly streams the KV cache, block by block.'},
     {k:'o',n:'O-proj GEMM',lib:'cuBLAS / CUTLASS',kind:'GEMM on tensor cores',bound:'like QKV',d:'Mixes the attention heads back together with the output projection W_O.'},
     {k:'ar',n:'All-Reduce',lib:'NCCL (or a custom all-reduce)',kind:'communication kernel',bound:'NVLink latency (decode) or bandwidth (prefill)',d:'Only with tensor parallelism: the GPUs add their partial results. NCCL runs this as a kernel too, moving data over NVLink between GPUs.'},
     {k:'mlp',n:'Gate/up GEMM',lib:'cuBLAS / CUTLASS',kind:'GEMM on tensor cores',bound:'like QKV',d:'The MLP\'s first matrix multiply, usually the largest single GEMM in the layer.'},
     {k:'act',n:'SiLU × up',lib:'Triton or custom CUDA',kind:'element-wise (fused)',bound:'memory',d:'The activation function and the multiply of SwiGLU, fused into one kernel so the wide hidden tensor is read once.'},
     {k:'down',n:'Down GEMM',lib:'cuBLAS / CUTLASS',kind:'GEMM on tensor cores',bound:'like QKV',d:'The MLP\'s second matrix multiply brings the vector back to width h. With tensor parallelism another All-Reduce follows.'}];
   let sel='attn';
-  function render(){clear(svg);lbl(svg,20,22,'MAIN KERNELS OF ONE LAYER, IN ORDER (click one)',{b:1});
+  function render(){clear(svg);lbl(svg,20,22,'MAIN KERNELS OF ONE LAYER (norms and adds trimmed; click one)',{b:1});
     OPS.forEach((o,i)=>{const x=20+i*81,on=o.k===sel;const nm=o.n.split(' '),g=box(svg,x,36,75,52,nm[0],nm.slice(1).join(' ')||null,on?'var(--accent)':o.lib.startsWith('cuBLAS')?'var(--g1)':o.k==='ar'?'var(--g2)':o.k==='attn'?'var(--g0)':'var(--g3)',{on,fs:10.5,fs2:10});g.style.cursor='pointer';g.addEventListener('click',()=>{sel=o.k;render();});
       if(i<OPS.length-1)arr(svg,x+75,62,x+81,62,'var(--muted)',{w:1.5});});
     const o=OPS.find(x=>x.k===sel);
@@ -706,7 +711,7 @@ function stepper(pre,steps,draw,ms){const svg=$('#'+pre+'-svg');let k=0,timer=nu
   const _r=render;render=function(){_r();[...$('#lb-seg').children].forEach((b,i)=>b.setAttribute('aria-pressed',String(OPS[i].k===sel)));};render();
 })();
 
-/* ---------- 05 CUDA grid ---------- */
+/* ---------- 04 CUDA grid ---------- */
 (function(){
   const svg=$('#cu-svg');let mode='grid';
   function render(){clear(svg);
@@ -717,7 +722,7 @@ function stepper(pre,steps,draw,ms){const svg=$('#'+pre+'-svg');let k=0,timer=nu
     else if(mode==='block'){lbl(svg,20,22,'ONE BLOCK = 32 × 8 THREADS, ALL ON ONE SM',{b:1});
       for(let ty=0;ty<8;ty++)for(let tx=0;tx<32;tx++)R(svg,20+tx*15,36+ty*24,13,20,`fill:${PAL(ty)};opacity:.9`,{rx:2});
       lbl(svg,520,60,'threads of one block can:',{c:'var(--ink)',b:1,fs:12});lbl(svg,520,82,'· share fast shared memory',{fs:11.5});lbl(svg,520,102,'· wait for each other',{fs:11.5});lbl(svg,520,120,'  (__syncthreads())',{fs:11.5});
-      lbl(svg,520,160,'threads in different blocks',{c:'var(--ink)',b:1,fs:12});lbl(svg,520,180,'cannot (except in a Hopper',{fs:11.5});lbl(svg,520,198,'thread block cluster).',{fs:11.5});}
+      lbl(svg,520,160,'threads in different blocks',{c:'var(--ink)',b:1,fs:12});lbl(svg,520,180,'cannot share shared memory',{fs:11.5});lbl(svg,520,198,'or a barrier (except in a',{fs:11.5});lbl(svg,520,216,'Hopper cluster).',{fs:11.5});}
     else if(mode==='warps'){lbl(svg,20,22,'THE SAME BLOCK, CUT INTO WARPS OF 32 THREADS',{b:1});
       for(let ty=0;ty<8;ty++){for(let tx=0;tx<32;tx++)R(svg,20+tx*15,36+ty*24,13,20,`fill:${PAL(ty)};opacity:.9`,{rx:2});T(svg,510,52+ty*24,'warp '+ty,{style:'font-weight:700;font-size:11.5px'});}
       lbl(svg,580,60,'256 threads ÷ 32',{c:'var(--ink)',b:1,fs:12});lbl(svg,580,80,'= 8 warps',{c:'var(--ink)',b:1,fs:12});lbl(svg,580,116,'Each warp runs one',{fs:11.5});lbl(svg,580,134,'instruction at a time',{fs:11.5});lbl(svg,580,152,'for all 32 threads.',{fs:11.5});}
@@ -732,16 +737,16 @@ function stepper(pre,steps,draw,ms){const svg=$('#'+pre+'-svg');let k=0,timer=nu
   seg($('#cu-seg'),[{l:'Grid',v:'grid'},{l:'One block',v:'block'},{l:'Warps',v:'warps'},{l:'Indexing',v:'idx'}],mode,v=>{mode=v;render();});render();
 })();
 
-/* ---------- 06 compile ---------- */
+/* ---------- 05 compile ---------- */
 (function(){
   const ST=[
     {n:'CUDA C++',code:['c[i] = a[i] + b[i];'],c:'The source line from section 04. CUDA C++ is ordinary C++ plus a few keywords for kernels and launches.'},
-    {n:'PTX',code:['ld.global.f32  %f1, [%rd5];','ld.global.f32  %f2, [%rd6];','add.f32        %f3, %f1, %f2;','st.global.f32  [%rd7], %f3;'],c:'<b>nvcc</b> compiles it to <b>PTX</b>: a virtual instruction set with unlimited registers, the same for every NVIDIA GPU. Two loads from global memory (HBM), one add, one store. Illustrative listing.'},
+    {n:'PTX',code:['ld.global.f32  %f1, [%rd5];','ld.global.f32  %f2, [%rd6];','add.f32        %f3, %f1, %f2;','st.global.f32  [%rd7], %f3;'],c:'<b>nvcc</b> compiles it to <b>PTX</b>: a virtual instruction set with unlimited virtual registers. It is forward-compatible: PTX for an older target can be compiled just in time for newer GPUs. Two loads from global memory (HBM), one add, one store. Illustrative listing.'},
     {n:'SASS',code:['LDG.E R2, [R2.64] ;','LDG.E R5, [R4.64] ;','FADD  R9, R2, R5 ;','STG.E [R6.64], R9 ;'],c:'<b>ptxas</b> turns PTX into <b>SASS</b>, the real machine code for one GPU generation (sm_90 for the H100), with real registers and scheduling. This is what the warp schedulers execute. Illustrative listing.'},
     {n:'Fat binary',code:['library.so','  ├─ SASS for sm_80 (A100)','  ├─ SASS for sm_90 (H100)','  └─ PTX (for future GPUs)'],c:'Libraries such as cuBLAS ship a <b>fat binary</b>: ready SASS for each GPU generation they support, plus PTX. Triton kernels are compiled the same way, but at run time: the first time one is called with a new combination of data types and compile-time constants, then cached.'},
     {n:'Load and run',code:['driver: GPU is sm_90 →','  use the sm_90 SASS','  (unknown GPU → compile PTX now, "JIT")','copy code to GPU memory, ready to launch'],c:'The first time a kernel is used (CUDA loads code lazily by default), the driver loads the matching SASS onto the GPU. If none matches, it compiles the PTX just in time. After that, every launch only sends a small command; the code is already there.'}];
   stepper('cp',ST,(svg,st,k)=>{
-    const st5=['CUDA C++','PTX','SASS','fat binary','on the GPU'],tools=['nvcc','ptxas','link','driver'];
+    const st5=['CUDA C++','PTX','SASS','fat binary','on the GPU'],tools=['nvcc','ptxas','fatbinary','driver'];
     st5.forEach((s,i)=>{const x=20+i*148,on=i===k;box(svg,x,20,120,40,s,'',on?'var(--accent)':i<=k?'var(--g3)':'var(--surface-2)',{on,fs:12});if(i<4){arr(svg,x+120,40,x+146,40,'var(--muted)',{w:1.5});lbl(svg,x+133,74,tools[i],{a:'middle',fs:10.5,b:1});}});
     R(svg,20,96,720,130,'fill:var(--surface-2)',{rx:12});mono(svg,40,130,st.code,{fs:14,lh:26,w:600});});
 })();
@@ -795,7 +800,7 @@ function stepper(pre,steps,draw,ms){const svg=$('#'+pre+'-svg');let k=0,timer=nu
       box(svg,444,180,290,60,'tensor core','a small matrix multiply per instruction','var(--accent)',{fs:12});
       lbl(svg,20,300,'Every cycle, each of the 4 schedulers issues one instruction for one ready warp; waiting warps cost nothing.',{fs:11});}
     const N={chip:'The whole H100 SXM5: <b>132 SMs</b> in 8 GPCs (16 or 18 drawn per GPC here; the exact split varies from chip to chip), a <b>50 MB L2 cache</b> in the middle that all SMs share, and <b>80 GB of HBM3</b> in 5 stacks on the same package, read at about 3.35 TB/s. Everything the model owns, weights and KV cache, lives in HBM.',
-      gpc:'A <b>GPC</b> groups TPCs, and each TPC (texture processing cluster) holds 2 SMs. The full GH100 die has 8 GPCs × 9 TPCs = 144 SMs; the H100 SXM5 enables 132 of them, which helps chip yield.',
+      gpc:'A <b>GPC</b> groups TPCs, and each TPC (texture processing cluster) holds 2 SMs. The full GH100 die has 8 GPCs × 9 TPCs × 2 SMs = 144 SMs; the H100 SXM5 enables 132 of them, which helps chip yield.',
       sm:'An <b>SM</b> is a small processor of its own, split into 4 partitions. Each has a warp scheduler, a quarter of the 64K-entry register file, 32 FP32 cores and one tensor core. All four share 256 KB of L1 cache and shared memory, and a TMA unit that copies tiles of data in the background.',
       part:'Inside one partition. The warp scheduler holds the state of many warps; each cycle it picks one that is <b>ready</b> and sends its next instruction to the FP32 cores, the tensor core or the load/store units. Section 08 animates this.'};
     $('#gp-note').innerHTML=glink(N[lv]);}
@@ -873,7 +878,7 @@ function stepper(pre,steps,draw,ms){const svg=$('#'+pre+'-svg');let k=0,timer=nu
   seg($('#co-seg'),Object.entries(M).map(([v,m])=>({l:m.n,v})),mode,v=>{mode=v;render();});render();
 })();
 
-/* ---------- 10 GEMM on the chip ---------- */
+/* ---------- 11 GEMM on the chip ---------- */
 (function(){
   const ST=[
     {n:'The problem',f:'C [512 × 4096] = A [512 × 4096] · B [4096 × 4096]',c:'One linear layer during a 512-token prefill: A holds the tokens\' activations, B is a 4096 × 4096 weight matrix (Llama 2 7B size), C is the output. That is 2 × 512 × 4096 × 4096 ≈ 17 billion FLOPs.'},
@@ -900,7 +905,7 @@ function stepper(pre,steps,draw,ms){const svg=$('#'+pre+'-svg');let k=0,timer=nu
   },3600);
 })();
 
-/* ---------- 11 roofline ---------- */
+/* ---------- 12 roofline ---------- */
 (function(){
   const svg=$('#rf-svg'),NS=[1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192];const PK=989,BW=3.35,K=4096,N=4096;
   const X0=70,X1=730,Y0=270,Y1=30,lx=v=>X0+(Math.log10(v)-Math.log10(0.5))/(Math.log10(4000)-Math.log10(0.5))*(X1-X0),ly=v=>Y0-(Math.log10(v)-0)/(Math.log10(2000))*(Y0-Y1);
@@ -921,11 +926,11 @@ function stepper(pre,steps,draw,ms){const svg=$('#'+pre+'-svg');let k=0,timer=nu
 /* ---------- 13 optimization ladder ---------- */
 (function(){
   const ST=[
-    {n:'Naive',v:100,path:[1,0,0,0],c:'One thread per output number. Each thread walks a row of A and a column of B straight from HBM, doing one multiply-add per two loads. Nothing is reused, and neighbouring threads read B down a column (section 10), so most bytes fetched are wasted.',lim:'HBM traffic, uncoalesced'},
+    {n:'Naive',v:100,path:[1,0,0,0],c:'One thread per output number, each walking a row of A and a column of B straight from global memory: one multiply-add per two loads. Consecutive threads are mapped to consecutive rows of C, so a warp reads A with a stride of K and each load touches 32 different sectors (section 10). There is no deliberate reuse; only the caches help.',lim:'HBM traffic, uncoalesced'},
     {n:'Coalesced',v:55,path:[1,0,0,0],c:'Re-map threads so that the 32 threads of a warp read neighbouring addresses. The same amount of data, but each fetched sector is now fully used.',lim:'HBM traffic: every number is still read many times'},
     {n:'Shared-memory tiling',v:14,path:[1,1,0,0],c:'Each thread block loads a tile of A and a tile of B into <b>shared memory</b> once; all its threads then reuse those numbers many times. HBM traffic drops by roughly the tile size.',lim:'shared-memory bandwidth and instruction count'},
-    {n:'Register tiling',v:7,path:[1,1,1,0],c:'Each thread computes a small block of outputs (say 8 × 8) instead of one, keeping operands in <b>registers</b> and reusing each loaded value several times. More registers per thread means fewer warps fit on an SM (lower occupancy), a trade-off kernels tune.',lim:'scalar FMA throughput of the CUDA cores'},
-    {n:'Tensor cores',v:2.2,path:[1,1,1,1],c:'Warps issue matrix-multiply-accumulate instructions (mma, and on Hopper wgmma for a whole warp group) that run on the <b>tensor cores</b>, doing a small matrix product per instruction in BF16 or FP8. This is where most of the GPU\'s FLOPs are.',lim:'keeping the tensor cores fed with data'},
+    {n:'Register tiling',v:7,path:[1,1,1,0],c:'Each thread computes a small block of outputs (say 8 × 8) instead of one, keeping operands in <b>registers</b> and reusing each loaded value several times. More registers per thread means fewer warps fit on an SM (lower occupancy), a trade-off kernels tune.',lim:'fused multiply-add (FMA) throughput of the CUDA cores'},
+    {n:'Tensor cores',v:2.2,path:[1,1,1,1],c:'Warps issue matrix-multiply-accumulate instructions (mma; on Hopper, wgmma for a warp group of 4 warps, which reads its inputs straight from shared memory) that run on the <b>tensor cores</b>, doing a small matrix product per instruction in BF16 or FP8. This is where most of the GPU\'s FLOPs are.',lim:'keeping the tensor cores fed with data'},
     {n:'Async copies + pipelining',v:1.5,path:[1,1,1,1],c:'While the tensor cores work on one pair of tiles, the <b>TMA</b> unit already copies the next pair into shared memory (double or multi-buffering). Some warps only load, others only compute (warp specialization). This is roughly what cuBLAS, CUTLASS and FlashAttention-3 do on an H100.',lim:'close to the hardware peak'}];
   stepper('op',ST,(svg,st,k)=>{
     lbl(svg,20,20,'TIME FOR THE SAME MATRIX MULTIPLY (illustrative, naive = 100)',{b:1,fs:10.5});
@@ -1035,7 +1040,7 @@ function stepper(pre,steps,draw,ms){const svg=$('#'+pre+'-svg');let k=0,timer=nu
   seg($('#rk-seg'),[{l:'8-GPU server',v:'server'},{l:'NVL72 rack',v:'rack'},{l:'Cluster',v:'cluster'}],lv,v=>{lv=v;render();});render();
 })();
 
-/* ---------- 12 decode timeline ---------- */
+/* ---------- 18 decode timeline ---------- */
 (function(){
   const svg=$('#tl-svg');let mode='eager',timer=null,t=999;
   const KN=['norm','qkv','rope','attn','o','add','norm','gate/up','act','down','add'],DUR=[1.5,4,1,3,3,1,1.5,6,1.5,5,1];const LAUNCH=4,LAYERS=3;
@@ -1050,7 +1055,7 @@ function stepper(pre,steps,draw,ms){const svg=$('#'+pre+'-svg');let k=0,timer=nu
     if(t<end)S('line',{x1:x0+t*sc,x2:x0+t*sc,y1:40,y2:190,style:'stroke:var(--bad);stroke-width:2'},svg);
     [['var(--g1)','CPU launch'],['var(--accent)','GEMM'],['var(--g0)','attention'],['var(--g3)','small kernels']].forEach(([c,l],i)=>{R(svg,x0+i*150,214,12,12,`fill:${c}`,{rx:2});lbl(svg,x0+16+i*150,225,l,{fs:10.5});});
     lbl(svg,x0,262,mode==='eager'?'Gaps on the GPU lane = the GPU waiting for the CPU to launch the next kernel.':'One launch replays the recorded chain: kernels run back to back.',{fs:11.5,b:1,c:'var(--ink)'});
-    $('#tl-note').innerHTML=glink(mode==='eager'?'<b>Eager launches.</b> In this toy each launch costs the CPU 4 µs, longer than many decode kernels take to run. The GPU finishes a small kernel and then waits for the next launch: utilisation drops even though the GPU is "busy".':'<b>CUDA graph.</b> The engine captured this exact chain of kernels once, at start-up. Now one launch replays all of them, with no CPU work in between. Graphs need fixed shapes, so serving engines record one per common batch size.');
+    $('#tl-note').innerHTML=glink(mode==='eager'?'<b>Eager launches.</b> In this toy each launch costs the CPU 4 µs, longer than many decode kernels take to run. The GPU finishes a small kernel and then waits for the next launch: utilisation drops even though the GPU is "busy".':'<b>CUDA graph.</b> The engine captured this exact chain of kernels once, at start-up. Now one launch replays all of them, with no CPU work in between. Graphs need fixed shapes and fixed memory addresses, so serving engines copy inputs into pre-allocated buffers and record one graph per common batch size.');
     stats($('#tl-stats'),[{v:end.toFixed(0)+' µs',l:`for ${LAYERS} layers (toy)`},{v:Math.round(100*busy/(g.length?g[g.length-1].e-g[0].s:1))+'%',l:'GPU busy between first and last kernel'},{v:g.length,l:'kernels'}]);}
   function stop(){clearInterval(timer);timer=null;$('#tl-play').textContent='Play one step';}
   seg($('#tl-seg'),[{l:'Eager launches',v:'eager'},{l:'CUDA graph',v:'graph'}],mode,v=>{stop();mode=v;t=999;render();});
