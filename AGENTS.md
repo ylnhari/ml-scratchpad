@@ -89,6 +89,7 @@ entry of `pages.json`. **When a page is added, renamed or removed, update `pages
 | https://ylnhari.github.io/ml-scratchpad/continuous-batching/ | `continuous-batching/continuous_batching_explainer.ipynb` (executed) | `make continuous-batching-html` |
 | https://ylnhari.github.io/ml-scratchpad/additive-inference/ | `additive-inference/additive_inference_explainer.ipynb` (executed) | `make additive-inference-html` |
 | https://ylnhari.github.io/ml-scratchpad/llm-inference-visualized/ | `llm-inference-visualized/index.html` (hand-written source, not a generated export) | edit `index.html` directly |
+| https://ylnhari.github.io/ml-scratchpad/gpu-stack-visualized/ | `gpu-stack-visualized/index.html` (hand-written source, shares the design system of llm-inference-visualized) | edit `index.html` directly |
 
 ## Subfolders
 
@@ -104,6 +105,7 @@ entry of `pages.json`. **When a page is added, renamed or removed, update `pages
 | additive-inference/ | Ternary 1.7-bit multiply-free inference (Mach-1 / BitNet) | additive_inference_explainer.ipynb | `additive-inference` |
 | vllm-memory/ | vLLM GPU-memory lifecycle: profile run, KV pool sizing, scheduler steps, preemption | vllm_memory_explainer.ipynb (+ visual/index.html, interactive page with in-browser Python) | (numpy + matplotlib only) |
 | llm-inference-visualized/ | Interactive tensor-shape explainer: forward pass, inference optimizations, backward pass, modern-LLM changes, RoPE word order, LoRA fine-tuning | index.html (interactive page; a notebook can't animate the splits) | none |
+| gpu-stack-visualized/ | Request path from API to GPU silicon: Ray Serve, vLLM engine, PyTorch dispatch, kernel libraries, CUDA grid/blocks/warps, PTX/SASS, H100 SMs, memory hierarchy, tiled GEMM, roofline, CUDA graphs | index.html (interactive page) | none |
 
 ## Running
 

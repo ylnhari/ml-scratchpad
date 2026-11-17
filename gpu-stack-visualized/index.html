@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>From API Call to GPU Silicon</title>
+<meta name="description" content="One LLM request followed from the HTTP API through Ray Serve, vLLM, PyTorch, cuBLAS and CUDA down to SMs, warps and tensor cores on an H100.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  
+/* layout: sticky left rail + one wide column of live figures; text is captions only */
+  --bg:#f6f5f9; --surface:#ffffff; --surface-2:#efedf5; --ink:#1c1a2b; --muted:#66637d; --line:#e2dfeb;
+  --accent:#6a4fd0; --accent-soft:#ece6ff; --on-accent:#ffffff; --on-fill:#1c1a2b;
+  --g0:#ffaa9c; --g1:#ffd073; --g2:#f5a3d6; --g3:#86dbbf;
+  --ok:#1f7d52; --bad:#c9302c; --idle:#d9d6e3;
+  --f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12111a; --surface:#1b1a26; --surface-2:#24222f; --ink:#ece9f6; --muted:#a19db6; --line:#2f2c3d;
+    --accent:#b7a3ff; --accent-soft:#2c2647; --on-accent:#1c1a2b; --on-fill:#1c1a2b;
+    --g0:#ff9e8f; --g1:#ffcf6b; --g2:#f29bd0; --g3:#7ed6b8;
+    --ok:#5fd39a; --bad:#ff6b6b; --idle:#3a3749; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12111a; --surface:#1b1a26; --surface-2:#24222f; --ink:#ece9f6; --muted:#a19db6; --line:#2f2c3d;
+  --accent:#b7a3ff; --accent-soft:#2c2647; --on-accent:#1c1a2b; --on-fill:#1c1a2b;
+  --g0:#ff9e8f; --g1:#ffcf6b; --g2:#f29bd0; --g3:#7ed6b8;
+  --ok:#5fd39a; --bad:#ff6b6b; --idle:#3a3749; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body)}
+a{color:var(--accent)}
+
+h1{font:800 clamp(34px,5vw,58px)/1.02 var(--f-display);margin:0 0 10px;letter-spacing:-.02em;text-wrap:balance}
+.dek{color:var(--muted);max-width:70ch;margin:0}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;font:500 13px var(--f-mono)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:14px;border-radius:4px;display:inline-block}
+.wrap{max-width:1640px;margin:0 auto;padding:0 24px 60px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px}
+nav.rail{position:sticky;top:16px;align-self:start;font-size:13.5px;max-height:calc(100vh - 32px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding-right:4px}
+nav.rail ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+nav.rail a{display:flex;gap:8px;padding:5px 8px;border-radius:7px;text-decoration:none;color:var(--muted)}
+nav.rail a b{font:600 12px var(--f-mono);color:var(--accent);min-width:20px}
+nav.rail a:hover,nav.rail a.on{background:var(--surface);color:var(--ink)}
+@media (max-width:900px){.wrap{grid-template-columns:minmax(0,1fr)}nav.rail{display:none}}
+@media (max-width:700px){.svgbox::before{content:'swipe sideways to see the whole figure →';display:block;position:sticky;left:0;font:600 11px var(--f-mono);color:var(--muted);margin:0 0 4px}}
+.wrap>*{min-width:0}
+section{padding:30px 0 10px;scroll-margin-top:10px}
+.sh{display:block}
+.sh .n{display:block;margin-bottom:4px}
+.sh .n{font:700 13px var(--f-mono);color:var(--accent)}
+h2{font:700 26px/1.15 var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+.cap{color:var(--muted);margin:6px 0 0;max-width:80ch}
+.fig{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:14px}
+.fig svg{width:100%;height:auto;display:block}
+.svgbox{overflow-x:auto}
+.svgbox svg{min-width:640px}
+.e2cfg{display:inline-flex;align-items:center;gap:6px}.e2cfg>.mono{font-size:11.5px;color:var(--muted)}.e2cfg .seg .btn{font-size:12px;padding:3px 8px}
+.backbtn{position:fixed;right:18px;bottom:18px;z-index:50;font:600 12px var(--f-mono,monospace);padding:6px 12px;border-radius:999px;border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.15)}a.xref{color:var(--accent);text-decoration:underline dotted;text-underline-offset:3px}
+.spd{display:inline-flex;align-items:center;gap:2px;font:500 11px var(--f-mono,monospace);color:var(--muted)}.spd button{font:600 11px var(--f-mono,monospace);padding:2px 5px;border-radius:6px;border:1px solid var(--surface-2);background:transparent;color:var(--muted);cursor:pointer}.spd button[aria-pressed=true]{background:var(--accent);color:var(--on-fill);border-color:var(--accent)}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.seg{display:inline-flex;flex-wrap:wrap;gap:4px;background:var(--surface-2);padding:3px;border-radius:10px}
+.btn{font:500 13.5px var(--f-body);padding:6px 12px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--ink);cursor:pointer}
+.btn.solid{background:var(--surface-2);border-color:var(--line)}
+.btn:hover{border-color:var(--line)}
+.btn[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.btn:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.glossc{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 14px;margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--surface-2);font:400 12px/1.5 var(--f-body);color:var(--muted)}.glossc b{font:600 12px var(--f-mono);color:var(--ink);margin-right:6px}
+.gl-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px 22px;margin:16px 0 0}.gl-i{padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line);scroll-margin-top:20px}.gl-i:target{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}.gl-i dt{font-weight:700;margin-bottom:3px}.gl-i dd{margin:0;color:var(--muted);font-size:14px;line-height:1.5}a.gl{color:inherit;text-decoration:underline dotted;text-underline-offset:3px;text-decoration-color:var(--accent)}
+.stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.stat{background:var(--surface-2);border-radius:10px;padding:7px 12px;min-width:120px}
+.stat b{display:block;font:700 18px var(--f-mono);font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+.stat.good b{color:var(--ok)} .stat.warn b{color:var(--bad)}
+.note{font:500 13.5px var(--f-body);color:var(--ink);background:var(--accent-soft);border-radius:10px;padding:8px 12px;margin-top:10px}
+label.ctl{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+select,input[type=range]{font:500 13px var(--f-body);color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
+input[type=range]{padding:0;accent-color:var(--accent);width:170px}
+.mono{font-family:var(--f-mono)}
+.fgl{float:right;margin:0 0 4px 16px;padding:4px 10px;border-left:2px solid var(--accent);font:500 12px/1.5 var(--f-display);color:var(--muted)}.fgl b{color:var(--ink)}
+.formula{font:500 13.5px/1.6 var(--f-mono);background:var(--surface-2);border-radius:10px;padding:10px 12px;overflow-wrap:anywhere;margin-top:10px}
+.formula b{color:var(--accent)}
+svg text{font-family:var(--f-mono);fill:var(--ink);font-size:12px}
+svg .lbl{font-size:10.5px;fill:var(--muted);letter-spacing:.06em}
+svg .big{font-size:15px;font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.chip{font:500 11.5px var(--f-mono);padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);cursor:pointer}
+.chip[aria-pressed="true"]{outline:2px solid var(--ink)}
+.chip.q{color:var(--muted);border-style:dashed}
+.spec{display:grid;gap:10px}
+.spec-row{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center}
+.spec-k{font:600 12px var(--f-mono);color:var(--muted);letter-spacing:.05em}
+.pills{display:flex;flex-wrap:wrap;gap:6px;min-height:32px}
+.pill{font:600 14px var(--f-mono);padding:5px 10px;border-radius:8px;background:var(--surface-2);border:1.5px solid var(--line)}
+.pill.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);border-color:var(--ok)}
+.pill.no{background:color-mix(in srgb,var(--bad) 15%,transparent);border-color:var(--bad);text-decoration:line-through}
+.pill.fix{border-style:dashed;border-color:var(--accent);background:var(--accent-soft)}
+.pill.draft{border-color:var(--g1)}
+.pill.ver{border-color:var(--g0)}
+@media (max-width:560px){.spec-row{grid-template-columns:1fr}}
+@keyframes pdIn{from{opacity:0;transform:scale(.55)}60%{opacity:1;transform:scale(1.08)}to{opacity:1;transform:none}}
+.part{margin-top:30px;padding-top:18px;border-top:2px solid var(--ink)}
+.part span{font:700 12px var(--f-mono);color:var(--accent);letter-spacing:.14em}
+.part h3{font:800 32px/1.1 var(--f-display);margin:2px 0 0;letter-spacing:-.01em}
+nav.rail li.grp{font:700 10.5px var(--f-mono);color:var(--muted);letter-spacing:.12em;padding:12px 8px 3px}
+nav.rail a.sub{padding:3px 8px 3px 22px;font-size:12.5px}
+table.sum{width:100%;min-width:640px;border-collapse:collapse;font-size:13.5px}
+table.sum th{font:600 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+table.sum td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.sum td.k{font-weight:700}
+table.sum td.ok{color:var(--ok);font-weight:600}
+table.sum td.no{color:var(--bad);font-weight:600}
+/* wide screens: text column (sticky) beside the figure column */
+@media (min-width:1280px){
+  section.split{display:grid;grid-template-columns:minmax(300px,370px) minmax(0,1fr);gap:44px;align-items:start}
+}
+@media (min-width:1280px) and (max-width:1439px){
+  section.split{grid-template-columns:290px minmax(0,1fr);gap:32px}
+}
+@media (min-width:1280px){
+  section.split .svgbox svg{min-width:0}
+  section.split table.sum{min-width:0}
+  section.split>.col-text{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}
+  section.split>.col-fig{min-width:0}
+  section.split>.col-fig>.fig:first-child{margin-top:0}
+  section.split .col-text .note{margin-top:14px}
+  .dek{max-width:90ch}
+}
+.col-text .cap{max-width:none}
+/* text column is the reading column: larger type on wide screens, where the figure leaves room */
+@media (min-width:1280px){body{font-size:16px}.note{font-size:15px;line-height:1.55}nav.rail a{font-size:14px}.col-text .cap,.col-text li,.col-text .note{font-size:17px;line-height:1.6}.col-text h2{font-size:30px}.notation .cap,.notation dd,.part .cap{font-size:17px}.nota-h{font-size:20px}}
+@media (min-width:1900px){.col-text .cap,.col-text li,.col-text .note{font-size:18.5px}.notation .cap,.notation dd,.part .cap{font-size:18px}}
+ul.cap{padding-left:20px}
+header.top{padding:40px 0 8px}
+.wrap{padding-top:0}
+nav.rail{margin-top:44px;max-height:calc(100vh - 60px)}
+.parts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:22px}
+.parts a{display:block;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;transition:border-color .15s,transform .15s}
+.parts a:hover{border-color:var(--accent);transform:translateY(-2px)}
+.parts span{font:700 11px var(--f-mono);letter-spacing:.12em;color:var(--accent)}
+.parts b{display:block;font:700 18px var(--f-display);margin:2px 0 4px}
+.parts small{display:block;color:var(--muted);font-size:13px;line-height:1.45}
+@media (max-width:700px){.parts{grid-template-columns:1fr}}
+.sw.hatch{background:repeating-linear-gradient(45deg,var(--muted) 0 2px,transparent 2px 6px);border:1px solid var(--muted)}
+.legend .lk{color:var(--muted);font-family:var(--f-body)}
+.notation{display:grid;grid-template-columns:300px minmax(0,1fr);gap:28px;align-items:center;margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 22px}
+.notation svg{width:100%;height:auto}
+.nota-h{font:700 17px var(--f-display);margin:0 0 4px}
+.notation dl{display:grid;grid-template-columns:28px 1fr;gap:6px 10px;margin:0}
+.notation dt{font:800 18px var(--f-mono);color:var(--accent)}
+.notation dd{margin:0;color:var(--ink)}
+@media (max-width:760px){.notation{grid-template-columns:1fr}}
+ul.rows{margin:6px 0;padding-left:20px}
+ul.rows li{margin:2px 0}
+footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker>
+    <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--muted);stroke-width:1.6;opacity:.55"/></pattern>
+    <pattern id="hatchBad" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--bad);stroke-width:2"/></pattern>
+    <pattern id="part0" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="7" height="7" style="fill:var(--surface)"/><line x1="0" y1="0" x2="0" y2="7" style="stroke:var(--g0);stroke-width:4"/></pattern>
+    <pattern id="part1" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="7" height="7" style="fill:var(--surface)"/><line x1="0" y1="0" x2="0" y2="7" style="stroke:var(--g1);stroke-width:4"/></pattern>
+  </defs>
+</svg>
+<div class="wrap">
+<nav class="rail" aria-label="Sections">
+  <ol>
+    <li class="grp">THE JOURNEY</li>
+    <li><a href="#journey"><b>00</b>One request, every layer</a></li>
+    <li class="grp">SOFTWARE</li>
+    <li><a href="#serving"><b>01</b>API and serving</a></li>
+    <li><a href="#engine"><b>02</b>The inference engine</a></li>
+    <li><a href="#pytorch"><b>03</b>PyTorch: ops to kernels</a></li>
+    <li><a href="#libs"><b>04</b>Kernel libraries</a></li>
+    <li><a href="#cuda"><b>05</b>CUDA: grids, blocks, threads</a></li>
+    <li><a href="#compile"><b>06</b>From C++ to GPU instructions</a></li>
+    <li class="grp">HARDWARE</li>
+    <li><a href="#gpu"><b>07</b>Inside an H100</a></li>
+    <li><a href="#warps"><b>08</b>Warps and the scheduler</a></li>
+    <li><a href="#memory"><b>09</b>The memory hierarchy</a></li>
+    <li><a href="#gemm"><b>10</b>One matrix multiply on the chip</a></li>
+    <li><a href="#roofline"><b>11</b>Compute-bound or memory-bound?</a></li>
+    <li><a href="#timeline"><b>12</b>One decode step, kernel by kernel</a></li>
+    <li class="grp">EXTRAS</li>
+    <li><a href="#x-glossary"><b>X1</b>Glossary</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="top">
+  <div class="top-in">
+    <h1>From API Call to GPU Silicon</h1>
+    <p class="dek">What actually happens when you send a prompt to a large language model (LLM): one request followed down every layer, from the HTTP call to the serving system, the inference engine, PyTorch, the kernel libraries and CUDA, down to the streaming multiprocessors and tensor cores of the GPU. Every idea is a live figure you can step through.</p>
+    <nav class="parts" aria-label="Parts">
+      <a href="#journey"><span>START HERE</span><b>The journey</b><small>One request through all twelve layers in a single picture.</small></a>
+      <a href="#serving"><span>PART I</span><b>Software</b><small>Serving, the engine, PyTorch, kernel libraries, CUDA and the compiler.</small></a>
+      <a href="#gpu"><span>PART II</span><b>Hardware</b><small>SMs, warps, tensor cores, the memory hierarchy, and one matrix multiply on the chip.</small></a>
+      <a href="https://ylnhari.github.io/ml-scratchpad/llm-inference-visualized/"><span>COMPANION</span><b>LLM Inference, Visualized</b><small>The model side: attention, KV cache, batching, parallelism and serving tricks.</small></a>
+    </nav>
+  </div>
+</header>
+
+<div class="part"><span>START HERE</span><h3>The journey</h3><p class="cap">Before any detail, the whole path in one figure. Each later section zooms into one of these layers.</p></div>
+
+<section id="journey">
+  <div class="sh"><span class="n">00</span><h2>One request, every layer</h2></div>
+  <p class="cap">A user types "Explain GPUs" into a chat app. Between that and the first word of the answer, the request passes through about a dozen layers of software and hardware. Each layer turns what it receives into something simpler for the layer below, until it becomes instructions running on the GPU's cores. Then the result climbs back up.</p>
+  <p class="cap">Press <b>Next</b> to go down one layer. The right side shows what is handed to the next layer down.</p>
+  <div class="fig">
+    <div class="controls"><button class="btn solid" id="jr-prev" type="button">◀ Prev</button><button class="btn solid" id="jr-next" type="button">Next ▶</button><button class="btn solid" id="jr-play" type="button">Play</button><span class="spd" aria-label="Animation speed">speed</span></div>
+    <div class="chips" id="jr-chips"></div>
+    <div class="note" id="jr-note" style="margin:10px 0;min-height:96px"></div>
+    <div class="svgbox"><svg id="jr-svg" viewBox="0 0 760 560" role="img" aria-label="The layers a request passes through, from API to GPU"></svg></div>
+  </div>
+</section>
+
+<div class="part"><span>PART I</span><h3>Software</h3><p class="cap">Everything that runs on CPUs: it decides <i>what</i> the GPU must compute and hands it over as a stream of small programs called kernels.</p></div>
+
+<section id="serving">
+  <div class="sh"><span class="n">01</span><h2>API and serving: getting the request to a GPU</h2></div>
+  <p class="cap">Your app sends an HTTP POST, usually in the OpenAI chat format, to an endpoint. Behind it, a serving system such as <b>Ray Serve</b> (the engine behind Anyscale's hosted endpoints) runs several <b>replicas</b>: identical copies of the model server, each owning one or more GPUs. A <b>router</b> picks a replica for every request, and an <b>autoscaler</b> adds or removes replicas as traffic changes.</p>
+  <ul class="cap">
+    <li>The router can be smarter than round-robin: Ray Serve LLM ships a router that prefers the replica that already holds this prompt's prefix in its KV cache, so that work is not repeated.</li>
+    <li>The answer streams back token by token over the same connection (server-sent events), so the user sees words as soon as they exist.</li>
+  </ul>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="sv-seg"></div><button class="btn solid" id="sv-play" type="button">Send requests</button><span class="spd" aria-label="Animation speed">speed</span></div>
+    <div class="svgbox"><svg id="sv-svg" viewBox="0 0 760 330" role="img" aria-label="Requests routed to replicas"></svg></div>
+    <div class="note" id="sv-note" style="margin-top:10px"></div>
+  </div>
+</section>
+
+<section id="engine">
+  <div class="sh"><span class="n">02</span><h2>The inference engine: vLLM, one step at a time</h2></div>
+  <p class="cap">Inside each replica runs an <b>inference engine</b> such as vLLM. It works in a loop of <b>steps</b>: every step, it picks which requests to advance, runs the model once for all of them together, and emits one new token for each. vLLM splits this across processes so the slow CPU work never blocks the GPU:</p>
+  <ul class="cap">
+    <li>the <b>API server</b> process turns text into token IDs (tokenizing) and token IDs back into text (detokenizing), and streams results out;</li>
+    <li>the <b>EngineCore</b> process runs the <b>scheduler</b> and the <b>KV cache manager</b>; the two processes talk over ZeroMQ, a fast messaging library;</li>
+    <li>one <b>GPU worker</b> per GPU runs the <b>model runner</b>, which builds the input tensors and calls the model.</li>
+  </ul>
+  <div class="fig">
+    <div class="controls"><button class="btn solid" id="en-prev" type="button">◀ Prev</button><button class="btn solid" id="en-next" type="button">Next ▶</button><button class="btn solid" id="en-play" type="button">Play</button><span class="spd" aria-label="Animation speed">speed</span></div>
+    <div class="chips" id="en-chips"></div>
+    <div class="note" id="en-note" style="margin:10px 0;min-height:76px"></div>
+    <div class="svgbox"><svg id="en-svg" viewBox="0 0 760 360" role="img" aria-label="vLLM processes and one engine step"></svg></div>
+  </div>
+</section>
+
+<section id="pytorch">
+  <div class="sh"><span class="n">03</span><h2>PyTorch: from model.forward() to kernel launches</h2></div>
+  <p class="cap">The model runner calls <span class="mono">model(input_ids, positions, …)</span>. That Python code never touches the GPU's numbers itself. Each tensor operation goes to PyTorch's C++ core, where a <b>dispatcher</b> looks at the tensors (which device, which data type) and picks the matching implementation. For a CUDA tensor that ends in a <b>kernel launch</b>: a request to run one small GPU program on the data.</p>
+  <ul class="cap">
+    <li>Launches are <b>asynchronous</b>. The CPU puts each launch into a queue called a <b>CUDA stream</b> and moves on at once; the GPU works through the queue in order. The CPU only waits when it needs a result back, for example the sampled token.</li>
+    <li>In inference the model runs under <span class="mono">torch.inference_mode()</span>, so the dispatcher skips the autograd bookkeeping that training needs.</li>
+    <li><b>torch.compile</b> can trace the model ahead of time and fuse chains of small element-wise ops into one generated kernel (written in Triton), so fewer kernels are launched.</li>
+  </ul>
+  <div class="fig">
+    <div class="controls"><button class="btn solid" id="pt-prev" type="button">◀ Prev</button><button class="btn solid" id="pt-next" type="button">Next ▶</button><button class="btn solid" id="pt-play" type="button">Play</button><span class="spd" aria-label="Animation speed">speed</span></div>
+    <div class="chips" id="pt-chips"></div>
+    <div class="note" id="pt-note" style="margin:10px 0;min-height:76px"></div>
+    <div class="svgbox"><svg id="pt-svg" viewBox="0 0 760 400" role="img" aria-label="PyTorch dispatch from Python to a CUDA kernel launch"></svg></div>
+  </div>
+</section>
+
+<section id="libs">
+  <div class="sh"><span class="n">04</span><h2>Kernel libraries: who writes the GPU code</h2></div>
+  <p class="cap">Almost nobody writes the heavy kernels by hand for each model. PyTorch and vLLM call into specialised libraries, each tuned for one kind of work. Click a part of one transformer layer to see which library runs it and what kind of kernel it is.</p>
+  <ul class="cap">
+    <li><b>cuBLAS</b> (and NVIDIA's open template library <b>CUTLASS</b>, on which many custom kernels are built): matrix multiplications, called GEMMs. They hold almost all of the model's arithmetic.</li>
+    <li><b>FlashAttention</b> / <b>FlashInfer</b>: fused attention kernels that read the KV cache in blocks (section 09 explains why fusing matters).</li>
+    <li><b>Triton</b> or hand-written CUDA: the small element-wise and normalisation kernels (RMSNorm, RoPE, activation, residual add).</li>
+    <li><b>NCCL</b> (NVIDIA Collective Communications Library): All-Reduce and the other collectives when a model is split across GPUs.</li>
+    <li><b>cuDNN</b>: NVIDIA's deep-learning primitives library, best known for convolutions; it also offers fused attention kernels.</li>
+  </ul>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="lb-seg"></div></div>
+    <div class="svgbox"><svg id="lb-svg" viewBox="0 0 760 300" role="img" aria-label="Which library runs each op in a transformer layer"></svg></div>
+    <div class="note" id="lb-note" style="margin-top:10px"></div>
+  </div>
+</section>
+
+<section id="cuda">
+  <div class="sh"><span class="n">05</span><h2>CUDA: a kernel is a grid of blocks of threads</h2></div>
+  <p class="cap"><b>CUDA</b> is NVIDIA's programming model and toolkit for GPUs. A <b>kernel</b> is a function that runs on the GPU. When it is launched, it runs as thousands of <b>threads</b>, all executing the same code on different data. The threads are grouped in two levels:</p>
+  <ul class="cap">
+    <li>a <b>thread block</b> (up to 1,024 threads) always runs on one SM and can share fast on-chip memory and synchronise inside the block;</li>
+    <li>the <b>grid</b> is all the blocks of one launch. Blocks cannot rely on each other: the hardware may run them in any order, on any SM.</li>
+  </ul>
+  <p class="cap">The launch states both sizes: <span class="mono">kernel&lt;&lt;&lt;grid, block, shared_mem, stream&gt;&gt;&gt;(args)</span>. Inside, each thread works out which piece of data is its own from its block and thread numbers. The hardware then cuts every block into <b>warps</b> of 32 consecutive threads (section 08).</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="cu-seg"></div></div>
+    <div class="svgbox"><svg id="cu-svg" viewBox="0 0 760 330" role="img" aria-label="Grid, blocks, threads and warps of one kernel launch"></svg></div>
+    <div class="note" id="cu-note" style="margin-top:10px"></div>
+  </div>
+</section>
+
+<section id="compile">
+  <div class="sh"><span class="n">06</span><h2>From C++ to GPU instructions: PTX and SASS</h2></div>
+  <p class="cap">GPU code is compiled in two stages. The compiler <b>nvcc</b> turns CUDA C++ into <b>PTX</b> (Parallel Thread Execution), a virtual instruction set that is the same for every NVIDIA GPU. A second assembler, <b>ptxas</b>, turns PTX into <b>SASS</b>, the real machine code of one GPU generation (sm_90 for the H100). Libraries ship both: SASS for the GPUs they were built for, and PTX so the driver can compile it on the fly (just-in-time) for a newer GPU.</p>
+  <div class="fig">
+    <div class="controls"><button class="btn solid" id="cp-prev" type="button">◀ Prev</button><button class="btn solid" id="cp-next" type="button">Next ▶</button><span class="spd" aria-label="Animation speed">speed</span></div>
+    <div class="chips" id="cp-chips"></div>
+    <div class="note" id="cp-note" style="margin:10px 0;min-height:60px"></div>
+    <div class="svgbox"><svg id="cp-svg" viewBox="0 0 760 240" role="img" aria-label="Compilation from CUDA C++ to PTX to SASS"></svg></div>
+  </div>
+</section>
+
+<div class="part"><span>PART II</span><h3>Hardware</h3><p class="cap">What the GPU is made of, and what happens on it once a kernel arrives. Numbers are for an NVIDIA H100 SXM5, the most common GPU in today's LLM servers.</p></div>
+
+<section id="gpu">
+  <div class="sh"><span class="n">07</span><h2>Inside an H100: GPCs, SMs and cores</h2></div>
+  <p class="cap">A GPU is not one big processor but many copies of the same building block, the <b>streaming multiprocessor</b> (<b>SM</b>). An H100 SXM5 has <b>132 SMs</b>, grouped into 8 <b>GPCs</b> (graphics processing clusters). They share a 50 MB L2 cache and 80 GB of HBM3 memory. Zoom in level by level:</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="gp-seg"></div></div>
+    <div class="svgbox"><svg id="gp-svg" viewBox="0 0 760 400" role="img" aria-label="H100 chip, GPC, SM and SM partition"></svg></div>
+    <div class="note" id="gp-note" style="margin-top:10px"></div>
+    <div class="stats" id="gp-stats"></div>
+  </div>
+</section>
+
+<section id="warps">
+  <div class="sh"><span class="n">08</span><h2>Warps and the scheduler: how an SM hides waiting</h2></div>
+  <p class="cap">The <b>warp</b>, 32 threads, is the unit the hardware actually schedules. All 32 run the same instruction at the same time on their own data (NVIDIA calls this SIMT, single instruction, multiple threads). Each of an SM's 4 partitions has a <b>warp scheduler</b> that, every clock cycle, picks one warp that is ready and issues its next instruction.</p>
+  <p class="cap">Reading memory takes hundreds of cycles. A CPU core would mostly sit and wait. An SM keeps many warps resident (up to 64) and simply switches to another ready warp at no cost, so the arithmetic units stay busy while others wait. Press Play and compare few warps with many.</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="wp-seg"></div><button class="btn solid" id="wp-play" type="button">Play</button><span class="spd" aria-label="Animation speed">speed</span></div>
+    <div class="svgbox"><svg id="wp-svg" viewBox="0 0 760 300" role="img" aria-label="Warp scheduler switching between warps"></svg></div>
+    <div class="note" id="wp-note" style="margin-top:10px"></div>
+    <div class="stats" id="wp-stats"></div>
+  </div>
+</section>
+
+<section id="memory">
+  <div class="sh"><span class="n">09</span><h2>The memory hierarchy: small and fast near the cores, big and slow far away</h2></div>
+  <p class="cap">Data reaches the tensor cores through a ladder of memories. Each step up is smaller but closer and faster. Fast kernels are built around one idea: load each number from far memory <b>once</b>, keep it close, and reuse it as many times as possible.</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="mh-seg"></div></div>
+    <div class="svgbox"><svg id="mh-svg" viewBox="0 0 760 330" role="img" aria-label="GPU memory hierarchy"></svg></div>
+    <div class="note" id="mh-note" style="margin-top:10px"></div>
+  </div>
+</section>
+
+<section id="gemm">
+  <div class="sh"><span class="n">10</span><h2>One matrix multiply on the chip</h2></div>
+  <p class="cap">Take one linear layer: C = A · B, where A holds the tokens' activations and B is a weight matrix. A GEMM kernel cuts C into <b>tiles</b>, and each tile becomes one thread block. The blocks are spread over the 132 SMs. Inside its SM, a block walks along the shared dimension: it copies a slice of A and a slice of B from HBM into shared memory, the tensor cores multiply them, and the partial sums build up in registers. At the end the finished tile is written back to HBM.</p>
+  <div class="fig">
+    <div class="controls"><button class="btn solid" id="gm-prev" type="button">◀ Prev</button><button class="btn solid" id="gm-next" type="button">Next ▶</button><button class="btn solid" id="gm-play" type="button">Play</button><span class="spd" aria-label="Animation speed">speed</span></div>
+    <div class="chips" id="gm-chips"></div>
+    <div class="note" id="gm-note" style="margin:10px 0;min-height:76px"></div>
+    <div class="svgbox"><svg id="gm-svg" viewBox="0 0 760 230" role="img" aria-label="A tiled GEMM: tiles, thread blocks, SMs and the K loop"></svg></div>
+  </div>
+</section>
+
+<section id="roofline">
+  <div class="sh"><span class="n">11</span><h2>Compute-bound or memory-bound? The roofline</h2></div>
+  <p class="cap">Every kernel needs two things: arithmetic (FLOPs, floating-point operations) and bytes moved from HBM. Their ratio, FLOPs per byte, is the kernel's <b>arithmetic intensity</b>. An H100 SXM5 can do about 989 trillion BF16 FLOPs per second on its tensor cores but read only about 3.35 TB per second from HBM, so a kernel needs about <b>295 FLOPs per byte</b> before the tensor cores, not memory, become the limit.</p>
+  <p class="cap">For a weight matrix multiplied by the activations of <b>n tokens</b>, each weight is read once and used n times, so intensity grows with n. Drag n: one decode step for a single request (n = 1) is deep in the memory-bound zone; a long prefill is compute-bound. This is the hardware reason behind batching.</p>
+  <div class="fig">
+    <div class="controls"><label class="ctl">tokens per weight read, n = <span class="mono" id="rf-nv"></span><input type="range" id="rf-n" min="0" max="13" value="0"></label></div>
+    <div class="svgbox"><svg id="rf-svg" viewBox="0 0 760 320" role="img" aria-label="Roofline model for an H100"></svg></div>
+    <div class="stats" id="rf-stats"></div>
+  </div>
+</section>
+
+<section id="timeline">
+  <div class="sh"><span class="n">12</span><h2>One decode step, kernel by kernel</h2></div>
+  <p class="cap">Putting it together: one decode step of a Llama-style model is a long chain of small kernels, about a dozen per layer (norms, GEMMs, RoPE, attention, activation, adds) times every layer. For one token each kernel finishes in microseconds, so the CPU time spent <i>launching</i> them can leave the GPU idle between kernels. <b>CUDA graphs</b> fix this: the engine records the whole chain once, then replays it with a single launch. vLLM captures graphs for its common batch sizes at start-up.</p>
+  <p class="cap">The timings in this figure are illustrative, chosen to show the shape of the effect, not measured.</p>
+  <div class="fig">
+    <div class="controls"><div class="seg" id="tl-seg"></div><button class="btn solid" id="tl-play" type="button">Play one step</button><span class="spd" aria-label="Animation speed">speed</span></div>
+    <div class="svgbox"><svg id="tl-svg" viewBox="0 0 760 300" role="img" aria-label="CPU launches and GPU execution timeline"></svg></div>
+    <div class="note" id="tl-note" style="margin-top:10px"></div>
+    <div class="stats" id="tl-stats"></div>
+  </div>
+</section>
+
+<div class="part"><span>EXTRAS</span><h3>Terms</h3></div>
+<section id="x-glossary">
+  <div class="sh"><span class="n">X1</span><h2>Glossary</h2></div>
+  <dl class="gl-list">
+    <div class="gl-i" id="g-sm"><dt>SM (streaming multiprocessor)</dt><dd>The GPU&#x27;s building block: a small processor with its own warp schedulers, cores, tensor cores, registers and shared memory. An H100 SXM5 has 132.</dd></div>
+    <div class="gl-i" id="g-warp"><dt>warp</dt><dd>32 threads that the hardware schedules together; all execute the same instruction at the same time.</dd></div>
+    <div class="gl-i" id="g-kernel"><dt>kernel</dt><dd>A function that runs on the GPU, launched as a grid of thread blocks.</dd></div>
+    <div class="gl-i" id="g-block"><dt>thread block</dt><dd>A group of up to 1,024 threads that runs on one SM and can share shared memory.</dd></div>
+    <div class="gl-i" id="g-gemm"><dt>GEMM</dt><dd>General matrix-matrix multiply: the operation behind every linear layer.</dd></div>
+    <div class="gl-i" id="g-tc"><dt>tensor cores</dt><dd>Units inside each SM that multiply small matrices in one instruction; where almost all of an LLM&#x27;s FLOPs run.</dd></div>
+    <div class="gl-i" id="g-hbm"><dt>HBM</dt><dd>High-bandwidth memory: the GPU&#x27;s main memory (80 GB on an H100), stacked next to the chip.</dd></div>
+    <div class="gl-i" id="g-l2"><dt>L2 cache</dt><dd>A 50 MB on-chip cache shared by all SMs; every HBM read passes through it.</dd></div>
+    <div class="gl-i" id="g-smem"><dt>shared memory</dt><dd>A fast scratchpad inside each SM, controlled by the kernel, shared by the threads of a block.</dd></div>
+    <div class="gl-i" id="g-tma"><dt>TMA</dt><dd>Tensor Memory Accelerator: an H100 unit that copies tiles between HBM and shared memory in the background.</dd></div>
+    <div class="gl-i" id="g-stream"><dt>CUDA stream</dt><dd>A queue of GPU work. Launches go in at one end; the GPU runs them in order.</dd></div>
+    <div class="gl-i" id="g-graph"><dt>CUDA graph</dt><dd>A recorded chain of kernel launches that can be replayed with one launch.</dd></div>
+    <div class="gl-i" id="g-ptx"><dt>PTX</dt><dd>Parallel Thread Execution: NVIDIA&#x27;s virtual instruction set, compiled to SASS for each GPU.</dd></div>
+    <div class="gl-i" id="g-sass"><dt>SASS</dt><dd>The real machine code of one GPU generation.</dd></div>
+    <div class="gl-i" id="g-cublas"><dt>cuBLAS</dt><dd>NVIDIA&#x27;s library of tuned linear-algebra kernels, including GEMM.</dd></div>
+    <div class="gl-i" id="g-nccl"><dt>NCCL</dt><dd>NVIDIA Collective Communications Library: All-Reduce and other multi-GPU collectives.</dd></div>
+    <div class="gl-i" id="g-dispatcher"><dt>dispatcher</dt><dd>The part of PyTorch that picks which implementation of an op to run, from the tensors&#x27; device and data type.</dd></div>
+    <div class="gl-i" id="g-replica"><dt>replica</dt><dd>One full copy of the model server, with its own GPUs.</dd></div>
+    <div class="gl-i" id="g-memory"><dt>memory-bound</dt><dd>Limited by how fast data arrives from memory, not by arithmetic.</dd></div>
+    <div class="gl-i" id="g-compute"><dt>compute-bound</dt><dd>Limited by arithmetic speed; data arrives fast enough.</dd></div>
+    <div class="gl-i" id="g-flops"><dt>FLOPs</dt><dd>Floating-point operations: multiplications and additions.</dd></div>
+    <div class="gl-i" id="g-kv"><dt>KV cache</dt><dd>The saved keys and values of earlier tokens, so they are not recomputed each step.</dd></div>
+    <div class="gl-i" id="g-allreduce"><dt>All-Reduce</dt><dd>A collective where every GPU contributes a partial result and every GPU ends up with the sum.</dd></div>
+    <div class="gl-i" id="g-logits"><dt>logits</dt><dd>The model&#x27;s raw scores, one per vocabulary entry, before softmax.</dd></div>
+  </dl>
+</section>
+
+<section id="next-llm">
+  <div class="sh"><span class="n">→</span><h2>Next: the model side</h2></div>
+  <nav class="parts" aria-label="Related pages">
+    <a href="https://ylnhari.github.io/ml-scratchpad/llm-inference-visualized/"><span>COMPANION PAGE</span><b>LLM Inference, Visualized</b><small>What the kernels compute: attention, the KV cache, prefill vs decode, batching, parallelism, quantization and serving tricks.</small></a>
+    <a href="https://ylnhari.github.io/ml-scratchpad/vllm-memory/visual/"><span>DEEP DIVE</span><b>vLLM Memory, Visualized</b><small>How vLLM budgets GPU memory, sizes the KV cache pool and schedules requests.</small></a>
+  </nav>
+</section>
+</main>
+</div>
+
+<footer>Sources: <a href="https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/">NVIDIA Hopper Architecture In-Depth</a> · <a href="https://docs.nvidia.com/cuda/hopper-tuning-guide/index.html">CUDA Hopper Tuning Guide</a> · <a href="https://docs.nvidia.com/cuda/cuda-programming-guide/">CUDA Programming Guide</a> · <a href="https://vllm.ai/blog/2025-01-27-v1-alpha-release.html">vLLM V1 architecture</a> · <a href="https://docs.ray.io/en/latest/serve/llm">Ray Serve LLM</a> · <a href="https://pytorch.org/blog/accelerating-pytorch-with-cuda-graphs/">PyTorch: CUDA graphs</a>. Hardware numbers are for the H100 SXM5 (80 GB). Diagrams are simplified and sizes scaled down for drawing; timings marked illustrative are not measurements.</footer>
+
+<script>
+let SPEED=1;const _st=setTimeout,_ct=clearTimeout,_ci=clearInterval;
+window.setInterval=(f,ms)=>{const hd={x:0};const run=()=>{hd.t=_st(()=>{if(hd.x)return;f();if(!hd.x)run();},ms/SPEED);};run();return hd;};
+window.clearInterval=hd=>{if(hd&&typeof hd==='object'){hd.x=1;_ct(hd.t);}else _ci(hd);};
+const rateAll=()=>document.getAnimations().forEach(a=>{a.playbackRate=SPEED;});
+['animationstart','transitionrun'].forEach(ev=>document.addEventListener(ev,e=>{e.target.getAnimations().forEach(a=>{a.playbackRate=SPEED;});},true));
+document.addEventListener('DOMContentLoaded',()=>{const SP=[0.5,1,2,3];const all=[...document.querySelectorAll('.spd')];
+  all.forEach(sp=>SP.forEach(v=>{const b=document.createElement('button');b.type='button';b.textContent=v+'×';b.dataset.v=v;b.setAttribute('aria-pressed',String(v===1));
+    b.onclick=()=>{SPEED=v;all.forEach(s=>s.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(+x.dataset.v===v))));rateAll();};sp.appendChild(b);}));});
+
+const NS="http://www.w3.org/2000/svg";
+const $=q=>document.querySelector(q);
+function S(tag,a,p){const e=document.createElementNS(NS,tag);if(a)for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+function T(p,x,y,str,a){const t=S('text',Object.assign({x,y},a||{}),p);t.textContent=str;return t;}
+function R(p,x,y,w,h,style,extra){return S('rect',Object.assign({x,y,width:Math.max(0,w),height:Math.max(0,h),style},extra||{}),p);}
+function clear(e){while(e.firstChild)e.removeChild(e.firstChild);}
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const G=i=>`var(--g${i})`;
+const PAL=i=>`hsl(${(i*47+205)%360} 78% 76%)`;
+function seg(box,opts,init,cb){box.innerHTML='';opts.forEach(o=>{const b=document.createElement('button');b.type='button';b.className='btn';b.textContent=o.l;b.setAttribute('aria-pressed',String(o.v===init));b.onclick=()=>{[...box.children].forEach(c=>c.setAttribute('aria-pressed','false'));b.setAttribute('aria-pressed','true');cb(o.v);};box.appendChild(b);});}
+const GLT=[["streaming multiprocessor","sm"],["thread block","block"],["tensor cores","tc"],["tensor core","tc"],["shared memory","smem"],["CUDA stream","stream"],["CUDA graph","graph"],["memory-bound","memory"],["compute-bound","compute"],["All-Reduce","allreduce"],["KV cache","kv"],["dispatcher","dispatcher"],["replicas","replica"],["replica","replica"],["warps","warp"],["warp","warp"],["GEMM","gemm"],["HBM","hbm"],["L2","l2"],["TMA","tma"],["PTX","ptx"],["SASS","sass"],["cuBLAS","cublas"],["NCCL","nccl"],["FLOPs","flops"],["logits","logits"],["SM","sm"]];
+function secLink(s){return String(s).replace(/(<a\b[\s\S]*?<\/a>)|\b([Ss]ection|Extras) ((?:0\d|1\d|A\d|X\d)(?:\.\d)?)\b/g,(m,a,w,n)=>{if(a)return a;const id=SECID[n];return id?`<a class="xref" href="#${id}">${w} ${n}</a>`:m;});}
+const SECID={};document.querySelectorAll('section[id] .sh .n').forEach(n=>{SECID[n.textContent.trim()]=n.closest('section').id;});
+function glink(s){return secLink(glink0(s));}
+function glink0(s){s=String(s);const used=new Set();return s.split(/(<a\b[\s\S]*?<\/a>|<[^>]+>)/).map(part=>{if(part.startsWith('<'))return part;for(const [t,k] of GLT){if(used.has(k))continue;const esc=t.replace(/[-]/g,'\\-');const re=new RegExp('(^|[^A-Za-z-])('+esc+')(?![A-Za-z])',t===t.toUpperCase()?'':'i');const m=part.match(re);if(m){used.add(k);const i=m.index+m[1].length;part=part.slice(0,i)+'\u0000'+k+'\u0001'+m[2]+'\u0002'+part.slice(i+m[2].length);}}return part.replace(/\u0000([^\u0001]+)\u0001([^\u0002]+)\u0002/g,'<a class="gl" href="#g-$1">$2</a>');}).join('');}
+function stats(box,arr){box.innerHTML=arr.map(s=>`<div class="stat ${s.c||''}"><b>${s.v}</b><span>${glink(s.l)}</span></div>`).join('');}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});}
+
+/* ---------- shared helpers for this page ---------- */
+function box(p,x,y,w,h,t1,t2,fill,o){o=o||{};const g=S('g',{},p);
+  R(g,x,y,w,h,`fill:${fill};${o.on?'stroke:var(--ink);stroke-width:2.5':o.dash?'stroke:var(--muted);stroke-dasharray:4 3':''}`,{rx:o.rx==null?8:o.rx});
+  const fs=o.fs||12.5;if(t1)T(g,x+w/2,y+(t2?h/2-3:h/2+fs*0.38),t1,{'text-anchor':'middle',style:`font-weight:700;font-size:${fs}px;fill:var(--on-fill)`});
+  if(t2)T(g,x+w/2,y+h/2+13,t2,{'text-anchor':'middle',style:`font-size:${o.fs2||10.5}px;fill:var(--on-fill)`});return g;}
+function arr(p,x1,y1,x2,y2,col,o){o=o||{};return S('line',{x1,y1,x2,y2,'marker-end':'url(#arr)',style:`stroke:${col||'var(--muted)'};stroke-width:${o.w||2}${o.dash?';stroke-dasharray:5 4':''}`},p);}
+function lbl(p,x,y,s,o){o=o||{};return T(p,x,y,s,Object.assign({style:`font-size:${o.fs||11}px;${o.b?'font-weight:700;':''}fill:${o.c||'var(--muted)'}`},o.a?{'text-anchor':o.a}:{}));}
+function mono(p,x,y,lines,o){o=o||{};lines.forEach((ln,i)=>T(p,x,y+i*(o.lh||16),ln,{style:`font:${o.w||500} ${o.fs||12}px var(--f-mono);fill:${o.c||'var(--ink)'}`}));}
+/* generic step-through figure: chips + prev/next/play + note */
+function stepper(pre,steps,draw,ms){const svg=$('#'+pre+'-svg');let k=0,timer=null;
+  const chips=$('#'+pre+'-chips');if(chips)steps.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=(i+1)+' '+s.n;b.onclick=()=>{stop();k=i;render();};chips.appendChild(b);});
+  function render(){clear(svg);const st=steps[k];draw(svg,st,k);
+    $('#'+pre+'-note').innerHTML=`<b class="mono" style="color:var(--accent)">${k+1}/${steps.length} · ${st.n}</b>${st.f?`<div class="formula" style="margin:6px 0">${st.f}</div>`:'<br>'}${glink(st.c)}`;
+    if(chips)[...chips.children].forEach((b,i)=>b.setAttribute('aria-pressed',String(i===k)));
+    const pv=$('#'+pre+'-prev'),nx=$('#'+pre+'-next');if(pv)pv.disabled=k===0;if(nx)nx.disabled=k===steps.length-1;}
+  function stop(){clearInterval(timer);timer=null;const pl=$('#'+pre+'-play');if(pl)pl.textContent='Play';}
+  const pv=$('#'+pre+'-prev'),nx=$('#'+pre+'-next'),pl=$('#'+pre+'-play');
+  if(pv)pv.onclick=()=>{stop();if(k>0){k--;render();}};
+  if(nx)nx.onclick=()=>{stop();if(k<steps.length-1){k++;render();}};
+  if(pl)pl.onclick=()=>{if(timer){stop();return;}if(k>=steps.length-1)k=0;else k++;render();pl.textContent='Pause';timer=setInterval(()=>{if(k>=steps.length-1){stop();return;}k++;render();},RM?400:ms||3200);};
+  render();}
+
+/* ---------- 00 the journey ---------- */
+(function(){
+  const L=[
+    {n:'Your app',t:'client',hand:['HTTP POST /v1/chat/completions','{"model": "llama-3.1-8b",',' "messages": [...], "stream": true}'],side:'net',
+     c:'Your code (or the OpenAI client library) sends the prompt as JSON in an HTTP request. <b>stream: true</b> asks for tokens as soon as they exist.'},
+    {n:'Serving layer',t:'Ray Serve / Anyscale',hand:['the same request,','routed to one replica'],side:'cpu',
+     c:'A proxy receives the request, and a <b>router</b> picks one of several identical <b>replicas</b> of the model server. An autoscaler adds replicas when traffic rises. Section 01.'},
+    {n:'API server',t:'vLLM: tokenizer',hand:['token IDs [128000, 849, 21435, 71701]','+ sampling settings'],side:'cpu',
+     c:'The replica\'s API process applies the chat template and the <b>tokenizer</b>, turning text into integers. The IDs shown are illustrative. Section 02.'},
+    {n:'EngineCore',t:'scheduler + KV cache manager',hand:['this step\'s batch: which requests,','how many tokens each, their KV blocks'],side:'cpu',
+     c:'Every engine step, the <b>scheduler</b> chooses which requests advance, and the KV cache manager gives each one memory blocks for its keys and values. Section 02.'},
+    {n:'Model runner',t:'builds GPU input tensors',hand:['input_ids, positions, block tables','copied to GPU memory'],side:'cpu',
+     c:'The model runner packs the batch into tensors on the GPU and calls the model\'s forward function, often by replaying a recorded CUDA graph (section 12).'},
+    {n:'PyTorch',t:'model.forward → ops',hand:['a stream of operations:','aten::mm, rms_norm, rotary, attention, …'],side:'cpu',
+     c:'The model\'s Python code calls tensor operations. PyTorch\'s <b>dispatcher</b> routes each one to its CUDA implementation. Section 03.'},
+    {n:'Kernel libraries',t:'cuBLAS · FlashAttention · Triton · NCCL',hand:['a compiled GPU program (kernel)','+ grid and block sizes'],side:'cpu',
+     c:'Each operation becomes a call into a library that holds a tuned GPU program, a <b>kernel</b>: cuBLAS for matrix multiplies, FlashAttention for attention, and so on. Section 04.'},
+    {n:'CUDA runtime + driver',t:'cudaLaunchKernel',hand:['a launch command in the GPU\'s queue','(the kernel\'s code is already on the GPU)'],side:'cpu',
+     c:'The CUDA runtime and driver turn the call into a command and put it on a <b>stream</b>, a queue the GPU reads in order. The CPU does not wait; it moves on to the next launch. Sections 05 and 06.'},
+    {n:'GPU front end',t:'work distributor',hand:['thread blocks,','each assigned to a free SM'],side:'gpu',
+     c:'On the GPU, a hardware scheduler takes the launch, cuts the grid into <b>thread blocks</b> and hands each block to a streaming multiprocessor (SM) with room for it. Section 07.'},
+    {n:'Streaming multiprocessor',t:'4 warp schedulers',hand:['warps of 32 threads,','one instruction per scheduler per cycle'],side:'gpu',
+     c:'Each SM splits its blocks into <b>warps</b> of 32 threads. Every cycle, each of its 4 warp schedulers issues one instruction from a warp that is ready. Section 08.'},
+    {n:'Tensor cores + memory',t:'HBM → L2 → shared memory → registers',hand:['the layer\'s output numbers,','finally the logits'],side:'gpu',
+     c:'The instructions move data up the memory ladder and feed the <b>tensor cores</b>, which do the matrix math. After every layer, the last kernel produces the <b>logits</b>: one score per vocabulary entry. Sections 09 to 11.'},
+    {n:'Back up',t:'sample → detokenize → stream',hand:['one new token, e.g. "GPUs"','sent to your app; then the next step'],side:'cpu',
+     c:'The engine samples the next token from the logits, the API server turns it back into text, and the serving layer streams it to your app. Then the whole loop runs again for the next token.'}];
+  stepper('jr',L,(svg,st,k)=>{
+    const x0=60,w=300,h=36,g=8;
+    R(svg,8,10,22,8*(h+g)-g+2,'fill:var(--surface-2)',{rx:6});T(svg,19,10+(8*(h+g))/2,'CPU',{'text-anchor':'middle',style:'font:700 11px var(--f-mono);fill:var(--muted)',transform:`rotate(-90 19 ${10+(8*(h+g))/2})`});
+    R(svg,8,10+8*(h+g),22,3*(h+g)-g+2,'fill:var(--g0);opacity:.6',{rx:6});T(svg,19,10+8*(h+g)+(3*(h+g))/2,'GPU',{'text-anchor':'middle',style:'font:700 11px var(--f-mono);fill:var(--on-fill)',transform:`rotate(-90 19 ${10+8*(h+g)+(3*(h+g))/2})`});
+    R(svg,8,10+11*(h+g),22,h,'fill:var(--surface-2)',{rx:6});
+    L.forEach((l,i)=>{const y=10+i*(h+g),done=i<k,on=i===k;
+      const fill=on?'var(--accent)':l.side==='gpu'?'var(--g0)':i===11?'var(--g3)':'var(--g1)';
+      const gg=box(svg,x0,y,w,h,l.n,l.t,fill,{on,fs:12,fs2:10});gg.style.opacity=(done||on)?1:.7;
+      if(i<11)S('line',{x1:x0+w/2,y1:y+h,x2:x0+w/2,y2:y+h+g,style:'stroke:var(--muted);stroke-width:1.5'},svg);});
+    const y=10+k*(h+g);arr(svg,x0+w+6,y+h/2,412,y+h/2,'var(--accent)',{w:2.5});
+    const by=Math.min(Math.max(y-30,10),560-130);R(svg,416,by,330,120,'fill:var(--surface-2);stroke:var(--accent);stroke-width:2',{rx:10});
+    lbl(svg,430,by+22,k===11?'WHAT GOES BACK UP':'HANDS DOWN TO THE NEXT LAYER',{b:1,fs:10.5});
+    mono(svg,430,by+48,st.hand,{fs:11.5,lh:18});},3600);
+})();
+
+/* ---------- 01 serving ---------- */
+(function(){
+  const svg=$('#sv-svg');let mode='rr',timer=null,t=0;
+  const REQ=[['A',0],['B',1],['A',0],['A',0],['B',1],['C',2],['B',1],['A',0],['C',2],['A',0]];
+  const PC=['var(--g0)','var(--g3)','var(--g1)'];
+  function route(i,nrep){const [p,pi]=REQ[i];if(mode==='rr')return i%nrep;if(mode==='scale')return i<5?i%3:(i%4);return pi;}
+  function render(){clear(svg);const nrep=mode==='scale'&&t>5?4:3;
+    lbl(svg,20,22,'CLIENTS',{b:1});lbl(svg,250,22,'PROXY + ROUTER',{b:1});lbl(svg,520,22,'REPLICAS (each: vLLM on its own GPU)',{b:1});
+    box(svg,230,130,150,70,'Router',mode==='pc'?'prefix-aware':mode==='scale'?'round-robin + autoscaler':'round-robin','var(--accent)');
+    const reps=[];for(let r=0;r<nrep;r++){const y=40+r*70,isNew=r===3;reps.push(y);box(svg,520,y,220,56,'',null,isNew?'var(--g2)':'var(--surface-2)',{dash:isNew});
+      T(svg,532,y+20,`replica ${r+1}${isNew?' (new)':''}`,{style:'font-weight:700;font-size:12px'});
+      const seen=new Set();let hits=0;for(let i=0;i<Math.min(t,REQ.length);i++)if(route(i,nrep)===r){if(seen.has(REQ[i][0]))hits++;seen.add(REQ[i][0]);}
+      [...seen].forEach((p,j)=>{R(svg,532+j*26,y+30,20,16,`fill:${PC['ABC'.indexOf(p)]}`,{rx:4});T(svg,542+j*26,y+42,p,{'text-anchor':'middle',style:'font-size:10.5px;font-weight:700;fill:var(--on-fill)'});});
+      lbl(svg,730,y+42,hits?`${hits} cache hit${hits>1?'s':''}`:'',{a:'end',c:'var(--ok)',b:1});}
+    REQ.forEach((q,i)=>{const y=40+i*27;const sent=i<t;R(svg,20,y,150,22,`fill:${PC[q[1]]};opacity:${sent?1:.35}`,{rx:6});
+      T(svg,30,y+15,`request ${i+1} · prefix ${q[0]}`,{style:'font-size:11px;font-weight:700;fill:var(--on-fill)'});});
+    if(t>0&&t<=REQ.length){const i=t-1,r=route(i,nrep);arr(svg,172,40+i*27+11,228,165,PC[REQ[i][1]]);arr(svg,382,165,516,reps[r]+28,PC[REQ[i][1]],{w:2.5});}
+    let total=0;for(let r=0;r<nrep;r++){const seen=new Set();for(let i=0;i<Math.min(t,REQ.length);i++)if(route(i,nrep)===r){if(seen.has(REQ[i][0]))total++;seen.add(REQ[i][0]);}}
+    $('#sv-note').innerHTML=glink(mode==='rr'?`<b>Round-robin</b> sends each request to the next replica in turn. Requests that share a prefix (the same long system prompt, A, B or C) land on different replicas, so each one recomputes it. KV cache reuse so far: <b>${total}</b>.`:
+      mode==='pc'?`<b>Prefix-aware routing</b> sends requests with the same prefix to the same replica, where that prefix\'s keys and values are already in the KV cache, so prefill can skip it. KV cache reuse so far: <b>${total}</b>.`:
+      'A traffic spike: the <b>autoscaler</b> watches queue lengths and starts a fourth replica (dashed). New requests are spread over four replicas once it is ready. Starting a replica takes time, because the model weights must be loaded onto its GPU.');}
+  function stop(){clearInterval(timer);timer=null;$('#sv-play').textContent='Send requests';}
+  seg($('#sv-seg'),[{l:'Round-robin',v:'rr'},{l:'Prefix-aware',v:'pc'},{l:'Autoscale',v:'scale'}],mode,v=>{stop();mode=v;t=REQ.length;render();});
+  $('#sv-play').onclick=()=>{if(timer){stop();return;}t=0;render();$('#sv-play').textContent='Pause';timer=setInterval(()=>{t++;render();if(t>=REQ.length)stop();},RM?120:900);};
+  t=REQ.length;render();
+})();
+
+/* ---------- 02 engine ---------- */
+(function(){
+  const S0=[
+    {n:'Request arrives',hl:['api'],msg:[0,'"Explain GPUs"'],c:'The API server process receives the text, applies the chat template and runs the <b>tokenizer</b>: text becomes token IDs. This CPU work happens in its own process so it never delays the GPU.'},
+    {n:'To EngineCore',hl:['api','core'],msg:[1,'token IDs + sampling params'],c:'The request is sent to the EngineCore process over ZeroMQ and joins the scheduler\'s <b>waiting</b> queue.'},
+    {n:'Schedule',hl:['sched','kv'],msg:[2,'step plan'],c:'At the start of each step the <b>scheduler</b> picks requests within a token budget: every running request gets 1 decode token, and a new request gets its prompt (or a chunk of it). The <b>KV cache manager</b> gives each one enough blocks for the new tokens (PagedAttention, see the companion page).'},
+    {n:'Prepare inputs',hl:['runner'],msg:[3,'input_ids, positions, block tables'],c:'The <b>model runner</b> on each GPU worker packs the step into tensors: token IDs, their positions, and each request\'s block table. They are copied from CPU memory to the GPU.'},
+    {n:'Forward pass',hl:['runner','gpu'],msg:[4,'logits [num_tokens, V]'],c:'The model runs once for the whole batch. For decode-only steps the runner replays a recorded <b>CUDA graph</b> (section 12) instead of launching every kernel from Python. With tensor parallelism, every GPU worker runs its slice at the same time.'},
+    {n:'Sample',hl:['runner'],msg:[5,'one token ID per request'],c:'The sampler turns each request\'s logits into one token, using its temperature, top-p and other settings. Only these few integers are copied back to the CPU.'},
+    {n:'Stream out',hl:['core','api'],msg:[6,'"GPUs"'],c:'EngineCore sends the new tokens back. The API server <b>detokenizes</b> them and streams the text to the client. Finished requests free their KV blocks, and the loop starts the next step.'}];
+  stepper('en',S0,(svg,st)=>{const on=id=>st.hl.includes(id);
+    R(svg,20,30,190,200,'fill:var(--surface-2)',{rx:12});lbl(svg,32,50,'PROCESS 1 · API SERVER',{b:1,fs:10.5});
+    box(svg,36,64,158,46,'Tokenizer','text ⇄ token IDs',on('api')?'var(--accent)':'var(--g1)',{on:on('api')});
+    box(svg,36,124,158,46,'HTTP + streaming','OpenAI-style API',on('api')?'var(--accent)':'var(--g1)',{on:on('api')});
+    R(svg,260,30,210,200,`fill:var(--surface-2);${on('core')?'stroke:var(--ink);stroke-width:2.5':''}`,{rx:12});lbl(svg,272,50,'PROCESS 2 · ENGINECORE',{b:1,fs:10.5});
+    box(svg,276,64,178,46,'Scheduler','who runs this step',on('sched')?'var(--accent)':'var(--g3)',{on:on('sched')});
+    box(svg,276,124,178,46,'KV cache manager','blocks per request',on('kv')?'var(--accent)':'var(--g3)',{on:on('kv')});
+    lbl(svg,276,198,'waiting · running queues',{fs:10.5});
+    R(svg,520,30,220,300,'fill:var(--surface-2)',{rx:12});lbl(svg,532,50,'PROCESS 3+ · GPU WORKERS',{b:1,fs:10.5});
+    box(svg,536,64,188,46,'Model runner','inputs · forward · sample',on('runner')?'var(--accent)':'var(--g2)',{on:on('runner')});
+    R(svg,536,160,188,140,`fill:${on('gpu')?'var(--accent)':'var(--g0)'};${on('gpu')?'stroke:var(--ink);stroke-width:2.5':''}`,{rx:8});T(svg,630,184,'GPU memory holds',{'text-anchor':'middle',style:'font-weight:700;font-size:12.5px;fill:var(--on-fill)'});
+    lbl(svg,630,214,'weights',{a:'middle',c:'var(--on-fill)',b:1});lbl(svg,630,236,'KV cache blocks',{a:'middle',c:'var(--on-fill)',b:1});lbl(svg,630,258,'CUDA graphs',{a:'middle',c:'var(--on-fill)',b:1});
+    S('line',{x1:210,y1:130,x2:258,y2:130,style:'stroke:var(--line);stroke-width:2'},svg);lbl(svg,234,122,'ZMQ',{a:'middle',fs:10});
+    S('line',{x1:470,y1:130,x2:518,y2:130,style:'stroke:var(--line);stroke-width:2'},svg);
+    S('line',{x1:630,y1:110,x2:630,y2:158,style:'stroke:var(--line);stroke-width:2'},svg);
+    const P=[[115,230,115,270],[210,110,258,110],[365,170,365,270],[470,90,532,90],[630,112,630,156],[536,100,474,150],[258,150,212,150]][st.msg[0]];
+    arr(svg,P[0],P[1],P[2],P[3],'var(--accent)',{w:3});
+    R(svg,20,286,450,34,'fill:var(--accent-soft)',{rx:8});T(svg,32,308,'carrying: '+st.msg[1],{style:'font:700 12px var(--f-mono)'});
+  },3600);
+})();
+
+/* ---------- 03 pytorch ---------- */
+(function(){
+  const LV=[['Python','y = self.qkv_proj(x)','nn.Linear in the model code'],['C++ binding','torch._C → at::linear','leave Python'],['Dispatcher','keys {CUDA, BFloat16}','pick the CUDA kernel'],['ATen CUDA op','aten::mm → at::cuda::blas::gemm','PyTorch\'s CUDA code'],['cuBLAS / cuBLASLt','cublasLtMatmul(...)','choose a tuned GEMM kernel'],['CUDA runtime','cudaLaunchKernel(grid, block, args, stream)','enqueue and return']];
+  const ST=[
+    {n:'Python call',c:'The model code calls a linear layer: <b>y = x · Wᵀ</b>. In Python this is one line; nothing has run on the GPU yet.'},
+    {n:'Into C++',c:'The call crosses from Python into PyTorch\'s C++ core (ATen). From here on no Python runs for this op, which is why each op costs only microseconds of CPU time.'},
+    {n:'Dispatch',c:'The <b>dispatcher</b> reads the tensors\' properties as a set of keys: here device CUDA and data type bfloat16. In inference mode there is no autograd key, so it goes straight to the CUDA implementation. On a CPU tensor the same call would reach a CPU kernel instead.'},
+    {n:'ATen CUDA op',c:'PyTorch\'s CUDA implementation of matrix multiply does not contain the math itself. It prepares sizes, strides and data types and hands the work to cuBLAS.'},
+    {n:'cuBLAS',c:'cuBLAS (or its newer cuBLASLt interface) picks one of many pre-tuned GEMM kernels for these shapes and data type: which tile size, how many thread blocks, whether to use the tensor cores (it does, for bfloat16).'},
+    {n:'Launch',c:'<b>cudaLaunchKernel</b> puts the kernel, its grid and block sizes and its arguments on the current CUDA stream and returns at once. The CPU goes back to Python and launches the next op while the GPU is still running this one.'},
+    {n:'CPU runs ahead',c:'This is the normal state: the CPU is several kernels ahead, filling the stream, and the GPU drains it. If the CPU ever falls behind (many tiny kernels), the GPU sits idle between kernels; section 12 shows the fix.'}];
+  stepper('pt',ST,(svg,st,k)=>{svg.setAttribute('viewBox',`0 0 760 ${k>=5?400:308}`);
+    LV.forEach((l,i)=>{const y=14+i*48,on=i===Math.min(k,5),done=i<k;const g=box(svg,20,y,330,40,l[0],'',on?'var(--accent)':'var(--g1)',{on,fs:12});g.style.opacity=done||on?1:.45;
+      T(svg,360,y+17,l[1],{style:'font:600 11.5px var(--f-mono);fill:var(--ink)'});lbl(svg,360,y+33,l[2],{fs:10.5});
+      if(i<5)S('line',{x1:185,y1:y+40,x2:185,y2:y+48,style:'stroke:var(--muted);stroke-width:1.5'},svg);});
+    if(k>=5){const y0=336;lbl(svg,20,y0+4,'CPU',{b:1});lbl(svg,20,y0+42,'GPU',{b:1});
+      const ops=['norm','qkv','rope','attn','o','add','norm','up'];ops.forEach((o,i)=>{const x=60+i*58;R(svg,x,y0-8,50,18,'fill:var(--g1)',{rx:3});T(svg,x+25,y0+5,o,{'text-anchor':'middle',style:'font-size:10px;font-weight:700;fill:var(--on-fill)'});
+        if(i<(k===6?6:3)){R(svg,x+70,y0+30,48,18,'fill:var(--g0)',{rx:3});T(svg,x+94,y0+43,o,{'text-anchor':'middle',style:'font-size:10px;font-weight:700;fill:var(--on-fill)'});}});
+      lbl(svg,560,y0+4,'launches (CPU)',{fs:10.5});lbl(svg,560,y0+44,'kernels run later (GPU)',{fs:10.5});}
+  },3400);
+})();
+
+/* ---------- 04 libraries ---------- */
+(function(){
+  const svg=$('#lb-svg');
+  const OPS=[
+    {k:'norm',n:'RMSNorm',lib:'Triton or custom CUDA',kind:'element-wise / reduction',bound:'memory',d:'Reads each token\'s h numbers, computes their root-mean-square and rescales them. Little arithmetic per byte, so it is limited by memory speed. vLLM often fuses it with the residual add.'},
+    {k:'qkv',n:'QKV GEMM',lib:'cuBLAS / CUTLASS',kind:'GEMM on tensor cores',bound:'compute in prefill, memory in decode',d:'One matrix multiply produces Q, K and V for every token. This is where the weights are, so it dominates time. Section 11 shows why it is fast in prefill but memory-bound in decode.'},
+    {k:'rope',n:'RoPE',lib:'custom CUDA (vLLM)',kind:'element-wise',bound:'memory',d:'Rotates pairs of numbers in Q and K by an angle set by the token\'s position. Pure element-wise work.'},
+    {k:'attn',n:'Attention',lib:'FlashAttention / FlashInfer',kind:'fused attention kernel',bound:'memory in decode (reads the KV cache)',d:'One fused kernel computes scores, softmax and the weighted sum of values in on-chip memory, never writing the full score table to HBM. In decode it mostly streams the KV cache, block by block through the block table.'},
+    {k:'o',n:'O-proj GEMM',lib:'cuBLAS / CUTLASS',kind:'GEMM on tensor cores',bound:'like QKV',d:'Mixes the attention heads back together with the output projection W_O.'},
+    {k:'ar',n:'All-Reduce',lib:'NCCL (or a custom all-reduce)',kind:'communication kernel',bound:'NVLink bandwidth',d:'Only with tensor parallelism: the GPUs add their partial results. NCCL runs this as a kernel too, moving data over NVLink between GPUs.'},
+    {k:'mlp',n:'Gate/up GEMM',lib:'cuBLAS / CUTLASS',kind:'GEMM on tensor cores',bound:'like QKV',d:'The MLP\'s first matrix multiply, usually the largest single GEMM in the layer.'},
+    {k:'act',n:'SiLU × up',lib:'Triton or custom CUDA',kind:'element-wise (fused)',bound:'memory',d:'The activation function and the multiply of SwiGLU, fused into one kernel so the wide hidden tensor is read once.'},
+    {k:'down',n:'Down GEMM',lib:'cuBLAS / CUTLASS',kind:'GEMM on tensor cores',bound:'like QKV',d:'The MLP\'s second matrix multiply brings the vector back to width h. With tensor parallelism another All-Reduce follows.'}];
+  let sel='attn';
+  function render(){clear(svg);lbl(svg,20,22,'ONE TRANSFORMER LAYER, IN KERNEL ORDER (click one)',{b:1});
+    OPS.forEach((o,i)=>{const x=20+i*81,on=o.k===sel;const nm=o.n.split(' '),g=box(svg,x,36,75,52,nm[0],nm.slice(1).join(' ')||null,on?'var(--accent)':o.lib.startsWith('cuBLAS')?'var(--g1)':o.k==='ar'?'var(--g2)':o.k==='attn'?'var(--g0)':'var(--g3)',{on,fs:10.5,fs2:10});g.style.cursor='pointer';g.addEventListener('click',()=>{sel=o.k;render();});
+      if(i<OPS.length-1)arr(svg,x+75,62,x+81,62,'var(--muted)',{w:1.5});});
+    const o=OPS.find(x=>x.k===sel);
+    R(svg,20,112,720,170,'fill:var(--surface-2)',{rx:12});
+    lbl(svg,40,140,'LIBRARY',{b:1,fs:10.5});T(svg,40,164,o.lib,{style:'font-weight:800;font-size:17px'});
+    lbl(svg,40,196,'KIND OF KERNEL',{b:1,fs:10.5});T(svg,40,216,o.kind,{style:'font-weight:700;font-size:13px'});
+    lbl(svg,40,246,'LIMITED BY',{b:1,fs:10.5});T(svg,40,266,o.bound,{style:'font-weight:700;font-size:13px'});
+    lbl(svg,400,140,'COLOURS',{b:1,fs:10.5});[['var(--g1)','matrix multiply (cuBLAS / CUTLASS)'],['var(--g0)','fused attention'],['var(--g3)','small element-wise kernels'],['var(--g2)','communication (NCCL)']].forEach(([c,t],i)=>{R(svg,400,152+i*24,14,14,`fill:${c}`,{rx:3});lbl(svg,422,164+i*24,t,{fs:11.5,c:'var(--ink)'});});
+    $('#lb-note').innerHTML=glink('<b>'+o.n+'.</b> '+o.d);}
+  seg($('#lb-seg'),OPS.map(o=>({l:o.n,v:o.k})),sel,v=>{sel=v;render();});
+  const _r=render;render=function(){_r();[...$('#lb-seg').children].forEach((b,i)=>b.setAttribute('aria-pressed',String(OPS[i].k===sel)));};render();
+})();
+
+/* ---------- 05 CUDA grid ---------- */
+(function(){
+  const svg=$('#cu-svg');let mode='grid';
+  function render(){clear(svg);
+    if(mode==='grid'){lbl(svg,20,22,'GRID = 4 × 3 BLOCKS   (kernel<<<dim3(4,3), dim3(32,8)>>>)',{b:1});
+      for(let by=0;by<3;by++)for(let bx=0;bx<4;bx++){const x=20+bx*130,y=36+by*92;box(svg,x,y,122,84,`block (${bx}, ${by})`,'256 threads',PAL(by*4+bx),{fs:11.5});}
+      lbl(svg,560,60,'12 blocks × 256 threads',{c:'var(--ink)',b:1,fs:12});lbl(svg,560,80,'= 3,072 threads',{c:'var(--ink)',b:1,fs:12});
+      lbl(svg,560,116,'Blocks run independently,',{fs:11.5});lbl(svg,560,134,'in any order, on any SM.',{fs:11.5});lbl(svg,560,170,'A real GEMM launch has',{fs:11.5});lbl(svg,560,188,'hundreds of blocks.',{fs:11.5});}
+    else if(mode==='block'){lbl(svg,20,22,'ONE BLOCK = 32 × 8 THREADS, ALL ON ONE SM',{b:1});
+      for(let ty=0;ty<8;ty++)for(let tx=0;tx<32;tx++)R(svg,20+tx*15,36+ty*24,13,20,`fill:${PAL(ty)};opacity:.9`,{rx:2});
+      lbl(svg,520,60,'threads of one block can:',{c:'var(--ink)',b:1,fs:12});lbl(svg,520,82,'· share fast shared memory',{fs:11.5});lbl(svg,520,102,'· wait for each other',{fs:11.5});lbl(svg,520,120,'  (__syncthreads())',{fs:11.5});
+      lbl(svg,520,160,'threads in different blocks',{c:'var(--ink)',b:1,fs:12});lbl(svg,520,180,'cannot do either.',{fs:11.5});}
+    else if(mode==='warps'){lbl(svg,20,22,'THE SAME BLOCK, CUT INTO WARPS OF 32 THREADS',{b:1});
+      for(let ty=0;ty<8;ty++){for(let tx=0;tx<32;tx++)R(svg,20+tx*15,36+ty*24,13,20,`fill:${PAL(ty)};opacity:.9`,{rx:2});T(svg,510,52+ty*24,'warp '+ty,{style:'font-weight:700;font-size:11.5px'});}
+      lbl(svg,580,60,'256 threads ÷ 32',{c:'var(--ink)',b:1,fs:12});lbl(svg,580,80,'= 8 warps',{c:'var(--ink)',b:1,fs:12});lbl(svg,580,116,'Each warp runs one',{fs:11.5});lbl(svg,580,134,'instruction at a time',{fs:11.5});lbl(svg,580,152,'for all 32 threads.',{fs:11.5});}
+    else{lbl(svg,20,22,'EACH THREAD FINDS ITS OWN DATA',{b:1});
+      mono(svg,20,56,['__global__ void add(const float* a, const float* b,','                    float* c, int n) {','  int i = blockIdx.x * blockDim.x + threadIdx.x;','  if (i < n) c[i] = a[i] + b[i];','}','','// launch: enough blocks of 256 threads to cover n','add<<<(n + 255) / 256, 256, 0, stream>>>(a, b, c, n);'],{fs:12.5,lh:22});
+      lbl(svg,20,290,'Illustrative example: one thread per output element.',{fs:11});}
+    const N={grid:'A launch creates a <b>grid</b> of thread blocks. Here 4 × 3 blocks of 256 threads each. The programmer chooses the sizes; the hardware decides where and when each block runs.',
+      block:'A <b>thread block</b> is the unit that is placed on one SM. Its threads can cooperate through shared memory and barriers, which is how GEMM and attention kernels share loaded tiles.',
+      warps:'The SM never schedules single threads. It cuts each block into <b>warps</b> of 32 consecutive threads; a warp is what a warp scheduler issues instructions for (section 08).',
+      idx:'Every thread runs the same code. It works out its own position from <b>blockIdx</b> (which block), <b>blockDim</b> (block size) and <b>threadIdx</b> (which thread in the block), and handles that element.'};
+    $('#cu-note').innerHTML=glink(N[mode]);}
+  seg($('#cu-seg'),[{l:'Grid',v:'grid'},{l:'One block',v:'block'},{l:'Warps',v:'warps'},{l:'Indexing',v:'idx'}],mode,v=>{mode=v;render();});render();
+})();
+
+/* ---------- 06 compile ---------- */
+(function(){
+  const ST=[
+    {n:'CUDA C++',code:['c[i] = a[i] + b[i];'],c:'The source line from section 05. CUDA C++ is ordinary C++ plus a few keywords for kernels and launches.'},
+    {n:'PTX',code:['ld.global.f32  %f1, [%rd5];','ld.global.f32  %f2, [%rd6];','add.f32        %f3, %f1, %f2;','st.global.f32  [%rd7], %f3;'],c:'<b>nvcc</b> compiles it to <b>PTX</b>: a virtual instruction set with unlimited registers, the same for every NVIDIA GPU. Two loads from global memory (HBM), one add, one store. Illustrative listing.'},
+    {n:'SASS',code:['LDG.E R2, [R2.64] ;','LDG.E R5, [R4.64] ;','FADD  R9, R2, R5 ;','STG.E [R6.64], R9 ;'],c:'<b>ptxas</b> turns PTX into <b>SASS</b>, the real machine code for one GPU generation (sm_90 for the H100), with real registers and scheduling. This is what the warp schedulers execute. Illustrative listing.'},
+    {n:'Fat binary',code:['library.so','  ├─ SASS for sm_80 (A100)','  ├─ SASS for sm_90 (H100)','  └─ PTX (for future GPUs)'],c:'Libraries such as cuBLAS ship a <b>fat binary</b>: ready SASS for each GPU generation they support, plus PTX. Triton kernels are compiled the same way, but at run time, the first time a shape is seen.'},
+    {n:'Load and run',code:['driver: GPU is sm_90 →','  use the sm_90 SASS','  (unknown GPU → compile PTX now, "JIT")','copy code to GPU memory, ready to launch'],c:'When the program starts, the CUDA driver loads the matching SASS onto the GPU. If none matches, it compiles the PTX just in time. After that, every launch only sends a small command; the code is already there.'}];
+  stepper('cp',ST,(svg,st,k)=>{
+    const st5=['CUDA C++','PTX','SASS','fat binary','on the GPU'],tools=['nvcc','ptxas','link','driver'];
+    st5.forEach((s,i)=>{const x=20+i*148,on=i===k;box(svg,x,20,120,40,s,'',on?'var(--accent)':i<=k?'var(--g3)':'var(--surface-2)',{on,fs:12});if(i<4){arr(svg,x+120,40,x+146,40,'var(--muted)',{w:1.5});lbl(svg,x+133,74,tools[i],{a:'middle',fs:10.5,b:1});}});
+    R(svg,20,96,720,130,'fill:var(--surface-2)',{rx:12});mono(svg,40,130,st.code,{fs:14,lh:26,w:600});});
+})();
+
+/* ---------- 07 H100 zoom ---------- */
+(function(){
+  const svg=$('#gp-svg');let lv='chip';
+  function render(){clear(svg);
+    if(lv==='chip'){R(svg,90,20,580,330,'fill:var(--surface-2)',{rx:12});
+      for(let gi=0;gi<8;gi++){const gx=104+(gi%4)*141,gy=gi<4?32:208;R(svg,gx,gy,130,128,'fill:var(--g3);opacity:.35',{rx:8});T(svg,gx+8,gy+15,'GPC '+gi,{style:'font-weight:700;font-size:11px'});
+        const n=gi<4?17:16;for(let s=0;s<n;s++){R(svg,gx+8+(s%6)*20,gy+24+Math.floor(s/6)*32,16,26,'fill:var(--g3)',{rx:3});}}
+      R(svg,104,166,556,36,'fill:var(--g1)',{rx:6});T(svg,382,189,'L2 cache · 50 MB (shared by all SMs)',{'text-anchor':'middle',style:'font-weight:700;font-size:12px;fill:var(--on-fill)'});
+      for(let i=0;i<5;i++){R(svg,i<3?20:690,40+(i%3)*100,58,80,'fill:var(--g0)',{rx:6});T(svg,(i<3?20:690)+29,84+(i%3)*100,'HBM3',{'text-anchor':'middle',style:'font-weight:700;font-size:10.5px;fill:var(--on-fill)'});}
+      lbl(svg,380,375,'5 HBM3 stacks (16 GB each) around the chip · NVLink and PCIe interfaces on the edge',{a:'middle',fs:11});}
+    else if(lv==='gpc'){lbl(svg,20,24,'ONE GPC (graphics processing cluster): pairs of SMs called TPCs',{b:1});
+      for(let t=0;t<9;t++){const x=20+(t%5)*146,y=40+Math.floor(t/5)*170;R(svg,x,y,136,156,'fill:var(--g3);opacity:.35',{rx:8});T(svg,x+8,y+16,'TPC '+t,{style:'font-weight:700;font-size:11px'});
+        for(let s=0;s<2;s++)box(svg,x+8+s*64,y+26,58,120,'SM','',t===8&&s===1?'var(--surface-2)':'var(--g3)',{fs:12,dash:t===8});}
+      lbl(svg,20,388,'Up to 9 TPCs (18 SMs) per GPC on the full die. On an H100 SXM5 some are switched off: 66 TPCs, 132 SMs enabled.',{fs:11});}
+    else if(lv==='sm'){lbl(svg,20,24,'ONE STREAMING MULTIPROCESSOR (SM)',{b:1});
+      for(let p=0;p<4;p++){const x=20+p*182;R(svg,x,40,172,220,'fill:var(--g3);opacity:.3',{rx:8});T(svg,x+8,58,'partition '+p,{style:'font-weight:700;font-size:11px'});
+        box(svg,x+8,66,156,26,'warp scheduler + dispatch','','var(--g2)',{fs:10.5});box(svg,x+8,98,156,30,'register file','16,384 × 32-bit','var(--g1)',{fs:10.5,fs2:9.5});
+        for(let c=0;c<32;c++)R(svg,x+8+(c%16)*9.8,136+Math.floor(c/16)*13,8.4,11,'fill:var(--g3)',{rx:1.5});lbl(svg,x+86,178,'32 FP32 cores',{a:'middle',fs:10,c:'var(--ink)'});
+        box(svg,x+8,186,156,40,'tensor core','matrix multiply',('var(--accent)'),{fs:11});box(svg,x+8,232,156,22,'load / store units','','var(--surface-2)',{fs:10});}
+      box(svg,20,272,720,40,'L1 cache + shared memory · 256 KB (up to 228 KB as shared memory)','','var(--g1)',{fs:12});
+      box(svg,20,320,720,34,'TMA (Tensor Memory Accelerator): copies whole tiles between HBM and shared memory','','var(--surface-2)',{fs:11.5});}
+    else{lbl(svg,20,24,'ONE SM PARTITION, ONE CLOCK CYCLE',{b:1});
+      for(let w=0;w<8;w++){const y=40+w*30,ready=[1,0,1,1,0,0,1,0][w];R(svg,20,y,150,24,ready?'fill:var(--g3)':'fill:url(#hatch)',{rx:4});T(svg,28,y+16,`warp ${w} · ${ready?'ready':'waiting for memory'}`,{style:'font-size:10.5px;font-weight:700'});}
+      box(svg,230,120,150,60,'warp scheduler','picks warp 2','var(--g2)',{fs:12});arr(svg,170,112,228,150,'var(--accent)',{w:2.5});
+      arr(svg,380,150,440,90,'var(--muted)');arr(svg,380,150,440,210,'var(--muted)');
+      box(svg,444,60,290,60,'32 FP32 cores','one instruction × 32 threads','var(--g3)',{fs:12});
+      box(svg,444,180,290,60,'tensor core','a small matrix multiply per instruction','var(--accent)',{fs:12});
+      lbl(svg,20,300,'Every cycle, each of the 4 schedulers issues one instruction for one ready warp; waiting warps cost nothing.',{fs:11});}
+    const N={chip:'The whole H100 SXM5: <b>132 SMs</b> in 8 GPCs (16 or 17 drawn per GPC here), a <b>50 MB L2 cache</b> in the middle that all SMs share, and <b>80 GB of HBM3</b> in 5 stacks on the same package, read at about 3.35 TB/s. Everything the model owns, weights and KV cache, lives in HBM.',
+      gpc:'A <b>GPC</b> groups TPCs, and each TPC (texture processing cluster) holds 2 SMs. The full GH100 die has 8 GPCs × 9 TPCs = 144 SMs; the H100 SXM5 enables 132 of them, which helps chip yield.',
+      sm:'An <b>SM</b> is a small processor of its own, split into 4 partitions. Each has a warp scheduler, a quarter of the 64K-entry register file, 32 FP32 cores and one tensor core. All four share 256 KB of L1 cache and shared memory, and a TMA unit that copies tiles of data in the background.',
+      part:'Inside one partition. The warp scheduler holds the state of many warps; each cycle it picks one that is <b>ready</b> and sends its next instruction to the FP32 cores, the tensor core or the load/store units. Section 08 animates this.'};
+    $('#gp-note').innerHTML=glink(N[lv]);}
+  seg($('#gp-seg'),[{l:'Whole chip',v:'chip'},{l:'One GPC',v:'gpc'},{l:'One SM',v:'sm'},{l:'One partition',v:'part'}],lv,v=>{lv=v;render();});
+  stats($('#gp-stats'),[{v:'132',l:'SMs (H100 SXM5)'},{v:'528',l:'tensor cores (4 per SM)'},{v:'16,896',l:'FP32 cores (128 per SM)'},{v:'50 MB',l:'L2 cache'},{v:'80 GB',l:'HBM3 at 3.35 TB/s'},{v:'989',l:'dense BF16 TFLOPS on tensor cores'}]);
+  render();
+})();
+
+/* ---------- 08 warps ---------- */
+(function(){
+  const svg=$('#wp-svg');let nw=2,timer=null,t=40;const C=36,LAT=8,BURST=2;
+  function sim(){const st=[];let last=-1;const W=[...Array(nw)].map(()=>({rem:BURST,wait:0}));const grid=W.map(()=>[]);const issue=[];
+    for(let c=0;c<C;c++){W.forEach(w=>{if(w.wait>0)w.wait--;});let pick=-1;for(let j=1;j<=nw;j++){const i=(last+j)%nw;if(W[i].wait===0){pick=i;break;}}
+      W.forEach((w,i)=>grid[i].push(i===pick?'run':w.wait>0?'wait':'ready'));
+      if(pick>=0){last=pick;const w=W[pick];w.rem--;if(w.rem===0){w.rem=BURST;w.wait=LAT;}}issue.push(pick);}
+    return {grid,issue};}
+  function render(){clear(svg);const {grid,issue}=sim();const cw=17,x0=90;
+    lbl(svg,x0,18,'CLOCK CYCLES →',{b:1,fs:10.5});
+    grid.forEach((row,i)=>{const y=28+i*(nw>4?24:44),hh=nw>4?20:36;T(svg,x0-8,y+hh/2+4,'warp '+i,{'text-anchor':'end',style:'font-size:11px;font-weight:700'});
+      row.forEach((s,c)=>{if(c>=t)return;R(svg,x0+c*cw,y,cw-2,hh,s==='run'?'fill:var(--accent)':s==='wait'?'fill:url(#hatch)':'fill:var(--g3);opacity:.5',{rx:2});});});
+    const yb=28+nw*(nw>4?24:44)+14;T(svg,x0-8,yb+14,'issued',{'text-anchor':'end',style:'font-size:11px;font-weight:700'});
+    issue.forEach((p,c)=>{if(c>=t)return;R(svg,x0+c*cw,yb,cw-2,20,p>=0?'fill:var(--ok)':'fill:var(--bad);opacity:.6',{rx:2});});
+    const shown=issue.slice(0,t),busy=shown.filter(p=>p>=0).length;
+    const yl=yb+46;[['var(--accent)','issued this cycle'],['var(--g3)','ready'],['url(#hatch)','waiting for memory'],['var(--bad)','idle cycle']].forEach(([c,l],i)=>{R(svg,x0+i*150,yl,12,12,`fill:${c}`,{rx:2});lbl(svg,x0+16+i*150,yl+11,l,{fs:10.5});});svg.setAttribute('viewBox',`0 0 760 ${yl+24}`);
+    $('#wp-note').innerHTML=glink(nw===2?'With only <b>2 warps</b>, both are soon waiting for memory at the same time, and the scheduler has nothing to issue: the red cycles are wasted.':'With <b>8 warps</b> there is almost always one ready. The memory waits still happen, but they are hidden behind other warps\' work. This is why GPUs need thousands of threads in flight, and why kernels try to keep many warps resident per SM.');
+    stats($('#wp-stats'),[{v:Math.round(100*busy/Math.max(1,shown.length))+'%',l:'cycles with an instruction issued'},{v:LAT+' cycles',l:'memory wait in this toy (real: hundreds)'},{v:nw,l:'resident warps'}]);}
+  function stop(){clearInterval(timer);timer=null;$('#wp-play').textContent='Play';}
+  seg($('#wp-seg'),[{l:'2 warps',v:2},{l:'8 warps',v:8}],nw,v=>{stop();nw=v;t=C;render();});
+  $('#wp-play').onclick=()=>{if(timer){stop();return;}t=0;render();$('#wp-play').textContent='Pause';timer=setInterval(()=>{t++;render();if(t>=C)stop();},RM?20:180);};
+  render();
+})();
+
+/* ---------- 09 memory hierarchy ---------- */
+(function(){
+  const svg=$('#mh-svg');let sel='reg';
+  const LV=[{k:'reg',n:'Registers',sz:'256 KB per SM (64K × 4 B)',bw:'fastest: read every cycle',w:120,d:'Each thread\'s private variables. The accumulators of a GEMM tile live here while the K loop runs. Registers are split among the warps on the SM, so a kernel that uses many registers per thread fits fewer warps.'},
+    {k:'smem',n:'L1 + shared memory',sz:'256 KB per SM (up to 228 KB shared)',bw:'on the SM, a few cycles away',w:220,d:'<b>Shared memory</b> is a scratchpad the kernel controls: a block loads tiles of A and B here once, and all its warps reuse them many times. FlashAttention keeps its working tiles here.'},
+    {k:'l2',n:'L2 cache',sz:'50 MB, shared by all 132 SMs',bw:'on chip, further away',w:340,d:'Every read from HBM passes through L2. If two SMs need the same tile soon after each other, the second one finds it in L2. Too small to hold a model\'s weights.'},
+    {k:'hbm',n:'HBM3 (GPU memory)',sz:'80 GB',bw:'about 3.35 TB/s',w:470,d:'High-bandwidth memory, stacked next to the chip. Holds the weights, the KV cache and activations. Reading it is the bottleneck of decode: every step reads every weight once.'},
+    {k:'nv',n:'NVLink to other GPUs',sz:'other GPUs\' HBM',bw:'900 GB/s total per GPU',w:590,d:'The direct GPU-to-GPU link inside a server, used by NCCL for tensor-parallel All-Reduce. Much slower than local HBM, so splitting a model costs communication.'},
+    {k:'pcie',n:'PCIe to the CPU',sz:'host RAM',bw:'128 GB/s (PCIe Gen5)',w:700,d:'The link to the CPU. Input token IDs come in and sampled tokens go out this way. Weights are loaded over it once, at start-up; nothing big crosses it per step.'}];
+  function render(){clear(svg);lbl(svg,20,20,'CLOSER TO THE CORES (smaller, faster) ↑',{b:1,fs:10.5});
+    LV.forEach((l,i)=>{const y=30+i*46,x=380-l.w/2,on=l.k===sel;const g=box(svg,x,y,l.w,38,l.n,'',on?'var(--accent)':i<2?'var(--g3)':i<4?'var(--g1)':'var(--g2)',{on,fs:12});g.style.cursor='pointer';g.addEventListener('click',()=>{sel=l.k;render();});});
+    lbl(svg,20,318,'FARTHER AWAY (bigger, slower) ↓',{b:1,fs:10.5});
+    const l=LV.find(x=>x.k===sel);$('#mh-note').innerHTML=glink(`<b>${l.n}</b> · size: ${l.sz} · speed: ${l.bw}. ${l.d}`);
+    [...$('#mh-seg').children].forEach((b,i)=>b.setAttribute('aria-pressed',String(LV[i].k===sel)));}
+  seg($('#mh-seg'),LV.map(l=>({l:l.n.split(' ')[0]==='L1'?'L1 / shared':l.n.split(' (')[0].replace(' to the CPU','').replace(' to other GPUs',''),v:l.k})),sel,v=>{sel=v;render();});render();
+})();
+
+/* ---------- 10 GEMM on the chip ---------- */
+(function(){
+  const ST=[
+    {n:'The problem',f:'C [512 × 4096] = A [512 × 4096] · B [4096 × 4096]',c:'One linear layer during a 512-token prefill: A holds the tokens\' activations, B is a 4096 × 4096 weight matrix (Llama 2 7B size), C is the output. That is 2 × 512 × 4096 × 4096 ≈ 17 billion FLOPs.'},
+    {n:'Cut C into tiles',f:'tile = 128 × 128   →   C has 4 × 32 = 128 tiles',c:'The kernel splits the output into 128 × 128 tiles. Each tile becomes one <b>thread block</b>, responsible for computing just that piece of C.'},
+    {n:'Blocks onto SMs',f:'128 blocks on 132 SMs → one wave',c:'The GPU\'s front end hands the 128 blocks to free SMs. Here they all fit at once, one <b>wave</b>, leaving 4 SMs idle. If there were 200 blocks, a second, partly empty wave would follow, one reason GEMM speed depends on shapes.'},
+    {n:'Load a slice',f:'per step: A slice [128 × 64] + B slice [64 × 128] → shared memory',c:'Each block walks along K, the shared dimension, 64 at a time. It copies a slice of A\'s rows and a slice of B\'s columns from HBM (through L2) into <b>shared memory</b>; on the H100 the TMA unit does this copy in the background while the tensor cores work on the previous slice.'},
+    {n:'Tensor cores',f:'C_tile += A_slice · B_slice   (64 steps of K)',c:'The block\'s warps feed the slices to the SM\'s 4 <b>tensor cores</b>, which multiply small matrices per instruction. Partial sums stay in <b>registers</b>. After 4096 / 64 = 64 steps the tile is complete. Each number loaded into shared memory was used 128 times.'},
+    {n:'Write back',f:'C_tile → HBM',c:'The finished 128 × 128 tile is written to HBM once. Across the whole kernel, every weight in B was read from HBM only 4 times (once per row of tiles), yet used 512 times.'},
+    {n:'Decode is different',f:'C [1 × 4096] = a [1 × 4096] · B [4096 × 4096]',c:'In decode there is one token per request. C is a single row, so each weight is read once and used once: two FLOPs per two bytes. The tensor cores mostly wait for HBM, the <b>memory-bound</b> case. Section 11 measures it.'}];
+  stepper('gm',ST,(svg,st,k)=>{const dec=k===6;
+    const mt=dec?1:4;const A=(x,y)=>{R(svg,x,y,60,dec?8:120,'fill:var(--g3)',{rx:3});lbl(svg,x+30,y-6,dec?'a [1 × K]':'A [M × K]',{a:'middle',b:1,c:'var(--ink)'});};
+    A(20,dec?80:40);R(svg,110,30,120,140,'fill:var(--g1)',{rx:3});lbl(svg,170,24,'B [K × N] weights',{a:'middle',b:1,c:'var(--ink)'});
+    const cx=270,cy=dec?80:40;lbl(svg,cx+90,cy-6,dec?'C [1 × N]':'C [M × N]',{a:'middle',b:1,c:'var(--ink)'});
+    for(let r=0;r<mt;r++)for(let c=0;c<16;c++){const on=k>=1;R(svg,cx+c*11.5,cy+(dec?0:r*30),10.5,dec?8:28,`fill:${k>=1?PAL(r*16+c):'var(--g0)'};opacity:${k===0?.5:k>=5&&!dec?1:.75}`,{rx:1.5});}
+    if(k>=1&&!dec)lbl(svg,cx,cy+135,'16 of 32 tile columns drawn',{fs:10});
+    if(k>=3&&k<=5){R(svg,20,40,60,30,'fill:var(--accent);opacity:.75',{rx:2});R(svg,110,30,32,140,'fill:var(--accent);opacity:.55',{rx:2});}
+    if(k===2){lbl(svg,480,24,'132 SMs',{b:1,c:'var(--ink)'});for(let s=0;s<132;s++){const x=480+(s%12)*22,y=34+Math.floor(s/12)*12;R(svg,x,y,19,9,s<128?`fill:${PAL(s)}`:'fill:var(--surface-2);stroke:var(--muted)',{rx:2});}lbl(svg,480,182,'128 busy · 4 idle',{fs:11});}
+    if(k>=3&&k<=5){const sx=470;R(svg,sx,30,270,180,'fill:var(--surface-2)',{rx:10});lbl(svg,sx+12,50,'ONE SM, ONE BLOCK',{b:1,fs:10.5});
+      box(svg,sx+12,60,246,34,'shared memory: A slice + B slice','',k===3?'var(--accent)':'var(--g1)',{on:k===3,fs:11});
+      box(svg,sx+12,104,246,40,'4 tensor cores','C_tile += A_slice · B_slice',k===4?'var(--accent)':'var(--g2)',{on:k===4,fs:11.5});
+      box(svg,sx+12,154,246,40,'registers: C tile accumulators','',k===5?'var(--accent)':'var(--g3)',{on:k===5,fs:11});
+      if(k===3)arr(svg,160,100,sx+10,77,'var(--accent)',{w:2.5});if(k===5)arr(svg,sx+10,174,cx+190,cy+60,'var(--accent)',{w:2.5});}
+    if(dec){R(svg,470,30,270,150,'fill:var(--surface-2)',{rx:10});lbl(svg,486,58,'per weight read from HBM:',{b:1,c:'var(--ink)',fs:12});lbl(svg,486,82,'prefill (512 tokens): used 512 times',{fs:11.5});lbl(svg,486,104,'decode (1 token): used once',{fs:11.5,c:'var(--bad)',b:1});lbl(svg,486,140,'batching many requests raises this',{fs:11});lbl(svg,486,158,'number again (section 11).',{fs:11});}
+  },3600);
+})();
+
+/* ---------- 11 roofline ---------- */
+(function(){
+  const svg=$('#rf-svg'),NS=[1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192];const PK=989,BW=3.35,K=4096,N=4096;
+  const X0=70,X1=730,Y0=270,Y1=30,lx=v=>X0+(Math.log10(v)-Math.log10(0.5))/(Math.log10(4000)-Math.log10(0.5))*(X1-X0),ly=v=>Y0-(Math.log10(v)-0)/(Math.log10(2000))*(Y0-Y1);
+  function render(){clear(svg);const n=NS[+$('#rf-n').value];$('#rf-nv').textContent=n;
+    const I=n*K*N/(K*N+n*(K+N)),att=Math.min(PK,I*BW),ridge=PK/BW;
+    [1,10,100,1000].forEach(v=>{S('line',{x1:X0,x2:X1,y1:ly(v),y2:ly(v),style:'stroke:var(--line)'},svg);lbl(svg,X0-6,ly(v)+4,String(v),{a:'end',fs:10});});
+    [1,10,100,1000].forEach(v=>{S('line',{x1:lx(v),x2:lx(v),y1:Y1,y2:Y0,style:'stroke:var(--line)'},svg);lbl(svg,lx(v),Y0+16,String(v),{a:'middle',fs:10});});
+    lbl(svg,X0,Y1-10,'achievable TFLOPS (log)',{b:1,fs:10.5});lbl(svg,X1,Y0+34,'arithmetic intensity: FLOPs per byte read (log)',{a:'end',b:1,fs:10.5});
+    const pts=[[0.5,0.5*BW],[ridge,PK],[4000,PK]];S('polyline',{points:pts.map(p=>lx(p[0])+','+ly(p[1])).join(' '),style:'fill:none;stroke:var(--accent);stroke-width:3'},svg);
+    S('line',{x1:lx(ridge),x2:lx(ridge),y1:ly(PK),y2:Y0,style:'stroke:var(--muted);stroke-dasharray:4 4'},svg);lbl(svg,lx(ridge)+6,Y0-8,'ridge ≈ 295',{fs:10.5,b:1});
+    lbl(svg,lx(2),ly(30),'memory-bound: speed = intensity × 3.35 TB/s',{fs:11,b:1,c:'var(--ink)'});lbl(svg,lx(400),ly(PK)-10,'compute-bound: 989 TFLOPS',{fs:11,b:1,c:'var(--ink)'});
+    S('circle',{cx:lx(I),cy:ly(Math.max(att,1)),r:7,style:'fill:var(--bad);stroke:var(--surface);stroke-width:2'},svg);
+    const flops=2*n*K*N,bytes=2*(K*N+n*K+n*N),tus=Math.max(flops/(PK*1e12),bytes/(BW*1e12))*1e6;
+    stats($('#rf-stats'),[{v:I.toFixed(1),l:'FLOPs per byte for this GEMM'},{v:Math.round(att)+' TFLOPS',l:'best possible speed'},{v:I<ridge?'memory-bound':'compute-bound',l:'limited by',c:I<ridge?'warn':'good'},{v:tus<10?tus.toFixed(1)+' µs':Math.round(tus)+' µs',l:'lower bound on time (BF16, 4096 × 4096 weight)'}]);}
+  $('#rf-n').addEventListener('input',render);render();
+})();
+
+/* ---------- 12 decode timeline ---------- */
+(function(){
+  const svg=$('#tl-svg');let mode='eager',timer=null,t=999;
+  const KN=['norm','qkv','rope','attn','o','add','norm','gate/up','act','down','add'],DUR=[1.5,4,1,3,3,1,1.5,6,1.5,5,1];const LAUNCH=4,LAYERS=3;
+  function plan(){const ev=[];let cpu=0,gpu=0;if(mode==='graph'){ev.push({lane:'cpu',s:0,e:6,n:'graph launch'});cpu=6;gpu=7;}
+    for(let l=0;l<LAYERS;l++)KN.forEach((n,i)=>{const d=DUR[i];if(mode==='eager'){const ls=cpu;cpu+=LAUNCH;ev.push({lane:'cpu',s:ls,e:cpu,n});const s=Math.max(gpu,cpu);ev.push({lane:'gpu',s,e:s+d,n});gpu=s+d;}else{ev.push({lane:'gpu',s:gpu,e:gpu+d,n});gpu+=d;}});
+    return {ev,end:Math.max(cpu,gpu)};}
+  function render(){clear(svg);const {ev,end}=plan(),span=170,sc=640/span,x0=90;
+    lbl(svg,x0,20,`TIME (µs, illustrative) · ${LAYERS} of 32 layers drawn`,{b:1,fs:10.5});
+    [['cpu','CPU launches',50],['gpu','GPU kernels',140]].forEach(([k,n,y])=>{T(svg,x0-8,y+20,n,{'text-anchor':'end',style:'font-size:11px;font-weight:700'});R(svg,x0,y,640,36,'fill:var(--surface-2)',{rx:6});});
+    ev.forEach(e=>{if(e.s>=t)return;const y=e.lane==='cpu'?54:144,w=(Math.min(e.e,t)-e.s)*sc;R(svg,x0+e.s*sc,y,Math.max(w-1,1),28,`fill:${e.lane==='cpu'?'var(--g1)':e.n==='attn'?'var(--g0)':/qkv|gate|down|^o$/.test(e.n)?'var(--accent)':'var(--g3)'}`,{rx:3});});
+    const g=ev.filter(e=>e.lane==='gpu');let idle=0;for(let i=1;i<g.length;i++)idle+=Math.max(0,g[i].s-g[i-1].e);const busy=g.reduce((a,e)=>a+e.e-e.s,0);
+    if(t<end)S('line',{x1:x0+t*sc,x2:x0+t*sc,y1:40,y2:190,style:'stroke:var(--bad);stroke-width:2'},svg);
+    [['var(--g1)','CPU launch'],['var(--accent)','GEMM'],['var(--g0)','attention'],['var(--g3)','small kernels']].forEach(([c,l],i)=>{R(svg,x0+i*150,214,12,12,`fill:${c}`,{rx:2});lbl(svg,x0+16+i*150,225,l,{fs:10.5});});
+    lbl(svg,x0,262,mode==='eager'?'Gaps on the GPU lane = the GPU waiting for the CPU to launch the next kernel.':'One launch replays the recorded chain: kernels run back to back.',{fs:11.5,b:1,c:'var(--ink)'});
+    $('#tl-note').innerHTML=glink(mode==='eager'?'<b>Eager launches.</b> In this toy each launch costs the CPU 4 µs, longer than many decode kernels take to run. The GPU finishes a small kernel and then waits for the next launch: utilisation drops even though the GPU is "busy".':'<b>CUDA graph.</b> The engine captured this exact chain of kernels once, at start-up. Now one launch replays all of them, with no CPU work in between. Graphs need fixed shapes, so vLLM records one per common batch size.');
+    stats($('#tl-stats'),[{v:end.toFixed(0)+' µs',l:`for ${LAYERS} layers (toy)`},{v:Math.round(100*busy/(g.length?g[g.length-1].e-g[0].s:1))+'%',l:'GPU busy between first and last kernel'},{v:g.length,l:'kernels'}]);}
+  function stop(){clearInterval(timer);timer=null;$('#tl-play').textContent='Play one step';}
+  seg($('#tl-seg'),[{l:'Eager launches',v:'eager'},{l:'CUDA graph',v:'graph'}],mode,v=>{stop();mode=v;t=999;render();});
+  $('#tl-play').onclick=()=>{if(timer){stop();return;}t=0;render();$('#tl-play').textContent='Pause';const end=plan().end;timer=setInterval(()=>{t+=2;render();if(t>=end){t=999;render();stop();}},RM?10:60);};
+  render();
+})();
+
+/* layout: split each figure section into a text column and a figure column */
+document.querySelectorAll('main section').forEach(sec=>{if(!sec.querySelector(':scope > .fig'))return;
+  const t=document.createElement('div'),f=document.createElement('div');t.className='col-text';f.className='col-fig';
+  [...sec.children].forEach(ch=>{(ch.classList.contains('fig')?f:t).appendChild(ch);});sec.append(t,f);sec.classList.add('split');});
+/* nav highlight */
+(function(){const links=[...document.querySelectorAll('nav.rail a')],secs=[...document.querySelectorAll('main section[id]')],rail=document.querySelector('nav.rail');let cur=null,tick=0;
+  function upd(){tick=0;const line=innerHeight*0.3;let act=null;for(const s of secs){if(s.getBoundingClientRect().top<=line)act=s;else break;}
+    if(secs.length&&secs[0].getBoundingClientRect().top>line)act=null;if(act===cur)return;cur=act;
+    links.forEach(l=>l.classList.toggle('on',!!act&&l.getAttribute('href')==='#'+act.id));
+    const on=links.find(l=>l.classList.contains('on'));if(on&&rail){const r=on.getBoundingClientRect(),rr=rail.getBoundingClientRect();if(r.top<rr.top+40||r.bottom>rr.bottom-40)rail.scrollTo({top:rail.scrollTop+(r.top-rr.top)-rr.height/2,behavior:RM?'auto':'smooth'});}}
+  addEventListener('scroll',()=>{if(!tick)tick=requestAnimationFrame(upd);},{passive:true});addEventListener('resize',upd);
+  links.forEach(l=>l.addEventListener('click',()=>{const s=document.querySelector(l.getAttribute('href'));setTimeout(()=>{cur=s;links.forEach(x=>x.classList.toggle('on',x===l));},RM?0:700);}));upd();})();
+
+(function(){
+  const skip=el=>el.closest('a,svg,script,style,nav,button,.formula');
+  const walk=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{acceptNode:n=>/([Ss]ection|Extras) (0\d|1\d|A\d|X\d)/.test(n.nodeValue)&&!skip(n.parentElement)?1:2});
+  const list=[];while(walk.nextNode())list.push(walk.currentNode);
+  list.forEach(n=>{const span=document.createElement('span');span.innerHTML=secLink(n.nodeValue.replace(/&/g,'&amp;').replace(/</g,'&lt;'));n.replaceWith(...span.childNodes);});
+  const back=document.createElement('button');back.type='button';back.className='backbtn';back.textContent='← back';back.hidden=true;document.body.appendChild(back);
+  let ret=null;
+  document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#"]');if(!a||a.closest('nav'))return;ret=window.scrollY;back.hidden=false;},true);
+  back.onclick=()=>{if(ret!==null)window.scrollTo({top:ret,behavior:'smooth'});ret=null;back.hidden=true;};
+})();
+
+/* contrast guard: after any SVG redraw, re-colour labels that are too faint on what sits behind them */
+(function(){
+  const rgb=s=>{const m=String(s).match(/rgba?\(([^)]+)\)/);if(!m)return null;const v=m[1].split(/[ ,\/]+/).filter(Boolean).map(Number);return {r:v[0],g:v[1],b:v[2],a:v.length>3?v[3]:1};};
+  const lum=c=>{const f=x=>{x/=255;return x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4);};return .2126*f(c.r)+.7152*f(c.g)+.0722*f(c.b);};
+  const cr=(a,b)=>{const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+  const mix=(f,b,a)=>({r:f.r*a+b.r*(1-a),g:f.g*a+b.g*(1-a),b:f.b*a+b.b*(1-a)});
+  const probe=document.createElement('span');probe.style.display='none';document.body.appendChild(probe);
+  const col=v=>{probe.style.color=`var(${v})`;return rgb(getComputedStyle(probe).color);};
+  function bgOf(el){while(el&&el!==document.documentElement){const c=rgb(getComputedStyle(el).backgroundColor);if(c&&c.a>0.5)return c;el=el.parentElement;}return col('--bg');}
+  function fix(svg){if(!svg.isConnected)return;const sr=svg.getBoundingClientRect();if(!sr.width)return;
+    const ink=col('--ink'),onf=col('--on-fill'),page=bgOf(svg);
+    const shapes=[...svg.querySelectorAll('rect,circle,ellipse,polygon,path')];
+    const boxes=shapes.map(s=>{const cs=getComputedStyle(s),f=rgb(cs.fill);if(!f||f.a===0)return null;const own=parseFloat((s.getAttribute('style')||'').match(/(?:^|;)\s*opacity\s*:\s*([\d.]+)/)?.[1]??'1');const op=own*(+cs.fillOpacity||1)*f.a;if(op<0.3)return null;const r=s.getBoundingClientRect();if(r.width<4||r.height<4)return null;return {s,r,c:mix(f,page,Math.min(op,1))};});
+    svg.querySelectorAll('text').forEach(t=>{if(t.dataset.of===undefined)t.dataset.of=t.style.fill||'';t.style.fill=t.dataset.of;const r=t.getBoundingClientRect();if(!r.width)return;const cx=r.left+r.width/2,cy=r.top+r.height/2;
+      let bg=page;for(let i=boxes.length-1;i>=0;i--){const b=boxes[i];if(!b)continue;if(!(b.s.compareDocumentPosition(t)&Node.DOCUMENT_POSITION_FOLLOWING))continue;if(cx>=b.r.left&&cx<=b.r.right&&cy>=b.r.top&&cy<=b.r.bottom){let inside=true;try{const m=b.s.getScreenCTM();if(m&&b.s.isPointInFill){const q=new DOMPoint(cx,cy).matrixTransform(m.inverse());inside=b.s.isPointInFill(q);}}catch(e){}if(inside){bg=b.c;break;}}}
+      const tc=rgb(getComputedStyle(t).fill);if(!tc)return;const vb=svg.viewBox&&svg.viewBox.baseVal,sc=vb&&vb.width?sr.width/vb.width:1;const need=parseFloat(getComputedStyle(t).fontSize)*sc<14?4.5:3;if(cr(mix(tc,bg,tc.a),bg)>=need)return;
+      const cands=[['var(--ink)',ink],['var(--on-fill)',onf],['#ffffff',{r:255,g:255,b:255}],['#16141f',{r:22,g:20,b:31}]];let best=null,bc=cr(mix(tc,bg,tc.a),bg);for(const [v,c] of cands){const x=cr(c,bg);if(x>bc+0.05){bc=x;best=v;}}if(best)t.style.fill=best;});}
+  const pend=new Set();let raf=0;
+  const queue=svg=>{pend.add(svg);if(!raf)raf=requestAnimationFrame(()=>{raf=0;const a=[...pend];pend.clear();a.forEach(fix);});};
+  document.querySelectorAll('main svg').forEach(svg=>{new MutationObserver(()=>queue(svg)).observe(svg,{childList:true,subtree:true});queue(svg);['animationend','transitionend'].forEach(ev=>svg.addEventListener(ev,()=>queue(svg),true));});
+  addEventListener('resize',()=>document.querySelectorAll('main svg').forEach(queue));
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>document.querySelectorAll('main svg').forEach(queue));
+  new MutationObserver(()=>document.querySelectorAll('main svg').forEach(queue)).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+})();
+</script>
+</body>
+</html>
