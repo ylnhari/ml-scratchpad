@@ -536,7 +536,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="sparsity">
   <div class="sh"><span class="n">09</span><h2>2:4 structured sparsity</h2></div>
-  <p class="cap">In every group of 4 weights, the 2 smallest are zeroed. The GPU stores only the survivors plus a 2-bit position index for each.</p>
+  <p class="cap">In every group of 4 weights, the 2 smallest are zeroed. The GPU stores only the survivors plus a 2-bit position index for each. This is <b>pruning</b>, not quantization: quantization (section 08) keeps every weight but stores it with fewer bits, while sparsity removes half the weights and keeps the rest at full precision. The two are separate tools for shrinking a model, and they stack: a 2:4-sparse model can also be quantized.</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="sp-seg"></div></div>
     <div class="svgbox"><svg id="sp-svg" viewBox="0 0 760 220" role="img" aria-label="2:4 sparsity"></svg></div>
