@@ -72,6 +72,10 @@ self-contained HTML export of its executed notebook as `<subfolder>/index.html`;
 **generated snapshot** and must be regenerated after any change to the notebook, or the page
 silently describes an older version.
 
+The site root, https://ylnhari.github.io/ml-scratchpad/, is `index.html`: a hand-written listing that renders every
+entry of `pages.json`. **When a page is added, renamed or removed, update `pages.json` in the same change**
+(path, title, kind `interactive` or `notebook`, date, tags, one-line description), or the page will not appear in the list.
+
 | Page | Source | Regenerate |
 |------|--------|------------|
 | https://ylnhari.github.io/ml-scratchpad/vllm-memory/ | `vllm-memory/vllm_memory_explainer.ipynb` (executed) | `make vllm-memory-html` |
