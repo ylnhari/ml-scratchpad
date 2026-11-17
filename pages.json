@@ -13,6 +13,19 @@
     "desc": "The transformer, attention, KV cache, batching, parallelism, disaggregated serving and every other serving trick, as live step-through figures."
   },
   {
+    "path": "gpu-stack-visualized/",
+    "title": "From API Call to GPU Silicon",
+    "kind": "interactive",
+    "date": "2026-11-17",
+    "tags": [
+      "inference",
+      "gpu",
+      "cuda",
+      "serving"
+    ],
+    "desc": "One LLM request followed down every layer: Ray Serve, vLLM, PyTorch, cuBLAS, CUDA, PTX/SASS, then SMs, warps, tensor cores and the memory hierarchy."
+  },
+  {
     "path": "vllm-memory/visual/",
     "title": "vLLM Memory, Visualized",
     "kind": "interactive",
