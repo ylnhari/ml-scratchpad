@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Every visual explainer and executed notebook in Hari's ML scratchpad, in one list.">
+<title>ylnhari · ML scratchpad</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{--bg:#f4f5f9;--surface:#fff;--surface-2:#eceef5;--text:#11152a;--muted:#5a6280;--border:#dde1eb;--accent:#4338ca;--accent-2:#0d9488;--accent-soft:#e2e3fb;
+  --display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;--sans:'IBM Plex Sans',-apple-system,'Segoe UI',Roboto,sans-serif;--mono:'JetBrains Mono',Consolas,monospace;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0a0d16;--surface:#121726;--surface-2:#1a2034;--text:#e8ebf5;--muted:#9aa3bd;--border:#262e46;--accent:#8f97ff;--accent-2:#2dd4bf;--accent-soft:#252a55;color-scheme:dark}}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 var(--sans)}
+.shell{max-width:72rem;margin:0 auto;padding:24px 28px 60px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding-bottom:18px;border-bottom:1px solid var(--border)}
+.brand{font:800 20px var(--display);color:var(--text);text-decoration:none}.brand span{color:var(--accent)}
+.topbar nav{display:flex;gap:18px;flex-wrap:wrap}.topbar nav a{color:var(--muted);text-decoration:none;font-weight:500}.topbar nav a:hover{color:var(--accent)}
+h1{font:800 clamp(28px,4vw,44px)/1.1 var(--display);margin:36px 0 10px;letter-spacing:-.02em}
+.lede{color:var(--muted);max-width:44rem;margin:0 0 28px;font-size:17px}
+.star{display:block;background:var(--accent);color:#fff;text-decoration:none;border-radius:16px;padding:22px 24px;margin-bottom:30px}
+.star b{font:800 22px var(--display);display:block}.star small{opacity:.9;font-size:15px}
+.label{font:600 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+input[type=search]{font:15px var(--sans);padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text);min-width:220px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chips button{font:500 13px var(--sans);padding:5px 11px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+.chips button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.count{margin:0 0 0 auto;color:var(--muted);font-size:13px}
+.grid{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card a{display:flex;flex-direction:column;height:100%;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;text-decoration:none;color:var(--text);transition:border-color .15s,transform .15s}
+.card a:hover{border-color:var(--accent);transform:translateY(-2px)}
+.kind{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:999px;align-self:flex-start;margin-bottom:8px}
+.kind.interactive{background:var(--accent-soft);color:var(--accent)}.kind.notebook{background:var(--surface-2);color:var(--accent-2)}
+.card b{font:700 18px/1.25 var(--display)}.card p{margin:6px 0 10px;color:var(--muted);font-size:14.5px;flex:1}
+.meta{font:12px var(--mono);color:var(--muted)}
+footer{margin-top:40px;color:var(--muted);font-size:13px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <a class="brand" href="./">ylnhari<span>/ml-scratchpad</span></a>
+    <nav aria-label="Site">
+      <a href="https://ylnhari.github.io/blog/">Blog</a>
+      <a href="https://ylnhari.github.io/ai-signal/bench.html">Model Bench</a>
+      <a href="https://ylnhari.github.io/ai-signal/">AI Signal daily</a>
+      <a href="https://github.com/ylnhari/ml-scratchpad">GitHub</a>
+    </nav>
+  </header>
+  <h1>Visual explainers and runnable notebooks</h1>
+  <p class="lede">Every page published from the ML scratchpad: interactive pages you can step through, and executed notebooks that build each idea from scratch.</p>
+  <a class="star" id="star" href="llm-inference-visualized/"><b>LLM Inference, Visualized →</b><small>The transformer, attention, KV cache, batching, parallelism and every serving trick, as live step-through figures.</small></a>
+  <p class="label">All pages</p>
+  <div class="toolbar" role="search">
+    <input id="q" type="search" placeholder="Search pages" aria-label="Search pages">
+    <div class="chips" id="chips" aria-label="Filter"></div>
+    <p class="count" id="count" role="status" aria-live="polite"></p>
+  </div>
+  <ul class="grid" id="list"></ul>
+  <footer><span>© ylnhari · source on <a href="https://github.com/ylnhari/ml-scratchpad">GitHub</a></span><span>Notebook pages are HTML exports of executed notebooks.</span></footer>
+</div>
+<script>
+(async function(){
+  const list=document.getElementById('list'),q=document.getElementById('q'),chips=document.getElementById('chips'),count=document.getElementById('count');
+  let pages=[];try{pages=await (await fetch('pages.json',{cache:'no-cache'})).json();}catch(e){list.innerHTML='<li>Could not load the page list.</li>';return;}
+  const filters=['all','interactive','notebook',...[...new Set(pages.flatMap(p=>p.tags))].sort()];let f='all';
+  filters.forEach(t=>{const b=document.createElement('button');b.type='button';b.textContent=t;b.setAttribute('aria-pressed',String(t===f));b.onclick=()=>{f=t;chips.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x.textContent===t)));draw();};chips.appendChild(b);});
+  const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  function draw(){const s=q.value.trim().toLowerCase();
+    const shown=pages.filter(p=>(f==='all'||p.kind===f||p.tags.includes(f))&&(!s||(p.title+' '+p.desc+' '+p.tags.join(' ')).toLowerCase().includes(s)));
+    list.innerHTML=shown.map(p=>`<li class="card"><a href="${esc(p.path)}"><span class="kind ${p.kind}">${p.kind==='interactive'?'interactive page':'executed notebook'}</span><b>${esc(p.title)}</b><p>${esc(p.desc)}</p><span class="meta">${p.date} · ${p.tags.map(esc).join(' · ')}</span></a></li>`).join('')||'<li>No pages match.</li>';
+    count.textContent=`${shown.length} of ${pages.length} pages`;}
+  q.oninput=draw;draw();
+})();
+</script>
+</body>
+</html>
