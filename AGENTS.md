@@ -105,7 +105,7 @@ entry of `pages.json`. **When a page is added, renamed or removed, update `pages
 | additive-inference/ | Ternary 1.7-bit multiply-free inference (Mach-1 / BitNet) | additive_inference_explainer.ipynb | `additive-inference` |
 | vllm-memory/ | vLLM GPU-memory lifecycle: profile run, KV pool sizing, scheduler steps, preemption | vllm_memory_explainer.ipynb (+ visual/index.html, interactive page with in-browser Python) | (numpy + matplotlib only) |
 | llm-inference-visualized/ | Interactive tensor-shape explainer: forward pass, inference optimizations, backward pass, modern-LLM changes, RoPE word order, LoRA fine-tuning | index.html (interactive page; a notebook can't animate the splits) | none |
-| gpu-stack-visualized/ | Request path from API to GPU silicon: Ray Serve, vLLM engine, PyTorch dispatch, kernel libraries, CUDA grid/blocks/warps, PTX/SASS, H100 SMs, memory hierarchy, tiled GEMM, roofline, CUDA graphs | index.html (interactive page) | none |
+| gpu-stack-visualized/ | The GPU stack from code to silicon (training + inference): framework → kernels, kernel libraries, CUDA grid/blocks/warps, PTX/SASS, streams, H100 SMs, warp scheduling, memory hierarchy, HBM/L2 coalescing + bank conflicts, tiled GEMM, roofline, kernel optimization ladder, fusion, NVLink/NVSwitch server, ring All-Reduce, NVL72 rack + cluster, CUDA graphs, DDP overlap | index.html (interactive page) | none |
 
 ## Running
 
