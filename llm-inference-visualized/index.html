@@ -194,7 +194,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <li><a href="#flash"><b>06</b>FlashAttention</a></li>
     <li><a href="#paged"><b>07</b>PagedAttention</a></li>
     <li><a href="#quant"><b>08</b>Quantization</a></li>
-    <li><a href="#sparsity"><b>09</b>2:4 sparsity</a></li>
+    <li><a href="#sparsity"><b>09</b>Pruning (2:4 sparsity)</a></li>
     <li><a href="#distill"><b>10</b>Distillation</a></li>
     <li><a href="#spec"><b>11</b>Speculative decoding</a></li>
     <li><a href="#disagg"><b>12</b>Disaggregated serving</a></li>
@@ -535,8 +535,13 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 </section>
 
 <section id="sparsity">
-  <div class="sh"><span class="n">09</span><h2>2:4 structured sparsity</h2></div>
-  <p class="cap">In every group of 4 weights, the 2 smallest are zeroed. The GPU stores only the survivors plus a 2-bit position index for each. This is <b>pruning</b>, not quantization: quantization (section 08) keeps every weight but stores it with fewer bits, while sparsity removes half the weights and keeps the rest at full precision. The two are separate tools for shrinking a model, and they stack: a 2:4-sparse model can also be quantized.</p>
+  <div class="sh"><span class="n">09</span><h2>Pruning</h2></div>
+  <p class="cap"><b>Pruning</b> removes weights that matter least, usually the ones closest to zero, by setting them to exactly 0. The model gets smaller and, if the hardware can skip the zeros, faster. It is not quantization (section 08): quantization keeps every weight but stores it with fewer bits, while pruning deletes weights and keeps the rest at full precision. The two stack, so a pruned model can also be quantized.</p>
+  <ul class="cap">
+    <li><b>Unstructured</b> pruning zeroes any weight anywhere. It can remove a lot, but the zeros are scattered, so GPUs cannot skip them and it rarely runs faster.</li>
+    <li><b>Structured</b> pruning zeroes weights in a fixed pattern the hardware understands, so it does run faster.</li>
+  </ul>
+  <p class="cap"><b>2:4 structured sparsity</b> is the pattern NVIDIA GPUs accelerate: in every group of 4 weights, the 2 smallest are zeroed. The GPU stores only the 2 survivors plus a 2-bit position index for each, and skips the zeros in the matrix multiply.</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="sp-seg"></div></div>
     <div class="svgbox"><svg id="sp-svg" viewBox="0 0 760 220" role="img" aria-label="2:4 sparsity"></svg></div>
