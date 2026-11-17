@@ -50,7 +50,8 @@ nav.rail ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
 nav.rail a{display:flex;gap:8px;padding:5px 8px;border-radius:7px;text-decoration:none;color:var(--muted)}
 nav.rail a b{font:600 12px var(--f-mono);color:var(--accent);min-width:20px}
 nav.rail a:hover,nav.rail a.on{background:var(--surface);color:var(--ink)}
-@media (max-width:900px){.wrap{grid-template-columns:1fr}nav.rail{display:none}}
+@media (max-width:900px){.wrap{grid-template-columns:minmax(0,1fr)}nav.rail{display:none}}
+.wrap>*{min-width:0}
 section{padding:30px 0 10px;scroll-margin-top:10px}
 .sh{display:block}
 .sh .n{display:block;margin-bottom:4px}
@@ -86,7 +87,7 @@ input[type=range]{padding:0;accent-color:var(--accent);width:170px}
 .mono{font-family:var(--f-mono)}
 .fgl{float:right;margin:0 0 4px 16px;padding:4px 10px;border-left:2px solid var(--accent);font:500 12px/1.5 var(--f-display);color:var(--muted)}.fgl b{color:var(--ink)}
 .formula{font:500 13.5px/1.6 var(--f-mono);background:var(--surface-2);border-radius:10px;padding:10px 12px;overflow-wrap:anywhere;margin-top:10px}
-.formula b{color:var(--g2)}
+.formula b{color:var(--accent)}
 svg text{font-family:var(--f-mono);fill:var(--ink);font-size:12px}
 svg .lbl{font-size:10.5px;fill:var(--muted);letter-spacing:.06em}
 svg .big{font-size:15px;font-weight:700}
@@ -305,7 +306,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
       <button class="btn solid" id="pd-skip" type="button">Skip to end of step</button>
       <button class="btn solid" id="pd-play" type="button">Auto-play</button>
       <button class="btn solid" id="pd-reset" type="button">Reset</button>
-      <span class="mono" style="font-size:12px;color:var(--muted)">speed</span><div class="seg" id="pd-speed"></div>
+      <span class="e2cfg"><span class="mono">speed</span><div class="seg" id="pd-speed"></div></span>
     </div>
     <div class="note" id="pd-note" style="margin:0 0 10px;min-height:52px"></div>
     <div class="svgbox"><svg id="pd-svg" viewBox="0 0 760 300" role="img" aria-label="Prefill and decode matrix shapes"></svg></div>
@@ -1332,8 +1333,8 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
   }
   function stop(){clearInterval(timer);timer=null;$('#tp-play').textContent='Play layer';}
   seg($('#par-tabs'),tabs,'tp',v=>{stop();mode=v;k=Math.min(k,8);render();});
-  $('#tp-prev').onclick=()=>{if(k>0){k--;render();}};
-  $('#tp-next').onclick=()=>{if(k<8){k++;render();}};
+  $('#tp-prev').onclick=()=>{stop();if(k>0){k--;render();}};
+  $('#tp-next').onclick=()=>{stop();if(k<8){k++;render();}};
   $('#tp-play').onclick=()=>{if(timer){stop();return;}k=0;render();$('#tp-play').textContent='Pause';
     timer=setInterval(()=>{if(k>=8){stop();return;}k++;render();},RM?60:1400);};
   render();
@@ -1488,7 +1489,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       if(cell){const dim=mode==='paged'&&cell.r!==sel?.35:1;st=cell.used?`fill:${PAL(cell.r)};opacity:${dim}`:`fill:url(#hatchBad);opacity:${.55*dim}`;}
       R(svg,x,y,cw-1.5,rh-2,st,{rx:2});}
     if(mode==='paged'){for(let b=0;b<32;b++){const r=Math.floor(b/4),c=(b%4)*8;R(svg,x0+c*cw-1,y0+r*rh-1,8*cw,rh,'fill:none;stroke:var(--ink);stroke-width:1;opacity:.35');
-      T(svg,x0+c*cw+2,y0+r*rh+rh-6,String(b),{style:'font-size:8.5px;fill:var(--ink);opacity:.6'});}}
+      T(svg,x0+c*cw+2,y0+r*rh+rh-6,String(b),{style:'font-size:9.5px;font-weight:700;fill:var(--ink);opacity:.9'});}}
     else{run.forEach(i=>{R(svg,x0-1,y0+i*2*rh-1,COLS*cw,2*rh,'fill:none;stroke:var(--ink);stroke-width:1.5;opacity:.5',{rx:3});});}
     T(svg,x0,y0+ROWS*rh+22,'hatched red = reserved but unused (fragmentation)',{class:'lbl'});
     const chips=$('#pg-chips');chips.innerHTML='';
@@ -1892,7 +1893,7 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
   const B=[box('input',70,596,260,28,'"I saw a dog ride in"','','var(--surface-2)'),box('tok',70,548,260,30,'Tokenizer','text → token IDs','var(--g1)'),box('emb',70,500,260,30,'Token embedding','IDs → vectors','var(--accent)'),
     box('n1',250,394,180,28,'Norm','RMSNorm','var(--g3)'),box('att',250,334,180,46,'Masked multi-head','self-attention','var(--g0)'),box('a1',188,306,24,24,'+','','var(--ink)'),
     box('n2',250,262,180,28,'Norm','RMSNorm','var(--g3)'),box('mlp',250,214,180,34,'MLP (feed-forward)','','var(--g2)'),box('a2',188,188,24,24,'+','','var(--ink)'),
-    box('stack',40,168,400,304,'','',''),box('fn',70,120,260,30,'Final norm','','var(--g3)'),box('lm',70,72,260,30,'LM head','h → V scores (V = vocabulary)','var(--g1)'),box('sm',70,24,260,30,'Softmax → probabilities','','var(--accent)'),box('loop',350,24,70,30,'"the"','','var(--ok)')];
+    box('stack',40,168,400,304,'','',''),box('fn',70,120,260,30,'Final norm','','var(--g3)'),box('lm',70,72,260,30,'LM head','h → V scores','var(--g1)'),box('sm',70,24,260,30,'Softmax → probabilities','','var(--accent)'),box('loop',350,24,70,30,'"the"','','var(--ok)')];
   const id=n=>B.find(b=>b.id===n);
   const ST=[
    {b:'input',n:'Text in',sh:'a string',c:'The model only ever does one job: <b>given the text so far, predict the next token</b>. Everything below is the machinery for that one prediction. Follow the data from the bottom of the diagram to the top.'},
@@ -1961,7 +1962,7 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
     L('M200 596 V580');L('M200 548 V532');L('M200 448 H340 V424');L('M340 394 V382');L('M340 334 V318 H214');L('M200 300 H340 V292');L('M340 262 V250');L('M340 214 V200 H214');L('M200 120 V104');L('M200 72 V56');L('M330 39 H348');
     S('path',{d:'M420 39 H455 V610 H332','marker-end':'url(#arr)',style:'fill:none;stroke:var(--ok);stroke-width:2;stroke-dasharray:5 4'},svg);
     T(svg,448,632,'append the new token & repeat',{'text-anchor':'end',style:'font-size:10.5px;fill:var(--ok);font-weight:700'});
-    B.forEach((b,i)=>{if(b.id==='stack')return;const on=b.id===st.b,g=S('g',{style:`cursor:pointer;opacity:${on?1:.62};transition:opacity .3s`},svg);
+    B.forEach((b,i)=>{if(b.id==='stack')return;const on=b.id===st.b,g=S('g',{style:`cursor:pointer;opacity:${on?1:.8};transition:opacity .3s`},svg);
       g.addEventListener('click',()=>{stop();k=ST.findIndex(s=>s.b===b.id);render();});
       if(b.id==='a1'||b.id==='a2'){S('circle',{cx:b.x+12,cy:b.y+12,r:13,style:`fill:var(--surface);stroke:${on?'var(--accent)':'var(--ink)'};stroke-width:${on?3.5:2}`},g);T(g,b.x+12,b.y+18,'+',{'text-anchor':'middle',class:'big'});return;}
       const dark=b.col!=='var(--surface-2)';R(g,b.x,b.y,b.w,b.h,`fill:${b.col};${on?'stroke:var(--ink);stroke-width:3':''}`,{rx:8});
@@ -1971,7 +1972,7 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
     R(svg,ZX,24,ZW,600,'fill:var(--surface-2);stroke:var(--line)',{rx:14});
     T(svg,ZX+16,52,st.zt||st.n,{style:'font-weight:800;font-size:14px'});T(svg,ZX+16,76,st.sh,{style:'font-size:12px;fill:var(--accent);font-weight:700'});
     (Z[st.b]||(()=>{}))();
-    $('#ar-note').innerHTML=`<b class="mono" style="color:var(--accent)">${k+1}/${ST.length} · ${st.n}</b><br>${st.c}`;
+    $('#ar-note').innerHTML=`<b class="mono" style="color:var(--accent)">${k+1}/${ST.length} · ${st.n}</b><br>${glink(st.c)}`;
     $('#ar-prev').disabled=k===0;$('#ar-next').disabled=k===ST.length-1;}
   function stop(){clearInterval(timer);timer=null;$('#ar-play').textContent='Play the data flow';}
   $('#ar-prev').onclick=()=>{stop();if(k>0){k--;render();}};$('#ar-next').onclick=()=>{stop();if(k<ST.length-1){k++;render();}};
@@ -2207,12 +2208,12 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
   (function(){const svg=$('#xs-svg');const lab=['cat','dog','car','sky','tree'],sc=[2.0,1.0,0.5,-0.5,-1.5];
     function render(){clear(svg);const t=+$('#xs-t').value/10;$('#xs-tv').textContent=t.toFixed(1);
       const z=sc.map(v=>v/t),ex=z.map(Math.exp),tot=ex.reduce((a,b)=>a+b,0),p=ex.map(v=>v/tot);
-      const cols=[[30,'scores',sc.map(v=>v.toFixed(1))],[200,'÷ temperature',z.map(v=>v.toFixed(2))],[370,'e to the power',ex.map(v=>v.toFixed(2))]];
+      const cols=[[30,'scores',sc.map(v=>v.toFixed(1))],[200,'÷ temperature',z.map(v=>v.toFixed(2))],[370,'e to the power',ex.map(v=>v>=1e4?v.toExponential(1):v.toFixed(2))]];
       cols.forEach(([x,ttl,vals],ci)=>{T(svg,x,40,ttl,{class:'lbl'});vals.forEach((v,i)=>{R(svg,x,52+i*40,120,30,'fill:var(--surface-2)',{rx:6});T(svg,x+8,72+i*40,lab[i],{style:'font-size:11px;fill:var(--muted)'});T(svg,x+112,72+i*40,v,{'text-anchor':'end',style:'font-weight:700'});});
         if(ci<2)S('line',{x1:x+126,x2:x+166,y1:150,y2:150,'marker-end':'url(#arr)',style:'stroke:var(--muted);stroke-width:2'},svg);});
       S('line',{x1:496,x2:536,y1:150,y2:150,'marker-end':'url(#arr)',style:'stroke:var(--muted);stroke-width:2'},svg);
-      T(svg,540,40,'÷ total = weights',{class:'lbl'});p.forEach((v,i)=>{R(svg,540,52+i*40,200*v,30,'fill:var(--accent)',{rx:6});T(svg,546+200*v,72+i*40,(100*v).toFixed(1)+'%',{style:'font-weight:700'});});
-      T(svg,30,272,`total of the e-powers = ${tot.toFixed(2)}; each weight = its e-power ÷ total, so all weights add to 100%`,{style:'font-size:12px;fill:var(--muted)'});
+      T(svg,540,40,'÷ total = weights',{class:'lbl'});p.forEach((v,i)=>{const bw=160*v;R(svg,540,52+i*40,bw,30,'fill:var(--accent)',{rx:6});const lbl=(100*v).toFixed(1)+'%';if(bw>60)T(svg,540+bw-6,72+i*40,lbl,{'text-anchor':'end',style:'font-weight:700;fill:var(--on-fill)'});else T(svg,546+bw,72+i*40,lbl,{style:'font-weight:700'});});
+      T(svg,30,272,`total of the e-powers = ${tot>=1e4?tot.toExponential(2):tot.toFixed(2)}; each weight = its e-power ÷ total, so all weights add to 100%`,{style:'font-size:12px;fill:var(--muted)'});
       stats($('#xs-stats'),[{v:(100*p[0]).toFixed(0)+'%',l:'weight on the top score'},{v:t.toFixed(1),l:'temperature'},{v:t<1?'sharper':t>1?'flatter':'unchanged',l:'compared with plain softmax'}]);}
     $('#xs-t').oninput=render;render();})();
 
@@ -2223,18 +2224,18 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
       if(mode==='dot'){T(svg,30,40,'two lists of the same length → one number',{class:'lbl'});const a=[1,2,3,4],b=[2,0,1,3];
         a.forEach((v,i)=>{R(svg,60+i*56,70,48,40,'fill:var(--g0)',{rx:6});T(svg,84+i*56,96,v,{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700'});R(svg,60+i*56,140,48,40,'fill:var(--g3)',{rx:6});T(svg,84+i*56,166,b[i],{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700'});T(svg,84+i*56,130,'×',{'text-anchor':'middle',style:'fill:var(--muted)'});});
         T(svg,60,220,'1×2 + 2×0 + 3×1 + 4×3 = 17',{class:'big'});T(svg,60,250,'q · k in attention is exactly this, with d_head numbers each',{style:'font-size:12px;fill:var(--muted)'});
-        $('#xg-note').innerHTML='A <b>dot product</b> multiplies matching positions and adds them up. Big when the two lists point the same way, near 0 when unrelated, negative when opposite.';}
+        $('#xg-note').innerHTML=glink('A <b>dot product</b> multiplies matching positions and adds them up. Big when the two lists point the same way, near 0 when unrelated, negative when opposite.');}
       else if(mode==='mm'){T(svg,30,40,'A [3, 4] · B [4, 2] = C [3, 2]',{class:'lbl'});grid(40,70,3,4,30,'var(--g0)',1,null,'A [3, 4]');T(svg,175,120,'·',{class:'big'});grid(200,55,4,2,30,'var(--g3)',null,1,'B [4, 2]');T(svg,290,120,'=',{class:'big'});
         grid(320,70,3,2,30,'var(--accent)',null,null,'C [3, 2]');R(svg,350,100,28,28,'fill:var(--accent);stroke:var(--ink);stroke-width:2',{rx:2});
         T(svg,420,90,'outlined cell = coloured row of A',{style:'font-weight:700'});T(svg,420,108,'· coloured column of B',{style:'font-weight:700'});T(svg,420,132,'one dot product per output cell:',{style:'font-size:12px;fill:var(--muted)'});T(svg,420,150,'3 × 2 = 6 dot products of length 4',{style:'font-size:12px;fill:var(--muted)'});
         T(svg,420,190,'inner sizes must match: [3, 4] · [4, 2]',{style:'font-weight:700'});T(svg,420,210,'a transpose only flips a matrix so they do',{style:'font-size:12px;fill:var(--muted)'});
-        $('#xg-note').innerHTML='A <b>matrix multiplication</b> is a grid of dot products: every row of A against every column of B. Every "·" between two weight-sized blocks on this page means this.';}
+        $('#xg-note').innerHTML=glink('A <b>matrix multiplication</b> is a grid of dot products: every row of A against every column of B. Every "·" between two weight-sized blocks on this page means this.');}
       else{const gemm=mode==='gemm';T(svg,30,40,gemm?'GEMM: many rows (tokens) × the weight matrix':'GEMV: one row (one token) × the weight matrix',{class:'lbl'});
         grid(40,70,gemm?6:1,6,22,'var(--g0)',null,null,gemm?'X [6 tokens, h]':'x [1 token, h]');T(svg,190,140,'·',{class:'big'});
         grid(215,70,6,6,22,'var(--g1)',null,null,'W [h, h], read from memory');T(svg,365,140,'=',{class:'big'});grid(390,70,gemm?6:1,6,22,'var(--accent)',null,null,gemm?'Y [6, h]':'y [1, h]');
         T(svg,540,90,gemm?'each weight read once,':'each weight read once,',{style:'font-weight:700'});T(svg,540,110,gemm?'used for 6 tokens':'used for 1 token',{style:'font-weight:700;fill:'+(gemm?'var(--ok)':'var(--bad)')});
         T(svg,540,150,gemm?'arithmetic units busy:':'arithmetic units idle,',{style:'font-size:12px;fill:var(--muted)'});T(svg,540,168,gemm?'compute-bound':'waiting on memory:',{style:'font-size:12px;fill:var(--muted)'});T(svg,540,186,gemm?'(prefill, training)':'memory-bound (decode)',{style:'font-size:12px;fill:var(--muted)'});
-        $('#xg-note').innerHTML=gemm?'<b>GEMM</b> (general matrix-matrix multiply) is the GPU library routine for a full matrix multiply. With many token rows, each weight fetched from memory is reused many times, so the GPU is limited by arithmetic. Prefill and training run as GEMMs.':'<b>GEMV</b> (general matrix-vector multiply) is the single-row case. Each weight is fetched for one row of work, so the GPU waits on memory. Decode of one sequence is a GEMV; batching many sequences turns it back into a GEMM (section 03).';}}
+        $('#xg-note').innerHTML=glink(gemm?'<b>GEMM</b> (general matrix-matrix multiply) is the GPU library routine for a full matrix multiply. With many token rows, each weight fetched from memory is reused many times, so the GPU is limited by arithmetic. Prefill and training run as GEMMs.':'<b>GEMV</b> (general matrix-vector multiply) is the single-row case. Each weight is fetched for one row of work, so the GPU waits on memory. Decode of one sequence is a GEMV; batching many sequences turns it back into a GEMM (section 03).');}}
     seg($('#xg-seg'),[{l:'Dot product',v:'dot'},{l:'Matrix multiply',v:'mm'},{l:'GEMM',v:'gemm'},{l:'GEMV',v:'gemv'}],'dot',v=>{mode=v;render();});render();})();
 })();
 
@@ -2315,7 +2316,7 @@ document.querySelectorAll('main section:not(#x-glossary) p.cap, main section:not
     [['computing',`fill:${G(0)}`],['All-Reduce','fill:var(--accent);opacity:.85'],['idle (waiting)','fill:url(#hatch)'],['weights','fill:var(--ink);opacity:.55'],['KV cache','fill:var(--bad)']].reduce((x,[l,f])=>{R(svg,x,ly-9,12,12,f,{rx:2});const t=T(svg,x+16,ly+1,l,{style:'font-size:10.5px;fill:var(--muted)'});return x+16+t.getComputedTextLength()+16;},sx);
     T(svg,sx,ly+18,`memory bars per GPU: axis ${mb(axis)} (each GPU has 80 GB)`+(wPer>80e9?' · weights do NOT fit on one GPU: add GPUs':''),{style:`font-size:10.5px;fill:${wPer>80e9?'var(--bad)':'var(--muted)'}`});
     // tokens strip
-    const ty=ly+44;T(svg,sx,ty,'TOKENS',{class:'lbl'});svg.setAttribute('viewBox',`0 0 760 ${ty+16}`);
+    const ty=ly+44;T(svg,sx,ty,'TOKENS',{class:'lbl'});svg.setAttribute('viewBox',`0 0 760 ${Math.max(ty+16,86+8*30+7*8+24+44+16)}`);
     R(svg,sx+60,ty-12,170,18,'fill:var(--surface-2)',{rx:4});T(svg,sx+145,ty+1,`prompt: ${cfg.s} tokens`,{'text-anchor':'middle',style:'font-size:11px'});
     const out=OPS.slice(0,k+1).filter(x=>x.tok).length;
     for(let t=0;t<cfg.d+1;t++){const x=sx+240+t*62;R(svg,x,ty-12,56,18,t<out?'fill:var(--g3)':'fill:none;stroke:var(--line);stroke-dasharray:2 3',{rx:4});T(svg,x+28,ty+1,'token '+(t+1),{'text-anchor':'middle',style:`font-size:10.5px;fill:${t<out?'var(--ink)':'var(--muted)'}`});}
@@ -2435,6 +2436,30 @@ document.querySelectorAll('main section').forEach(sec=>{if(!sec.querySelector(':
   let ret=null;
   document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#"]');if(!a||a.closest('nav'))return;ret=window.scrollY;back.hidden=false;},true);
   back.onclick=()=>{if(ret!==null)window.scrollTo({top:ret,behavior:'smooth'});ret=null;back.hidden=true;};
+})();
+
+/* contrast guard: after any SVG redraw, re-colour labels that are too faint on what sits behind them */
+(function(){
+  const rgb=s=>{const m=String(s).match(/rgba?\(([^)]+)\)/);if(!m)return null;const v=m[1].split(/[ ,\/]+/).filter(Boolean).map(Number);return {r:v[0],g:v[1],b:v[2],a:v.length>3?v[3]:1};};
+  const lum=c=>{const f=x=>{x/=255;return x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4);};return .2126*f(c.r)+.7152*f(c.g)+.0722*f(c.b);};
+  const cr=(a,b)=>{const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+  const mix=(f,b,a)=>({r:f.r*a+b.r*(1-a),g:f.g*a+b.g*(1-a),b:f.b*a+b.b*(1-a)});
+  const probe=document.createElement('span');probe.style.display='none';document.body.appendChild(probe);
+  const col=v=>{probe.style.color=`var(${v})`;return rgb(getComputedStyle(probe).color);};
+  function bgOf(el){while(el&&el!==document.documentElement){const c=rgb(getComputedStyle(el).backgroundColor);if(c&&c.a>0.5)return c;el=el.parentElement;}return col('--bg');}
+  function fix(svg){if(!svg.isConnected)return;const sr=svg.getBoundingClientRect();if(!sr.width)return;
+    const ink=col('--ink'),onf=col('--on-fill'),page=bgOf(svg);
+    const shapes=[...svg.querySelectorAll('rect,circle,ellipse,polygon,path')];
+    const boxes=shapes.map(s=>{const cs=getComputedStyle(s),f=rgb(cs.fill);if(!f||f.a===0)return null;const op=(+cs.opacity)*(+cs.fillOpacity||1)*f.a;if(op<0.3)return null;const r=s.getBoundingClientRect();if(r.width<4||r.height<4)return null;return {s,r,c:mix(f,page,Math.min(op,1))};});
+    svg.querySelectorAll('text').forEach(t=>{if(t.dataset.of===undefined)t.dataset.of=t.style.fill||'';t.style.fill=t.dataset.of;const r=t.getBoundingClientRect();if(!r.width)return;const cx=r.left+r.width/2,cy=r.top+r.height/2;
+      let bg=page;for(let i=boxes.length-1;i>=0;i--){const b=boxes[i];if(!b)continue;if(!(b.s.compareDocumentPosition(t)&Node.DOCUMENT_POSITION_FOLLOWING))continue;if(cx>=b.r.left&&cx<=b.r.right&&cy>=b.r.top&&cy<=b.r.bottom){let inside=true;try{const m=b.s.getScreenCTM();if(m&&b.s.isPointInFill){const q=new DOMPoint(cx,cy).matrixTransform(m.inverse());inside=b.s.isPointInFill(q);}}catch(e){}if(inside){bg=b.c;break;}}}
+      const tc=rgb(getComputedStyle(t).fill);if(!tc)return;const need=parseFloat(getComputedStyle(t).fontSize)<11?4.5:3;if(cr(mix(tc,bg,tc.a),bg)>=need)return;
+      const best=cr(ink,bg)>=cr(onf,bg)?'var(--ink)':'var(--on-fill)';t.style.fill=best;});}
+  const pend=new Set();let raf=0;
+  const queue=svg=>{pend.add(svg);if(!raf)raf=requestAnimationFrame(()=>{raf=0;const a=[...pend];pend.clear();a.forEach(fix);});};
+  document.querySelectorAll('main svg').forEach(svg=>{new MutationObserver(()=>queue(svg)).observe(svg,{childList:true,subtree:true});queue(svg);});
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>document.querySelectorAll('main svg').forEach(queue));
+  new MutationObserver(()=>document.querySelectorAll('main svg').forEach(queue)).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 })();
 </script>
 </body>
