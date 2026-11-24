@@ -164,7 +164,7 @@ ul.rows li{margin:2px 0}
 footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 .sub-h{font-size:18px;margin:22px 0 4px;font-weight:800}
-.to{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;margin:4px 0 8px;font:500 13px/1.45 var(--f-body);color:var(--ink);max-width:90ch}.to span{white-space:normal}.to .g{color:var(--ok)}.to .c{color:var(--bad)}.to .u,.to .x{color:var(--muted)}.v{font:800 10.5px var(--f-mono);letter-spacing:.04em;padding:2px 7px;border-radius:5px;color:#fff}.v-d{background:var(--ok)}.v-t{background:var(--accent)}.v-c{background:#b46a08}
+.to{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;margin:4px 0 8px;font:500 13px/1.45 var(--f-body);color:var(--ink);max-width:90ch}.to span{white-space:normal}.to .g{color:var(--ok)}.to .c{color:var(--bad)}.to .u,.to .x{color:var(--muted)}.v{font:800 10.5px var(--f-mono);letter-spacing:.04em;padding:2px 7px;border-radius:5px;color:#fff}.v-d{background:#1f7d52}.v-t{background:#5b3fc4}.v-c{background:#9a5a06}
 </style>
 </head>
 <body>
@@ -308,7 +308,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   </div>
 </section>
 
-<div class="part"><span>PART II</span><h3>Inference optimizations</h3><p class="cap">How serving systems make inference fast and cheap, and which of those shapes or memory costs each technique attacks. Each section opens with a verdict: <b class="v v-d">DEFAULT</b> on in modern engines, no real downside · <b class="v v-t">TUNE</b> always on, but a knob to set · <b class="v v-c">CHOICE</b> a real trade-off you decide. Then <span style="color:var(--ok)">▲ gain</span>, <span style="color:var(--bad)">▼ cost</span>, ✓ use when, ✗ avoid when.</p></div>
+<div class="part"><span>PART II</span><h3>Inference optimizations</h3><p class="cap">How serving systems make inference fast and cheap, and which of those shapes or memory costs each technique attacks. Each section opens with a verdict: <b class="v v-d">DEFAULT</b> on by default in modern engines; costs are minor · <b class="v v-t">TUNE</b> always on, but a knob to set · <b class="v v-c">CHOICE</b> a real trade-off you decide. Then <span style="color:var(--ok)">▲ gain</span>, <span style="color:var(--bad)">▼ cost</span>, ✓ use when, ✗ avoid when.</p></div>
 <section id="phases">
   <div class="sh"><span class="n">01</span><h2>Prefill vs decode</h2></div>
   <p class="cap">Answering a request has two phases. <b>Prefill</b> reads the whole prompt at once, as one matrix–matrix product. <b>Decode</b> then writes the reply one token per step, a matrix–vector product that still reads every weight. It stops when the model emits an end-of-sequence token or reaches a length limit. Long prompts, such as retrieved documents added by RAG (retrieval-augmented generation), make prefill longer. In the figure, weights live in <b>HBM</b>, the GPU's large main memory, and each token's keys and values (section 00.2) are saved in a <b>KV cache</b>, so decode only has to process the newest token; section 02 sizes that cache.</p>
@@ -404,7 +404,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 </section>
 <section id="par-pp">
   <div class="sh"><span class="n">04.3</span><h2>Pipeline parallelism: split the layers</h2></div>
-  <p class="to"><b class="v v-c">CHOICE</b><span class="g">▲ fits huge models, little communication</span><span class="c">▼ stages run in series: added latency, idle bubbles</span><span class="u">✓ spanning servers with slow links</span><span class="x">✗ single-request latency matters most</span></p>
+  <p class="to"><b class="v v-c">CHOICE</b><span class="g">▲ fits huge models, little communication</span><span class="c">▼ no per-request speed-up; idle bubbles unless many requests are in flight</span><span class="u">✓ spanning servers with slow links</span><span class="x">✗ single-request latency matters most</span></p>
   <p class="cap">Cut the stack of layers into stages, one per GPU. Each of the p GPUs stores 1/p of the weights and passes only a small activation tensor [b, s, h] to the next stage. But stages must wait on each other, and a single request still has to walk through every stage in turn.</p>
   <p class="cap">More microbatches make each block smaller and let the stages overlap, so the run finishes earlier.</p>
   <div class="fig">
@@ -418,7 +418,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 </section>
 <section id="par-tpc">
   <div class="sh"><span class="n">04.4</span><h2>Tensor parallelism: split inside each layer</h2></div>
-  <p class="to"><b class="v v-c">CHOICE</b><span class="g">▲ fits bigger models and cuts per-token latency</span><span class="c">▼ an All-Reduce in every layer</span><span class="u">✓ inside one NVLink server</span><span class="x">✗ across servers over the network</span></p>
+  <p class="to"><b class="v v-c">CHOICE</b><span class="g">▲ fits bigger models and cuts per-token latency</span><span class="c">▼ two All-Reduces in every layer</span><span class="u">✓ inside one NVLink server</span><span class="x">✗ across servers over the network</span></p>
   <p class="cap">TP splits the <b>weight matrices themselves</b>, so every GPU works on every layer, for the same sequences, with part of the weights. Step through what gets split, how, and what it costs.</p>
   <div class="fig">
     <div class="controls"><button class="btn solid" id="tpc-prev" type="button">◀ Prev</button><button class="btn solid" id="tpc-next" type="button">Next ▶</button><button class="btn solid" id="tpc-play" type="button">Play all</button><span class="spd" aria-label="Animation speed">speed</span></div>
@@ -429,7 +429,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 </section>
 <section id="par-sp">
   <div class="sh"><span class="n">04.5</span><h2>Sequence parallelism: remove TP's copies</h2></div>
-  <p class="to"><b class="v v-c">CHOICE</b><span class="g">▲ removes TP's duplicated activations</span><span class="c">▼ extra communication steps around each norm</span><span class="u">✓ long sequences with TP (training, long prefill)</span><span class="x">✗ short decode batches</span></p>
+  <p class="to"><b class="v v-c">CHOICE</b><span class="g">▲ removes TP's duplicated activations</span><span class="c">▼ two collectives instead of one (same bytes); more complex kernels</span><span class="u">✓ long sequences with TP (training, long prefill)</span><span class="x">✗ short decode batches</span></p>
   <p class="cap">TP leaves LayerNorm and Dropout (a training-only step that randomly zeroes some values) copied on every GPU. These ops treat each token on its own, so they can be split along the sequence s instead. Inside <b>every</b> layer, TP + SP switches layout op by op: split s at LayerNorm, Dropout and the residual add; plain TP inside attention and the MLP. Sequence parallelism comes from a later Megatron-LM paper; the two collectives it uses are <a class="gl" href="#g-rs">Reduce-Scatter</a> and <a class="gl" href="#g-ag">All-Gather</a>. Compare the layouts of the same [b, s, h] tensor on two GPUs:</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="cube-seg"></div><button class="btn solid" id="cube-replay" type="button">Replay cut</button><span class="spd" aria-label="Animation speed">speed</span></div>
@@ -504,7 +504,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="attention">
   <div class="sh"><span class="n">05</span><h2>MHA → GQA → MQA</h2></div>
-  <p class="to"><b class="v v-c">CHOICE</b><span class="g">▲ KV cache shrinks by heads ÷ KV heads</span><span class="c">▼ small quality loss; fixed when the model is trained</span><span class="u">✓ prefer GQA models for serving</span><span class="x">✗ you cannot change it on an existing model without retraining</span></p>
+  <p class="to"><b class="v v-c">CHOICE</b><span class="g">▲ KV cache shrinks by heads ÷ KV heads</span><span class="c">▼ small quality loss; fixed when the model is trained</span><span class="u">✓ prefer GQA models for serving</span><span class="x">✗ expecting to convert an MHA model without uptraining</span></p>
   <p class="cap">In standard multi-head attention (<b>MHA</b>), every query head has its own key and value head. Grouped-query attention (<b>GQA</b>) lets a group of query heads share one, and multi-query attention (<b>MQA</b>) shares one across all of them. Fewer KV heads means a smaller KV cache and fewer memory reads. The sharing must be learned: a model is trained with GQA or MQA, or an existing MHA model is <i>uptrained</i> with a small fraction of its original training compute. MQA can lose some quality, which is why most current models use GQA (Llama 2 70B: 64 query heads, 8 KV heads).</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="at-seg"></div></div>
@@ -529,7 +529,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   </div>
   <p class="cap">How can softmax be done one tile at a time when it needs the whole row? Each row keeps two running numbers: the largest score seen so far (m) and the sum of exponentials so far (ℓ). When a new tile has a larger maximum, the partial output already accumulated is rescaled by e<sup>(old m − new m)</sup>. After the last tile, dividing by ℓ gives exactly the same result as ordinary softmax.</p>
   <h3 class="sub-h">What it buys you</h3>
-  <p class="cap">Drag the sequence length. The figure compares one attention layer of a Llama-style model (32 heads, head size 128, BF16, one sequence), using H100 speeds: 3.35 TB/s HBM bandwidth and 989 TFLOP/s for BF16 tensor-core math. The arithmetic is identical in both; what changes is the memory the score table needs and the bytes moved through HBM.</p>
+  <p class="cap">Drag the sequence length. The figure compares one attention layer of a Llama-style model (32 heads, head size 128, BF16, one sequence), using H100 speeds: 3.35 TB/s HBM bandwidth and about 740 TFLOP/s of BF16 tensor-core math (75% of the 989 peak, what FlashAttention-3 reaches). The arithmetic is identical in both; what changes is the memory the score table needs and the bytes moved through HBM.</p>
   <div class="fig">
     <div class="controls"><label class="ctl">sequence length s = <span class="mono" id="fb-sv"></span><input type="range" id="fb-s" min="0" max="7" value="3"></label></div>
     <div class="svgbox"><svg id="fb-svg" viewBox="0 0 760 312" role="img" aria-label="Memory and time of standard attention versus FlashAttention as sequence length grows"></svg></div>
@@ -538,7 +538,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <p class="cap"><b>The gains.</b> Score memory falls from O(s²) to O(s): only the output and one number per row are stored. HBM traffic for the scores disappears, so attention stops waiting on memory and becomes limited by the tensor cores instead, typically 2–4× faster in training and prefill. And because the s × s table never has to fit in memory, context windows of 100k+ tokens became practical.</p>
   <p class="cap"><b>The trade-offs.</b> None in accuracy. The costs are elsewhere:</p>
   <ul class="cap">
-    <li><b>Extra arithmetic in training:</b> the backward pass recomputes the score tiles instead of reading a stored table, about 20–30% more FLOPs in attention, but still faster overall because memory was the bottleneck.</li>
+    <li><b>Extra arithmetic in training:</b> the backward pass recomputes the score tiles instead of reading a stored table, about 25% more backward-pass attention FLOPs, but still faster overall because memory was the bottleneck.</li>
     <li><b>Hand-written, hardware-specific kernels:</b> FlashAttention-2 and -3 are tuned per GPU generation (FlashAttention-3 targets Hopper), so new hardware or a new attention variant needs new kernel work; tools such as FlexAttention exist to generate variants.</li>
     <li><b>Small gain in decode:</b> with one new token per step there is no big s × s table to avoid; decode is limited by reading the KV cache (section 05). Decode-specific kernels (Flash-Decoding) instead split the KV cache across SMs to keep the GPU busy.</li>
   </ul>
@@ -614,7 +614,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="quant">
   <div class="sh"><span class="n">08</span><h2>Quantization</h2></div>
-  <p class="to"><b class="v v-c">CHOICE</b><span class="g">▲ 2–4× less memory, faster decode</span><span class="c">▼ accuracy loss, larger at lower bits</span><span class="u">✓ FP8 on GPUs that support it; INT4 weights when memory-bound</span><span class="x">✗ below 8 bits without running your own evals</span></p>
+  <p class="to"><b class="v v-c">CHOICE</b><span class="g">▲ 2–4× less weight memory; faster decode at small batches (INT4 gain fades at large batches)</span><span class="c">▼ accuracy loss, larger at lower bits</span><span class="u">✓ FP8 on GPUs that support it; INT4 weights when memory-bound</span><span class="x">✗ below 8 bits without running your own evals</span></p>
   <p class="cap">Quantization stores each number with fewer bits, so it can only take a few evenly spaced values: 16 with 4 bits, 256 with 8 (symmetric schemes like the one here use one fewer, 15 and 255, so that 0 sits exactly in the middle). Here 48 weights are snapped to the nearest one. A single outlier stretches the grid and wipes out resolution for everything else. Clipping the range trades that rounding error for clipping error.</p>
   <div class="fig">
     <div class="controls">
@@ -660,7 +660,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="spec">
   <div class="sh"><span class="n">11</span><h2>Speculative decoding</h2></div>
-  <p class="to"><b class="v v-c">CHOICE</b><span class="g">▲ often 2–3× faster tokens at low load, identical output distribution</span><span class="c">▼ extra compute; gains shrink or reverse at large batch sizes</span><span class="u">✓ latency-critical, low-concurrency serving</span><span class="x">✗ throughput-bound, heavily batched serving</span></p>
+  <p class="to"><b class="v v-c">CHOICE</b><span class="g">▲ often 2–3× faster tokens at low load, identical output distribution (with rejection sampling)</span><span class="c">▼ extra compute; gains shrink or reverse at large batch sizes</span><span class="u">✓ latency-critical, low-concurrency serving</span><span class="x">✗ throughput-bound, heavily batched serving</span></p>
   <p class="cap">A small draft model guesses several tokens. The big model checks all of them in a single parallel pass and keeps the matching prefix, plus one token of its own. (That is the rule for greedy decoding; when sampling, each draft token is accepted with probability min(1, p_big / p_draft), where p_big and p_draft are each model's probability for that token; on the first rejection, the replacement token is drawn from the leftover distribution max(0, p_big − p_draft), renormalised. Together these keep the output distribution exactly that of the big model.) It is also called speculative sampling or assisted generation. The draft can be a separate small model, or extra prediction heads added to the big model itself (as in Medusa).</p>
   <div class="fig">
     <div class="controls">
@@ -680,7 +680,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="disagg">
   <div class="sh"><span class="n">12</span><h2>Disaggregated serving: prefill and decode on different GPUs</h2></div>
-  <p class="to"><b class="v v-c">CHOICE</b><span class="g">▲ no prefill–decode interference; each side sized for its job</span><span class="c">▼ KV transfer between GPUs, more moving parts</span><span class="u">✓ large fleets with strict first-token and per-token targets</span><span class="x">✗ small deployments</span></p>
+  <p class="to"><b class="v v-c">CHOICE</b><span class="g">▲ no prefill–decode interference; each side sized for its job</span><span class="c">▼ KV transfer; prefill:decode GPU ratio to keep matched to traffic; no raw throughput gain</span><span class="u">✓ large fleets with strict first-token and per-token targets</span><span class="x">✗ small deployments</span></p>
   <p class="cap">Section 01 showed the two phases need different things: prefill is compute-bound, decode is memory-bound. When both run on the same GPU, a new prompt's prefill competes with decoding: without chunked prefill (splitting a long prompt into pieces mixed with decode steps), every running request stops getting tokens until it finishes; with it, they slow down instead. <b>Disaggregated serving</b> gives prefill and decode their own GPUs and ships each request's KV cache (section 02) from the prefill GPU to the decode GPU once its prompt is done.</p>
   <ul class="cap">
     <li><b>Aggregated</b> (the usual setup, with in-flight batching from section 03): both GPUs do both jobs.</li>
@@ -1571,7 +1571,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
 })();
 
 /* ---------- 06b FlashAttention benefit ---------- */
-(function(){const svg=$('#fb-svg'),SS=[1024,2048,4096,8192,16384,32768,65536,131072],H=32,D=128,BW=3.35e12,FL=989e12;
+(function(){const svg=$('#fb-svg'),SS=[1024,2048,4096,8192,16384,32768,65536,131072],H=32,D=128,BW=3.35e12,FL=740e12;
   const fmtB=b=>b>=1e12?(b/1e12).toFixed(1)+' TB':b>=1e9?(b/1e9).toFixed(b>=1e10?0:1)+' GB':b>=1e6?(b/1e6).toFixed(0)+' MB':(b/1e3).toFixed(0)+' KB';
   const fmtT=t=>t>=1e-3?(t*1e3).toFixed(t>=1e-2?0:1)+' ms':(t*1e6).toFixed(0)+' µs';
   function render(){clear(svg);const s=SS[+$('#fb-s').value];$('#fb-sv').textContent=s.toLocaleString();
@@ -1585,7 +1585,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
         if(inside)T(svg,134+lg(v),yy+20,f(v)+(lim&&v>lim?' · does not fit':''),{'text-anchor':'end',style:'font-size:12px;font-weight:800;fill:#ffffff'});
         else T(svg,Math.max(146+lg(v),lx&&lx>140+lg(v)-2&&lx<146+lg(v)+60?lx+6:0),yy+20,f(v),{style:'font-size:12px;font-weight:800'});});
       if(lim){const x=140+lim*sc;S('line',{x1:x,x2:x,y1:y+10,y2:y+108,style:'stroke:var(--ink);stroke-width:2;stroke-dasharray:5 4'},svg);T(svg,x>500?x-4:x+4,y+116,limLbl+' total memory',{'text-anchor':x>500?'end':'start',style:'font-size:10.5px;font-weight:700'});}});
-    const bound=trStd/BW>flops/FL;T(svg,20,288,`standard is ${bound?'memory-bound (waiting on HBM)':'compute-bound'}; FlashAttention is ${trFl/BW>flops/FL?'memory-bound':'compute-bound (tensor cores busy)'}`,{style:'font-size:11px;font-weight:700'});T(svg,20,304,'rough estimates from bytes and FLOPs; real kernels add overheads',{style:'font-size:10.5px;fill:var(--muted)'});
+    const bound=trStd/BW>flops/FL;T(svg,20,288,`standard is ${bound?'memory-bound (waiting on HBM)':'compute-bound'}; FlashAttention is ${trFl/BW>flops/FL?'memory-bound':'compute-bound (tensor cores busy)'}`,{style:'font-size:11px;font-weight:700'});T(svg,20,304,'assumes ~75% of peak math (FlashAttention-3 on H100: ~740 TFLOP/s); real kernels add overheads',{style:'font-size:10.5px;fill:var(--muted)'});
     stats($('#fb-stats'),[{v:fmtB(memStd)+' → '+fmtB(memFl),l:'score memory per layer',c:'good'},{v:fmtB(trStd)+' → '+fmtB(trFl),l:'HBM bytes moved'},{v:memStd>80e9?'won\'t fit':(tStd/tFl).toFixed(1)+'×',l:memStd>80e9?'standard needs more than the GPU has':'faster in this estimate',c:'good'},{v:(flops/1e12).toFixed(flops<1e12?2:1)+' TFLOP',l:'arithmetic, same for both'}]);}
   $('#fb-s').addEventListener('input',render);render();
 })();
@@ -1762,13 +1762,13 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
   const svg=$('#tk-svg');let sel=0;
   const box=(g,x,y,w,h,s,fill,fs)=>{R(g,x,y,w,h,`fill:${fill}`,{rx:5});T(g,x+w/2,y+h/2+4,s,{'text-anchor':'middle',style:`font-size:${fs||10.5}px;font-weight:700;fill:var(--on-fill)`});};
   const TK=[
-    {n:'CUDA graphs',t:'DEFAULT · ▼ extra GPU memory and start-up time to capture; only fixed batch sizes replay',c:'A decode step is hundreds of tiny kernels, and launching each one from the CPU takes a few microseconds, so the GPU can sit idle between them. Engines record the whole step once as a <b>CUDA graph</b> for each common batch size and replay it with a single launch. Section 18 of <a href="https://ylnhari.github.io/ml-scratchpad/gpu-stack-visualized/#timeline">The GPU Stack, Visualized</a> animates it.',
+    {n:'CUDA graphs',t:'DEFAULT · ▼ extra GPU memory and start-up time to capture; other sizes pad up to the next captured one',c:'A decode step is hundreds of tiny kernels, and launching each one from the CPU takes a few microseconds, so the GPU can sit idle between them. Engines record the whole step once as a <b>CUDA graph</b> for each common batch size and replay it with a single launch. Section 18 of <a href="https://ylnhari.github.io/ml-scratchpad/gpu-stack-visualized/#timeline">The GPU Stack, Visualized</a> animates it.',
       d:g=>{T(g,10,40,'eager',{style:'font-size:10.5px;fill:var(--muted)'});for(let i=0;i<7;i++)R(g,60+i*24,30,14,14,'fill:var(--g0)',{rx:2});T(g,10,74,'graph',{style:'font-size:10.5px;fill:var(--muted)'});for(let i=0;i<7;i++)R(g,60+i*15,64,14,14,'fill:var(--g0)',{rx:2});T(g,10,104,'gaps = launch overhead',{style:'font-size:10px;fill:var(--muted)'});}},
-    {n:'Async scheduling',t:'TUNE · ▼ more complex; check that the features you use support it',c:'Between GPU steps the CPU must schedule the next batch, prepare inputs and process outputs. Done one after the other, the GPU waits for the CPU every step. <b>Async scheduling</b> plans step n+1 on the CPU while the GPU is still running step n, so the GPU goes straight from one step to the next. vLLM (<span class="mono">--async-scheduling</span>), SGLang and TensorRT-LLM\'s overlap scheduler all do this.',
+    {n:'Async scheduling',t:'DEFAULT · ▼ one extra decode step per request; some features may not support it',c:'Between GPU steps the CPU must schedule the next batch, prepare inputs and process outputs. Done one after the other, the GPU waits for the CPU every step. <b>Async scheduling</b> plans step n+1 on the CPU while the GPU is still running step n, so the GPU goes straight from one step to the next. vLLM (on by default since v0.14), SGLang and TensorRT-LLM\'s overlap scheduler all do this by default.',
       d:g=>{T(g,10,42,'sync',{style:'font-size:10.5px;fill:var(--muted)'});for(let i=0;i<4;i++){const x=58+i*44;R(g,x,30,24,8,'fill:var(--g0)',{rx:2});R(g,x+24,40,18,6,'fill:var(--g2)',{rx:2});}
         T(g,10,82,'async',{style:'font-size:10.5px;fill:var(--muted)'});for(let i=0;i<6;i++){const x=58+i*26;R(g,x,70,24,8,'fill:var(--g0)',{rx:2});if(i<5)R(g,x+4,80,18,6,'fill:var(--g2)',{rx:2});}
         T(g,10,104,'upper bar GPU step · lower bar CPU work',{style:'font-size:10px;fill:var(--muted)'});}},
-    {n:'FP8 KV cache',t:'CHOICE · ▼ possible small accuracy loss; check on your evals',c:'The KV cache, not the weights, usually limits how many requests fit. Storing keys and values in 8-bit floating point instead of 16-bit halves the memory per token, so about twice as many tokens fit in the same pool, and decode reads half the bytes. Quality usually changes little; check it on your own evals (section 08 covers quantization).',
+    {n:'FP8 KV cache',t:'CHOICE · ▼ needs calibrated scales and backend support; check accuracy on your evals',c:'The KV cache, not the weights, usually limits how many requests fit. Storing keys and values in 8-bit floating point instead of 16-bit halves the memory per token, so about twice as many tokens fit in the same pool, and decode reads half the bytes. Quality usually changes little; check it on your own evals (section 08 covers quantization).',
       d:g=>{T(g,10,34,'BF16',{style:'font-size:10.5px;fill:var(--muted)'});for(let i=0;i<6;i++)R(g,52+i*26,22,24,18,`fill:${PAL(i)}`,{rx:2});T(g,10,74,'FP8',{style:'font-size:10.5px;fill:var(--muted)'});for(let i=0;i<12;i++)R(g,52+i*13,62,12,18,`fill:${PAL(i%6)}`,{rx:2});T(g,10,104,'same memory, twice the tokens',{style:'font-size:10px;fill:var(--muted)'});}},
     {n:'Cache-aware routing',t:'CHOICE · ▼ popular prefixes can overload one replica; the router must also balance load',c:'With several copies (replicas) of the model, a plain load balancer scatters a chat\'s turns across replicas, and each one prefills the shared history again. A <b>cache-aware router</b> sends requests that share a prefix to the replica that already holds it, so prefix caching (section 07.2) actually hits, while still balancing load.',
       d:g=>{box(g,10,44,52,26,'router','var(--g1)');[0,1,2].forEach(i=>{box(g,150,14+i*34,62,26,'replica '+(i+1),i===1?'var(--g3)':'var(--surface-2)',9.5);S('line',{x1:62,y1:57,x2:148,y2:27+i*34,style:`stroke:${i===1?'var(--accent)':'var(--line)'};stroke-width:${i===1?2.5:1.2}`},g);});T(g,10,128,'same prefix → same replica',{style:'font-size:10px;fill:var(--muted)'});}},
