@@ -536,7 +536,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <div class="sh"><span class="n">07.1</span><h2>The scheduler: one token budget per step</h2></div>
   <p class="cap">PagedAttention decides <i>where</i> the KV cache lives. The <b>scheduler</b> decides <i>what runs</i> in each step. Modern engines such as vLLM give every step a fixed <b>token budget</b> (vLLM's <span class="mono">max_num_batched_tokens</span>) and fill it in a fixed order:</p>
   <ul class="cap">
-    <li>every running request that is decoding gets its 1 token first;</li>
+    <li>requests already running go first: each decoding request gets its 1 token (a running prompt that is still being chunked gets its next chunk);</li>
     <li>whatever budget is left goes to waiting prompts, oldest first;</li>
     <li>a prompt that does not fit is cut into pieces and finished over the next steps (<b>chunked prefill</b>).</li>
   </ul>
@@ -564,7 +564,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
 
 <section id="preempt">
   <div class="sh"><span class="n">07.3</span><h2>Preemption: when the KV pool runs out</h2></div>
-  <p class="cap">The scheduler admits a request when its prompt fits in free KV blocks, but nobody knows how long each answer will be. As answers grow, the pool can fill up. Then the engine <b>preempts</b>: it pauses the most recently admitted request, frees its blocks so the older requests can keep going, and puts it back at the front of the queue. When blocks free up, the paused request is re-admitted and its KV cache is rebuilt by running prefill again over its prompt <i>and</i> the tokens it had already generated (<b>recompute</b>). The older alternative, <b>swap</b>, copies the blocks to CPU memory and back; vLLM V1 recomputes by default because that is cheaper there.</p>
+  <p class="cap">The scheduler admits a request when its prompt fits in free KV blocks, but nobody knows how long each answer will be. As answers grow, the pool can fill up. Then the engine <b>preempts</b>: it pauses the most recently admitted request, frees its blocks so the older requests can keep going, and puts it back at the front of the queue. When blocks free up, the paused request is re-admitted and its KV cache is rebuilt by running prefill again over its prompt <i>and</i> the tokens it had already generated (<b>recomputing</b>). The older alternative, <b>swap</b>, copies the blocks to CPU memory and back; vLLM V1 recomputes by default because that is cheaper there. With prefix caching on (also the V1 default), the paused request's full blocks keep their hashes in the free queue, so any that were not overwritten are found again and the real recompute is often smaller than shown here.</p>
   <div class="fig">
     <div class="controls"><div class="seg" id="pe-seg"></div><button class="btn solid" id="pe-play" type="button">Play</button><span class="spd" aria-label="Animation speed">speed</span></div>
     <div class="svgbox"><svg id="pe-svg" viewBox="0 0 760 330" role="img" aria-label="KV pool usage over time with preemption and recompute"></svg></div>
@@ -578,7 +578,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
   <div class="sh"><span class="n">07.4</span><h2>More engine tricks</h2></div>
   <p class="cap">Six more techniques that high-throughput engines (vLLM, SGLang, TensorRT-LLM) combine with the scheduler above. Each removes a different bottleneck: CPU overhead, memory, wasted prefill or idle hardware. Click a tile.</p>
   <div class="fig">
-    <div class="svgbox"><svg id="tk-svg" viewBox="0 0 760 420" role="img" aria-label="Gallery of six inference engine techniques"></svg></div>
+    <div class="svgbox"><svg id="tk-svg" viewBox="0 0 760 340" role="img" aria-label="Gallery of six inference engine techniques"></svg></div>
     <div class="note" id="tk-note"></div>
   </div>
 </section>
@@ -1582,13 +1582,13 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       const dur=1+used/16;seg.forEach(g=>{if(g.k==='d'||g.r.done>=g.r.p)g.r.tok.push(time+dur);});
       steps.push({s,t0:time,dur,seg,used});time+=dur;}
     return {steps,st,B,total:time};}
-  function render(){clear(svg);const {steps,st,B,total}=sim();$('#sc-bv').textContent=B+' tokens';
+  function render(){clear(svg);const {steps,st,B,total}=sim();$('#sc-bv').textContent=mode==='chunk'?B+' tokens':'not used';$('#sc-b').disabled=mode!=='chunk';
     const X0=118,W=626,sc=W/total,H0=150,hs=2.6;
     T(svg,X0,14,'TOKENS IN EACH STEP  (bar width = step time, illustrative)',{class:'lbl'});
     S('line',{x1:X0,x2:X0+W,y1:H0,y2:H0,style:'stroke:var(--line)'},svg);
     steps.forEach((p,i)=>{if(i>=t)return;const x=X0+p.t0*sc+1,w=p.dur*sc-2;let y=H0;
       p.seg.forEach(g=>{const h=Math.max(g.n*hs,3);y-=h;R(svg,x,y,w,h-0.5,`fill:${PAL(RQ.indexOf(RQ.find(q=>q.n===g.r.n)))};${g.k==='p'?'opacity:.9':''}`,{rx:2});
-        if(g.k==='p'){R(svg,x,y,w,h-0.5,'fill:url(#hatchBad);opacity:.25',{rx:2});if(h>13&&w>26)T(svg,x+w/2,y+h/2+4,g.r.n+' '+g.n,{'text-anchor':'middle',style:'font-size:10.5px;font-weight:800;fill:var(--on-fill)'});}});
+        if(g.k==='p'){R(svg,x,y,w,h-0.5,'fill:url(#hatchBad);opacity:.6',{rx:2});if(h>=12&&w>22)T(svg,x+w/2,y+h/2+3.5,g.r.n+' '+g.n,{'text-anchor':'middle',style:`font-size:${h>15?10.5:9}px;font-weight:800;fill:var(--on-fill)`});}});
       T(svg,x+w/2,H0+13,String(i+1),{'text-anchor':'middle',style:'font-size:9.5px;fill:var(--muted)'});});
     T(svg,X0-8,H0+13,'step',{'text-anchor':'end',style:'font-size:10px;fill:var(--muted)'});
     if(mode==='chunk'){const by=H0-B*hs;S('line',{x1:X0,x2:X0+W,y1:by,y2:by,style:'stroke:var(--bad);stroke-width:2;stroke-dasharray:6 4'},svg);T(svg,X0-8,by+4,'budget '+B,{'text-anchor':'end',style:'font-size:11px;font-weight:700;fill:var(--bad)'});}
@@ -1603,8 +1603,8 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     const gapA=(()=>{const a=st[0].tok;let g=0;for(let i=1;i<a.length;i++)g=Math.max(g,a[i]-a[i-1]);return g;})();
     const ttft=r=>r.tok.length?(r.tok[0]-steps[r.arr].t0):null,util=steps.reduce((a,p)=>a+p.used,0)/steps.length;
     T(svg,X0,ty+134,'hatched = prefill tokens (a whole prompt or a chunk) · thin = 1 decode token each',{style:'font-size:10.5px;fill:var(--muted)'});T(svg,X0,ty+150,'open circle = the prompt arrives',{style:'font-size:10.5px;fill:var(--muted)'});
-    $('#sc-note').innerHTML=glink(mode==='chunk'?`<b>Chunked prefill, budget ${B}.</b> Each step first gives A and B their decode token, then spends the rest of the budget on C's prompt (and later D's), a chunk at a time. Steps stay short and even, so A and B keep receiving tokens while C is still being prefilled. A smaller budget protects decode speed but finishes prompts later; a larger one gets C to its first token sooner but makes each step longer.`:
-      `<b>Whole prompts, no chunking.</b> When C arrives, its 40-token prompt runs as one long step on its own, and A and B get nothing until it is done; the same happens when D arrives. This is how engines worked before chunked prefill, and why one long prompt could freeze every other user's stream.`);
+    $('#sc-note').innerHTML=glink(mode==='chunk'?`<b>Chunked prefill, budget ${B}.</b> Each step first gives A and B their decode token, then spends the rest of the budget on C's prompt (and later D's), a chunk at a time. Steps stay much shorter than a whole-prompt step, so A and B keep receiving tokens while C is still being prefilled. A smaller budget protects decode speed but finishes prompts later; a larger one gets C to its first token sooner but makes each step longer.`:
+      `<b>Whole prompts, no chunking.</b> When C arrives, its 40-token prompt runs as one long step on its own, and A and B get nothing until it is done; the same happens when D arrives. C itself gets its first token sooner, but this is how engines worked before chunked prefill, and why one long prompt could freeze every other user's stream.`);
     stats($('#sc-stats'),[{v:fmt(gapA,2),l:'longest wait between two tokens for A (time units)',c:mode==='chunk'?'good':'bad'},{v:ttft(st[2])==null?'—':fmt(ttft(st[2]),2),l:'C: time to first token'},{v:fmt(util,1),l:'tokens per step, average'}]);}
   function stop(){clearInterval(timer);timer=null;$('#sc-play').textContent='Play';}
   seg($('#sc-seg'),[{l:'Chunked prefill',v:'chunk'},{l:'Whole prompt at once',v:'whole'}],mode,v=>{mode=v;stop();t=999;render();});
@@ -1631,28 +1631,29 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
   const ST=[{n:'R1 arrives',c:'Request R1: a 4-block system prompt (S1–S4), then its question Q1, which fills one block and part of a second. All 6 blocks are prefilled. The 5 full blocks get hashes and enter the cache; the half-filled last block does not.'},
     {n:'R2 arrives',c:'Request R2 has the same system prompt and a different question. With caching, its first 4 hashes match: S1–S4 are reused (their reference count goes to 2) and only its last block is prefilled. Without caching, all 5 blocks are computed again into new memory.'},
     {n:'R1 finishes',c:'R1 is done. Blocks still used by R2 stay put with a count of 1. R1\'s own cached block Q1a has a count of 0: it moves to the free queue but keeps its hash, so it can still be found. The half-filled block is simply freed.'},
-    {n:'R3: R1\'s next turn',c:'The user replies in R1\'s chat. The new prompt is the whole conversation so far plus the new message. With caching, S1–S4 and Q1a all hit, Q1a is pulled back out of the free queue, and only the 3 new blocks are prefilled.'}];
+    {n:'R3: R1\'s next turn',c:'The user replies in R1\'s chat. The new prompt is the whole conversation so far plus the new message. With caching, S1–S4 and Q1a all hit and Q1a is pulled back out of the free queue. Prefilled: Q1b (R1\'s half-filled block, now full but never cached), A1 and Q3.'}];
   function draw(k){const {slots,free,rec,comp,hit}=run(k);const X0=24,cw=44,ch=44;
     T(svg,X0,16,'KV BLOCK POOL: 16 blocks of 16 tokens',{class:'lbl'});
     for(let s=0;s<N;s++){const x=X0+s*cw,y=26,b=slots[s];
       if(!b){R(svg,x,y,cw-4,ch,'fill:var(--surface-2)',{rx:4});continue;}
       const live=b.refs>0;R(svg,x,y,cw-4,ch,`fill:${PAL(b.grp)};opacity:${live?1:.4}`,{rx:4});
       if(!live)R(svg,x,y,cw-4,ch,'fill:none;stroke:var(--ink);stroke-dasharray:3 3;stroke-width:1.2',{rx:4});
-      if(!b.full)R(svg,x+(cw-4)*.55,y,(cw-4)*.45,ch,'fill:var(--surface);opacity:.8',{rx:2});
+      if(!b.full)R(svg,x+(cw-4)*.55,y,(cw-4)*.45,ch,'fill:#ffffff;opacity:.7',{rx:2});
       T(svg,x+(cw-4)/2,y+20,b.l,{'text-anchor':'middle',style:'font-size:11.5px;font-weight:800;fill:var(--on-fill)'});
       T(svg,x+(cw-4)/2,y+36,live?(b.refs>1?'×'+b.refs:''):'cached',{'text-anchor':'middle',style:`font-size:${live?11:9.5}px;font-weight:700;fill:var(--on-fill)`});}
-    T(svg,X0,88,'×2 = used by two requests · faded "cached" = free but still holding its hash',{style:'font-size:10.5px;fill:var(--muted)'});T(svg,X0,103,'half-white = partly filled block (never cached)',{style:'font-size:10.5px;fill:var(--muted)'});
-    T(svg,X0,130,'EACH REQUEST\'S BLOCKS   (green outline = reused from cache, red = prefilled now)',{class:'lbl'});
+    T(svg,X0,88,'×2 = used by two requests · faded "cached" = free but still holding its hash',{style:'font-size:10.5px;fill:var(--muted)'});T(svg,X0,103,'pale right half = partly filled block (never cached)',{style:'font-size:10.5px;fill:var(--muted)'});
+    T(svg,X0,130,'EACH REQUEST\'S BLOCKS   (green outline = reused from cache, red = computed by prefill)',{class:'lbl'});
     ['R1','R2','R3'].forEach((r,i)=>{const y=140+i*56;const on=rec[r];T(svg,X0,y+26,r,{style:'font-weight:800;font-size:13px'});
       if(!on){T(svg,X0+40,y+26,'not arrived yet',{style:'font-size:11px;fill:var(--muted)'});return;}
       const gone=EV.slice(0,k+1).some(e=>e[0]===r&&e[1]==='out');
       on.forEach((b,j)=>{const x=X0+40+j*58;R(svg,x,y+6,52,32,`fill:${PAL(grp(b.l))};opacity:${gone?.35:1}`,{rx:4});
         R(svg,x,y+6,52,32,`fill:none;stroke:${b.h?'var(--ok)':'var(--bad)'};stroke-width:2.5`,{rx:4});
-        if(!b.full)R(svg,x+29,y+8,21,28,'fill:var(--surface);opacity:.8',{rx:2});
+        if(!b.full)R(svg,x+29,y+8,21,28,'fill:#ffffff;opacity:.7',{rx:2});
         T(svg,x+26,y+27,b.l,{'text-anchor':'middle',style:'font-size:11px;font-weight:800;fill:var(--on-fill)'});});
       if(gone)T(svg,X0+40+on.length*58+6,y+27,'finished',{style:'font-size:11px;fill:var(--muted)'});});
     stats($('#px-stats'),[{v:comp,l:'blocks prefilled so far'},{v:hit,l:'blocks reused from cache',c:hit?'good':''},{v:hit*16,l:'prompt tokens not recomputed'},{v:N-free.length+' / '+N,l:'blocks in use'}]);}
-  const STG=ST.map((s,i)=>({n:s.n,get f(){return caching?'prefix caching on':'prefix caching off: every request prefills all its blocks'},c:s.c,d:()=>draw(i)}));
+  const OFF=['Request R1: all 6 blocks are prefilled into free memory.','Without caching, R2 prefills all 5 of its blocks again, even the system prompt S1–S4 that R1 already computed.','R1 finishes and all 6 of its blocks are simply freed: nothing is kept for later.','R3 prefills all 8 blocks, including the whole earlier conversation.'];
+  const STG=ST.map((s,i)=>({n:s.n,get f(){return caching?'prefix caching on':'prefix caching off: every request prefills all its blocks'},get c(){return caching?s.c:OFF[i];},d:()=>draw(i)}));
   api=stager({svg,note:$('#px-note'),chips:$('#px-chips'),prev:$('#px-prev'),next:$('#px-next'),play:$('#px-play'),stages:STG});
   seg($('#px-seg'),[{l:'Prefix caching on',v:1},{l:'Off',v:0}],1,v=>{caching=!!v;api.render();});
 })();
@@ -1668,7 +1669,8 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
         while(used()+1>cap){const v=run.pop();pre++;evs.push({s,r:v.n});v.state='wait';v.blocks=0;wait.unshift(v);if(v===r)break;}
         if(run.includes(r)){r.blocks++;r.gen++;}});
       run.forEach(r=>{if(r.state==='pre')r.state='dec';});
-      while(wait.length){const r=wait[0],nb=r.p+r.gen;if(used()+nb>cap)break;wait.shift();r.blocks=nb;r.state='pre';r.adm=s;if(r.gen)recomp+=nb;run.push(r);}
+      const preNow=evs.some(e=>e.s===s);
+      while(wait.length&&!preNow){const r=wait[0],nb=r.p+r.gen;if(used()+nb>cap)break;wait.shift();r.blocks=nb;r.state='pre';r.adm=s;if(r.gen)recomp+=nb;run.push(r);}
       const lane={};run.forEach(r=>{lane[r.n]={k:r.state==='pre'?(r.gen?'re':'pf'):'d',b:r.blocks};});wait.forEach(r=>{lane[r.n]={k:'w',b:0};});
       run.filter(r=>r.state==='dec'&&r.gen>=r.out).forEach(r=>{r.state='done';r.end=s;});run=run.filter(r=>r.state!=='done');
       rows.push({lane});}
@@ -1677,20 +1679,20 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     T(svg,X0,14,'KV BLOCKS IN USE, STEP BY STEP',{class:'lbl'});
     const cy=H0-cap*hs;S('line',{x1:X0,x2:X0+W,y1:cy,y2:cy,style:'stroke:var(--bad);stroke-width:2;stroke-dasharray:6 4'},svg);T(svg,X0-8,cy+4,'pool '+cap,{'text-anchor':'end',style:'font-size:11px;font-weight:700;fill:var(--bad)'});
     S('line',{x1:X0,x2:X0+W,y1:H0,y2:H0,style:'stroke:var(--line)'},svg);
-    rows.forEach((row,s)=>{if(s>=t)return;let y=H0;RQ.forEach((r,i)=>{const L=row.lane[r.n];if(!L||!L.b)return;const h=L.b*hs;y-=h;R(svg,X0+s*cw+1,y,cw-2,h-1,`fill:${PAL(i)}`,{rx:2});if(L.k==='re')R(svg,X0+s*cw+1,y,cw-2,h-1,'fill:url(#hatchBad);opacity:.6',{rx:2});});});
+    rows.forEach((row,s)=>{if(s>=t)return;let y=H0;RQ.forEach((r,i)=>{const L=row.lane[r.n];if(!L||!L.b)return;const h=L.b*hs;y-=h;R(svg,X0+s*cw+1,y,cw-2,h-1,`fill:${PAL(i)}`,{rx:2});if(L.k!=='d')R(svg,X0+s*cw+1,y,cw-2,h-1,`fill:url(#hatchBad);opacity:${L.k==='re'?.9:.45}`,{rx:2});});});
     evs.forEach(e=>{if(e.s>=t)return;const x=X0+(e.s+.5)*cw;S('line',{x1:x,x2:x,y1:cy-8,y2:H0+142,style:'stroke:var(--bad);stroke-width:1.5;stroke-dasharray:3 3'},svg);T(svg,x,cy-12,'preempt '+e.r,{'text-anchor':'middle',style:'font-size:10.5px;font-weight:800;fill:var(--bad)'});});
     const ly=158;T(svg,X0,ly-8,'WHAT EACH REQUEST IS DOING',{class:'lbl'});
     RQ.forEach((r,i)=>{const y=ly+i*28;T(svg,X0-8,y+14,'request '+r.n,{'text-anchor':'end',style:'font-size:11px'});R(svg,X0,y,W,20,'fill:var(--surface-2)',{rx:4});
       rows.forEach((row,s)=>{if(s>=t)return;const L=row.lane[r.n];if(!L)return;const x=X0+s*cw+1;
         if(L.k==='w')R(svg,x,y+7,cw-2,6,'fill:var(--muted);opacity:.45',{rx:2});
         else if(L.k==='d')R(svg,x,y+3,cw-2,14,`fill:${PAL(i)}`,{rx:2});
-        else{R(svg,x,y+1,cw-2,18,`fill:${PAL(i)}`,{rx:2});R(svg,x,y+1,cw-2,18,`fill:url(#hatchBad);opacity:${L.k==='re'?.8:.3}`,{rx:2});}});
+        else{R(svg,x,y+1,cw-2,18,`fill:${PAL(i)}`,{rx:2});R(svg,x,y+1,cw-2,18,`fill:url(#hatchBad);opacity:${L.k==='re'?.95:.45}`,{rx:2});}});
       const d=st[i].end;if(d!=null&&d<t)T(svg,X0+(d+1)*cw+4,y+14,'done',{style:'font-size:10.5px;font-weight:700;fill:var(--ok)'});});
     if(t<NS){const x=X0+t*cw;S('line',{x1:x,x2:x,y1:20,y2:ly+112,style:'stroke:var(--accent);stroke-width:2'},svg);}
     T(svg,X0,ly+130,'thin grey = waiting · light hatch = first prefill · dense hatch = recompute',{style:'font-size:10.5px;fill:var(--muted)'});T(svg,X0,ly+146,'solid = decoding (one more block every 2 steps)',{style:'font-size:10.5px;fill:var(--muted)'});
-    $('#pe-note').innerHTML=glink(pre?`<b>Pool of ${cap} blocks.</b> The four requests are admitted as they arrive, but as their answers grow the pool fills. Each time a running request needs one more block and none is free, the newest request is preempted: its blocks are freed and it waits again. When room returns it is re-admitted and its prompt plus every token it had already produced are prefilled again (dense hatch). That recompute is the cost; the older requests never stall.`:
+    $('#pe-note').innerHTML=glink(pre?`<b>Pool of ${cap} blocks.</b> The four requests are admitted as they arrive, but as their answers grow the pool fills. Each time a running request needs one more block and none is free, the newest request is preempted: its blocks are freed and it waits again. When room returns it is re-admitted and its prompt plus every token it had already produced are prefilled again (dense hatch). That recomputing is the cost (worst case, without prefix-cache hits); the older requests never stall.`:
       `<b>Pool of ${cap} blocks.</b> With more KV memory every answer fits, so nothing is preempted and no work is repeated. Giving the pool more memory, or storing the KV cache in FP8, is the usual fix for frequent preemption.`);
-    stats($('#pe-stats'),[{v:pre,l:'preemptions',c:pre?'bad':'good'},{v:recomp,l:'blocks prefilled a second time'},{v:Math.max(...st.map(r=>r.end==null?NS:r.end))+1,l:'steps until all four finish'}]);}
+    stats($('#pe-stats'),[{v:pre,l:'preemptions',c:pre?'bad':'good'},{v:recomp,l:'blocks re-admitted (worst case: all recomputed)'},{v:Math.max(...st.map(r=>r.end==null?NS:r.end))+1,l:'steps until all four finish'}]);}
   function stop(){clearInterval(timer);timer=null;$('#pe-play').textContent='Play';}
   seg($('#pe-seg'),[{l:'Pool: 16 blocks',v:16},{l:'Pool: 22 blocks',v:22}],16,v=>{cap=v;stop();t=999;render();});
   $('#pe-play').onclick=()=>{if(timer){stop();return;}t=0;$('#pe-play').textContent='Pause';render();timer=setInterval(()=>{t++;render();if(t>=NS){t=999;render();stop();}},RM?80:420);};
@@ -1705,19 +1707,21 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     {n:'CUDA graphs',c:'A decode step is hundreds of tiny kernels, and launching each one from the CPU takes a few microseconds, so the GPU can sit idle between them. Engines record the whole step once as a <b>CUDA graph</b> for each common batch size and replay it with a single launch. Section 18 of <a href="https://ylnhari.github.io/ml-scratchpad/gpu-stack-visualized/#timeline">The GPU Stack, Visualized</a> animates it.',
       d:g=>{T(g,10,40,'eager',{style:'font-size:10.5px;fill:var(--muted)'});for(let i=0;i<7;i++)R(g,60+i*24,30,14,14,'fill:var(--g0)',{rx:2});T(g,10,74,'graph',{style:'font-size:10.5px;fill:var(--muted)'});for(let i=0;i<7;i++)R(g,60+i*15,64,14,14,'fill:var(--g0)',{rx:2});T(g,10,104,'gaps = launch overhead',{style:'font-size:10px;fill:var(--muted)'});}},
     {n:'Async scheduling',c:'Between GPU steps the CPU must schedule the next batch, prepare inputs and process outputs. Done one after the other, the GPU waits for the CPU every step. <b>Async scheduling</b> plans step n+1 on the CPU while the GPU is still running step n, so the GPU goes straight from one step to the next. vLLM (<span class="mono">--async-scheduling</span>), SGLang and TensorRT-LLM\'s overlap scheduler all do this.',
-      d:g=>{[['sync',30,0],['async',70,1]].forEach(([n,y,a])=>{T(g,10,y+12,n,{style:'font-size:10.5px;fill:var(--muted)'});for(let i=0;i<4;i++){const x=58+i*(a?40:52);R(g,x,y,a?36:28,8,'fill:var(--g0)',{rx:2});R(g,a?x+4:x+28,y+10,a?30:22,6,'fill:var(--g2)',{rx:2});}});T(g,10,104,'upper bar GPU · lower bar CPU',{style:'font-size:10px;fill:var(--muted)'});}},
+      d:g=>{T(g,10,42,'sync',{style:'font-size:10.5px;fill:var(--muted)'});for(let i=0;i<4;i++){const x=58+i*44;R(g,x,30,24,8,'fill:var(--g0)',{rx:2});R(g,x+24,40,18,6,'fill:var(--g2)',{rx:2});}
+        T(g,10,82,'async',{style:'font-size:10.5px;fill:var(--muted)'});for(let i=0;i<6;i++){const x=58+i*26;R(g,x,70,24,8,'fill:var(--g0)',{rx:2});if(i<5)R(g,x+4,80,18,6,'fill:var(--g2)',{rx:2});}
+        T(g,10,104,'upper bar GPU step · lower bar CPU work',{style:'font-size:10px;fill:var(--muted)'});}},
     {n:'FP8 KV cache',c:'The KV cache, not the weights, usually limits how many requests fit. Storing keys and values in 8-bit floating point instead of 16-bit halves the memory per token, so about twice as many tokens fit in the same pool, and decode reads half the bytes. Quality usually changes little; check it on your own evals (section 08 covers quantization).',
       d:g=>{T(g,10,34,'BF16',{style:'font-size:10.5px;fill:var(--muted)'});for(let i=0;i<6;i++)R(g,52+i*26,22,24,18,`fill:${PAL(i)}`,{rx:2});T(g,10,74,'FP8',{style:'font-size:10.5px;fill:var(--muted)'});for(let i=0;i<12;i++)R(g,52+i*13,62,12,18,`fill:${PAL(i%6)}`,{rx:2});T(g,10,104,'same memory, twice the tokens',{style:'font-size:10px;fill:var(--muted)'});}},
     {n:'Cache-aware routing',c:'With several copies (replicas) of the model, a plain load balancer scatters a chat\'s turns across replicas, and each one prefills the shared history again. A <b>cache-aware router</b> sends requests that share a prefix to the replica that already holds it, so prefix caching (section 07.2) actually hits, while still balancing load.',
-      d:g=>{box(g,10,44,52,26,'router','var(--g1)');[0,1,2].forEach(i=>{box(g,150,14+i*34,62,26,'replica '+(i+1),i===1?'var(--g3)':'var(--surface-2)',9.5);S('line',{x1:62,y1:57,x2:148,y2:27+i*34,style:`stroke:${i===1?'var(--accent)':'var(--line)'};stroke-width:${i===1?2.5:1.2}`},g);});T(g,10,134,'same prefix → same replica',{style:'font-size:10px;fill:var(--muted)'});}},
+      d:g=>{box(g,10,44,52,26,'router','var(--g1)');[0,1,2].forEach(i=>{box(g,150,14+i*34,62,26,'replica '+(i+1),i===1?'var(--g3)':'var(--surface-2)',9.5);S('line',{x1:62,y1:57,x2:148,y2:27+i*34,style:`stroke:${i===1?'var(--accent)':'var(--line)'};stroke-width:${i===1?2.5:1.2}`},g);});T(g,10,128,'same prefix → same replica',{style:'font-size:10px;fill:var(--muted)'});}},
     {n:'Expert parallelism',c:'In a mixture-of-experts model (section A2) each token uses only a few of many expert MLPs. <b>Expert parallelism</b> places different experts on different GPUs; each token is sent to the GPUs holding its experts and back (an all-to-all exchange), so a model with hundreds of experts runs without every GPU storing all of them.',
       d:g=>{[0,1,2,3].forEach(i=>{R(g,30+i*50,52,42,40,'fill:var(--surface-2)',{rx:4});T(g,51+i*50,66,'GPU '+i,{'text-anchor':'middle',style:'font-size:9.5px;fill:var(--muted)'});R(g,36+i*50,72,14,14,`fill:${PAL(i*2)}`,{rx:2});R(g,52+i*50,72,14,14,`fill:${PAL(i*2+1)}`,{rx:2});});[0,1,2].forEach(i=>{S('line',{x1:60+i*40,y1:20,x2:51+((i*3)%4)*50,y2:50,style:'stroke:var(--accent);stroke-width:1.5'},g);R(g,54+i*40,12,12,10,'fill:var(--ink)',{rx:2});});T(g,10,114,'tokens go to their experts\' GPUs',{style:'font-size:10px;fill:var(--muted)'});}},
     {n:'Multi-LoRA batching',c:'Many fine-tuned variants can share one base model. Requests for different <b>LoRA adapters</b> (section A4) run in the same batch: the big base matrix multiply is shared, and special kernels (from the Punica and S-LoRA work) apply each request\'s own small adapter alongside it. One GPU serves hundreds of fine-tunes instead of one each.',
       d:g=>{box(g,40,16,150,30,'shared base weights','var(--g1)');[0,1,2,3].forEach(i=>{R(g,40+i*40,62,32,20,`fill:${PAL(i)}`,{rx:3});T(g,56+i*40,76,'L'+(i+1),{'text-anchor':'middle',style:'font-size:10px;font-weight:700;fill:var(--on-fill)'});});T(g,10,104,'one batch, one adapter per request',{style:'font-size:10px;fill:var(--muted)'});}}];
-  function draw(){clear(svg);TK.forEach((tk,i)=>{const x=(i%3)*256,y=Math.floor(i/3)*208+4,g=S('g',{transform:`translate(${x},${y})`,style:'cursor:pointer'},svg);
-      R(g,0,0,246,198,`fill:var(--surface);stroke:${i===sel?'var(--accent)':'var(--line)'};stroke-width:${i===sel?3:1}`,{rx:10});
-      T(g,12,24,tk.n,{style:'font-weight:800;font-size:13.5px'});const c=S('g',{transform:'translate(0,50)'},g);tk.d(c);
-      g.addEventListener('click',()=>{sel=i;draw();});});
+  function draw(){clear(svg);TK.forEach((tk,i)=>{const x=(i%3)*256,y=Math.floor(i/3)*170+4,g=S('g',{transform:`translate(${x},${y})`,style:'cursor:pointer',tabindex:0,role:'button','aria-label':tk.n},svg);
+      R(g,0,0,246,160,`fill:var(--surface);stroke:${i===sel?'var(--accent)':'var(--line)'};stroke-width:${i===sel?3:1}`,{rx:10});
+      T(g,12,24,tk.n,{style:'font-weight:800;font-size:13.5px'});const c=S('g',{transform:'translate(0,30)'},g);tk.d(c);
+      g.addEventListener('click',()=>{sel=i;draw();});g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();sel=i;draw();}});});
     $('#tk-note').innerHTML=`<b class="mono" style="color:var(--accent)">${TK[sel].n.toUpperCase()}</b><br>`+glink(TK[sel].c);}
   draw();
 })();
