@@ -803,7 +803,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
       <label class="ctl">rank r <span class="mono" id="ls-rv"></span><input type="range" id="ls-r" min="0" max="6" value="3"></label>
       <span class="mono" style="font-size:12px;color:var(--muted)">matrix</span><div class="seg" id="ls-mat"></div>
     </div>
-    <div class="svgbox"><svg id="ls-svg" viewBox="0 0 760 300" role="img" aria-label="Frozen matrix W next to the thin LoRA matrices A and B"></svg></div>
+    <div class="svgbox"><svg id="ls-svg" viewBox="10 14 630 292" role="img" aria-label="Frozen matrix W next to the thin LoRA matrices A and B"></svg></div>
     <div class="stats" id="ls-stats"></div>
   </div>
 </section>
@@ -829,7 +829,7 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <div class="controls"><button class="btn" id="lt-prev" type="button">◀ Prev</button><button class="btn" id="lt-next" type="button">Next ▶</button><button class="btn" id="lt-play" type="button">Play</button><span class="spd" aria-label="Animation speed">speed</span></div>
     <div class="chips" id="lt-chips"></div>
     <div class="note" id="lt-note" style="margin:0 0 10px"></div>
-    <div class="svgbox"><svg id="lt-svg" viewBox="0 0 760 300" role="img" aria-label="LoRA training: forward through both paths, backward updates only A and B"></svg></div>
+    <div class="svgbox"><svg id="lt-svg" viewBox="0 14 760 250" role="img" aria-label="LoRA training: forward through both paths, backward updates only A and B"></svg></div>
   </div>
 </section>
 
@@ -1593,7 +1593,7 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
 /* ---------- 07 paged attention ---------- */
 (function(){
   const L=[37,9,60,21,14,45,30,12,26,18],svg=$('#pg-svg');
-  const x0=40,y0=30,cw=21,rh=22,COLS=32,ROWS=8,BS=8;
+  const x0=28,y0=30,cw=22,rh=30,COLS=32,ROWS=8,BS=8;
   const rnd=mulberry32(11),perm=[...Array(32).keys()];for(let i=31;i>0;i--){const j=Math.floor(rnd()*(i+1));[perm[i],perm[j]]=[perm[j],perm[i]];}
   let mode='contig',sel=2;
   function layout(){const cells=Array(256).fill(null);let run=[];
@@ -1610,15 +1610,22 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       if(cell){const dim=mode==='paged'&&cell.r!==sel?.35:1;st=cell.used?`fill:${PAL(cell.r)};opacity:${dim}`:`fill:url(#hatchBad);opacity:${.55*dim}`;}
       R(svg,x,y,cw-1.5,rh-2,st,{rx:2});}
     if(mode==='paged'){for(let b=0;b<32;b++){const r=Math.floor(b/4),c=(b%4)*8;R(svg,x0+c*cw-1,y0+r*rh-1,8*cw,rh,'fill:none;stroke:var(--ink);stroke-width:1;opacity:.35');
-      T(svg,x0+c*cw+2,y0+r*rh+rh-6,String(b),{style:'font-size:9.5px;font-weight:700;fill:var(--ink);opacity:.9'});}}
+      T(svg,x0+c*cw+3,y0+r*rh+rh-9,String(b),{style:'font-size:11px;font-weight:800;fill:var(--ink);opacity:.9'});}}
     else{run.forEach(i=>{R(svg,x0-1,y0+i*2*rh-1,COLS*cw,2*rh,'fill:none;stroke:var(--ink);stroke-width:1.5;opacity:.5',{rx:3});});}
     T(svg,x0,y0+ROWS*rh+22,'hatched red = reserved but unused (fragmentation)',{class:'lbl'});
+    svg.setAttribute('viewBox',`0 0 760 ${mode==='paged'?414:306}`);const L_=(x1,y1,x2,y2)=>{const l=document.createElementNS('http://www.w3.org/2000/svg','line');[['x1',x1],['y1',y1],['x2',x2],['y2',y2]].forEach(([k,v])=>l.setAttribute(k,v));l.setAttribute('style','stroke:var(--muted);stroke-width:1.5');svg.appendChild(l);};
+    if(mode==='paged'){const ty=y0+ROWS*rh+48,nm=String.fromCharCode(65+sel),tb=tables[sel];
+      T(svg,x0,ty,`BLOCK TABLE FOR ${nm}: where each of its blocks lives`,{class:'lbl'});
+      tb.forEach((ph,l)=>{const bx=x0+l*84,used=Math.min(BS,L[sel]-l*BS);
+        R(svg,bx,ty+10,76,30,`fill:${PAL(sel)}`,{rx:5});T(svg,bx+38,ty+30,`${nm} block ${l}`,{'text-anchor':'middle',style:'font-size:11.5px;font-weight:800;fill:var(--on-fill)'});
+        L_(bx+38,ty+40,bx+38,ty+54);T(svg,bx+38,ty+70,`phys ${ph}`,{'text-anchor':'middle',style:'font-size:12px;font-weight:800'});
+        if(used<BS)T(svg,bx+38,ty+86,`${used}/${BS} used`,{'text-anchor':'middle',style:'font-size:10.5px;fill:var(--bad)'});});}
     const chips=$('#pg-chips');chips.innerHTML='';
     L.forEach((len,i)=>{const b=document.createElement('button');b.type='button';b.className='chip'+(run.includes(i)?'':' q');
       b.style.borderColor=PAL(i);b.textContent=`${String.fromCharCode(65+i)} · ${len} tok${run.includes(i)?'':' · queued'}`;
       b.setAttribute('aria-pressed',String(mode==='paged'&&i===sel));b.onclick=()=>{if(run.includes(i)){sel=i;render();}};chips.appendChild(b);});
     const used=run.reduce((a,i)=>a+L[i],0);
-    $('#pg-table').innerHTML=mode==='paged'?`block table ${String.fromCharCode(65+sel)}: `+tables[sel].map((p,l)=>`logical ${l} → phys <b>${p}</b>`).join(' · '):
+    $('#pg-table').innerHTML=mode==='paged'?`Click a request above to see its block table: its blocks are scattered, yet attention reads them in order through the table.`:
       `each request reserves 64 contiguous slots = 2 full rows, whatever its real length`;
     stats($('#pg-stats'),[{v:run.length+' / '+L.length,l:'requests running'},
       {v:Math.round(used/256*100)+'%',l:'memory holding real tokens',c:mode==='paged'?'good':'warn'},
@@ -2497,9 +2504,9 @@ function stager(o){ /* o: {svg,note,chips,prev,next,play,stages,after} */
     $('#xs-t').oninput=render;render();})();
 
   /* X4 dot / matmul / gemm / gemv */
-  (function(){const svg=$('#xg-svg');let mode='dot';
+  (function(){const svg=$('#xg-svg');let mode='dot';const XVB={dot:'0 10 590 260',mm:'10 14 740 216',gemm:'10 14 740 222',gemv:'10 14 740 222'};
     function grid(x,y,r,c,cs,col,hlr,hlc,lab){for(let i=0;i<r;i++)for(let j=0;j<c;j++){const on=(hlr===i)||(hlc===j);R(svg,x+j*cs,y+i*cs,cs-2,cs-2,`fill:${on?col:'var(--idle)'}`,{rx:2});}if(lab)T(svg,x+c*cs/2,y+r*cs+16,lab,{'text-anchor':'middle',style:'font-size:11.5px;font-weight:700'});}
-    function render(){clear(svg);
+    function render(){clear(svg);svg.setAttribute('viewBox',XVB[mode]);
       if(mode==='dot'){T(svg,30,40,'two lists of the same length → one number',{class:'lbl'});const a=[1,2,3,4],b=[2,0,1,3];
         a.forEach((v,i)=>{R(svg,60+i*56,70,48,40,'fill:var(--g0)',{rx:6});T(svg,84+i*56,96,v,{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700'});R(svg,60+i*56,140,48,40,'fill:var(--g3)',{rx:6});T(svg,84+i*56,166,b[i],{'text-anchor':'middle',style:'fill:var(--on-fill);font-weight:700'});T(svg,84+i*56,130,'×',{'text-anchor':'middle',style:'fill:var(--muted)'});});
         T(svg,60,220,'1×2 + 2×0 + 3×1 + 4×3 = 17',{class:'big'});T(svg,60,250,'q · k in attention is exactly this, with d_head numbers each',{style:'font-size:12px;fill:var(--muted)'});
