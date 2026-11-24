@@ -163,6 +163,7 @@ ul.rows{margin:6px 0;padding-left:20px}
 ul.rows li{margin:2px 0}
 footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+.sub-h{font-size:18px;margin:22px 0 4px;font-weight:800}
 </style>
 </head>
 <body>
@@ -517,6 +518,21 @@ footer{max-width:1640px;margin:0 auto;padding:20px;color:var(--muted);font-size:
     <div class="svgbox"><svg id="fa-svg" viewBox="0 0 760 290" role="img" aria-label="FlashAttention tiling"></svg></div>
     <div class="stats" id="fa-stats"></div>
   </div>
+  <p class="cap">How can softmax be done one tile at a time when it needs the whole row? Each row keeps two running numbers: the largest score seen so far (m) and the sum of exponentials so far (ℓ). When a new tile has a larger maximum, the partial output already accumulated is rescaled by e<sup>(old m − new m)</sup>. After the last tile, dividing by ℓ gives exactly the same result as ordinary softmax.</p>
+  <h3 class="sub-h">What it buys you</h3>
+  <p class="cap">Drag the sequence length. The figure compares one attention layer of a Llama-style model (32 heads, head size 128, BF16, one sequence), using H100 speeds: 3.35 TB/s HBM bandwidth and 989 TFLOP/s for BF16 tensor-core math. The arithmetic is identical in both; what changes is the memory the score table needs and the bytes moved through HBM.</p>
+  <div class="fig">
+    <div class="controls"><label class="ctl">sequence length s = <span class="mono" id="fb-sv"></span><input type="range" id="fb-s" min="0" max="7" value="3"></label></div>
+    <div class="svgbox"><svg id="fb-svg" viewBox="0 0 760 312" role="img" aria-label="Memory and time of standard attention versus FlashAttention as sequence length grows"></svg></div>
+    <div class="stats" id="fb-stats"></div>
+  </div>
+  <p class="cap"><b>The gains.</b> Score memory falls from O(s²) to O(s): only the output and one number per row are stored. HBM traffic for the scores disappears, so attention stops waiting on memory and becomes limited by the tensor cores instead, typically 2–4× faster in training and prefill. And because the s × s table never has to fit in memory, context windows of 100k+ tokens became practical.</p>
+  <p class="cap"><b>The trade-offs.</b> None in accuracy. The costs are elsewhere:</p>
+  <ul class="cap">
+    <li><b>Extra arithmetic in training:</b> the backward pass recomputes the score tiles instead of reading a stored table, about 20–30% more FLOPs in attention, but still faster overall because memory was the bottleneck.</li>
+    <li><b>Hand-written, hardware-specific kernels:</b> FlashAttention-2 and -3 are tuned per GPU generation (FlashAttention-3 targets Hopper), so new hardware or a new attention variant needs new kernel work; tools such as FlexAttention exist to generate variants.</li>
+    <li><b>Small gain in decode:</b> with one new token per step there is no big s × s table to avoid; decode is limited by reading the KV cache (section 05). Decode-specific kernels (Flash-Decoding) instead split the KV cache across SMs to keep the GPU busy.</li>
+  </ul>
 </section>
 
 <section id="paged">
@@ -1528,12 +1544,32 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     T(svg,470,228,`score traffic via HBM: ${mode==='std'?traffic:0} tiles`,{style:`font-weight:700;fill:${mode==='std'?'var(--bad)':'var(--ok)'}`});
     T(svg,470,250,`s × s table in HBM: ${mode==='std'?(mat?'yes':'—'):'never'}`,{style:'font-weight:700'});
     stats($('#fa-stats'),[{v:mode==='std'?'4s²':'0',l:'score-matrix HBM reads+writes',c:mode==='std'?'warn':'good'},
-      {v:'O(s²)',l:mode==='std'?'extra HBM memory':'compute (unchanged)'},{v:'exact',l:'output vs standard'}]);}
+      {v:mode==='std'?'O(s²)':'O(s)',l:mode==='std'?'memory for the score table':'memory: output + one number per row',c:mode==='std'?'warn':'good'},{v:'O(s²)',l:'arithmetic (same in both)'},{v:'exact',l:'output vs standard'}]);}
   function stop(){clearInterval(timer);timer=null;$('#fa-play').textContent='Play';}
   function play(){if(timer){stop();return;}const end=mode==='std'?255:63;if(RM){k=end;render();return;}k=0;$('#fa-play').textContent='Pause';
     timer=setInterval(()=>{k++;if(k>=end){k=end;render();stop();return;}render();},mode==='std'?35:110);}
   seg($('#fa-seg'),[{l:'Standard attention',v:'std'},{l:'FlashAttention',v:'flash'}],'std',v=>{stop();mode=v;k=mode==='std'?255:63;render();});
   $('#fa-play').onclick=play;k=255;render();
+})();
+
+/* ---------- 06b FlashAttention benefit ---------- */
+(function(){const svg=$('#fb-svg'),SS=[1024,2048,4096,8192,16384,32768,65536,131072],H=32,D=128,BW=3.35e12,FL=989e12;
+  const fmtB=b=>b>=1e12?(b/1e12).toFixed(1)+' TB':b>=1e9?(b/1e9).toFixed(b>=1e10?0:1)+' GB':b>=1e6?(b/1e6).toFixed(0)+' MB':(b/1e3).toFixed(0)+' KB';
+  const fmtT=t=>t>=1e-3?(t*1e3).toFixed(t>=1e-2?0:1)+' ms':(t*1e6).toFixed(0)+' µs';
+  function render(){clear(svg);const s=SS[+$('#fb-s').value];$('#fb-sv').textContent=s.toLocaleString();
+    const memStd=s*s*2*H,memFl=s*4*H,io=4*s*D*2*H,trStd=io+4*s*s*2*H,trFl=io,flops=4*s*s*D*H;
+    const tStd=Math.max(trStd/BW,flops/FL),tFl=Math.max(trFl/BW,flops/FL);
+    const rows=[['MEMORY FOR THE SCORE TABLE (one layer, all heads; dashed line = whole GPU)',memStd,memFl,fmtB,'80 GB H100',80e9],['TIME FOR ONE ATTENTION LAYER (slower of memory and math)',tStd,tFl,fmtT,null,0]];
+    rows.forEach(([title,a,b,f,limLbl,lim],i)=>{const y=20+i*146;T(svg,20,y,title,{class:'lbl'});
+      const mx=Math.max(a,lim||0),sc=520/mx,lg=v=>Math.max(3,v*sc);
+      [['standard',a,'var(--bad)'],['FlashAttention',b,'var(--ok)']].forEach(([n,v,c],j)=>{const yy=y+14+j*44;T(svg,20,yy+22,n,{style:'font-size:12px;font-weight:700'});
+        R(svg,140,yy,lg(v),30,`fill:${c};opacity:.85`,{rx:4});const inside=lg(v)>380,lx=lim?140+lim*sc:0;
+        if(inside)T(svg,134+lg(v),yy+20,f(v)+(lim&&v>lim?' · does not fit':''),{'text-anchor':'end',style:'font-size:12px;font-weight:800;fill:#ffffff'});
+        else T(svg,Math.max(146+lg(v),lx&&lx>140+lg(v)-2&&lx<146+lg(v)+60?lx+6:0),yy+20,f(v),{style:'font-size:12px;font-weight:800'});});
+      if(lim){const x=140+lim*sc;S('line',{x1:x,x2:x,y1:y+10,y2:y+108,style:'stroke:var(--ink);stroke-width:2;stroke-dasharray:5 4'},svg);T(svg,x>500?x-4:x+4,y+116,limLbl+' total memory',{'text-anchor':x>500?'end':'start',style:'font-size:10.5px;font-weight:700'});}});
+    const bound=trStd/BW>flops/FL;T(svg,20,288,`standard is ${bound?'memory-bound (waiting on HBM)':'compute-bound'}; FlashAttention is ${trFl/BW>flops/FL?'memory-bound':'compute-bound (tensor cores busy)'}`,{style:'font-size:11px;font-weight:700'});T(svg,20,304,'rough estimates from bytes and FLOPs; real kernels add overheads',{style:'font-size:10.5px;fill:var(--muted)'});
+    stats($('#fb-stats'),[{v:fmtB(memStd)+' → '+fmtB(memFl),l:'score memory per layer',c:'good'},{v:fmtB(trStd)+' → '+fmtB(trFl),l:'HBM bytes moved'},{v:memStd>80e9?'won\'t fit':(tStd/tFl).toFixed(1)+'×',l:memStd>80e9?'standard needs more than the GPU has':'faster in this estimate',c:'good'},{v:(flops/1e12).toFixed(flops<1e12?2:1)+' TFLOP',l:'arithmetic, same for both'}]);}
+  $('#fb-s').addEventListener('input',render);render();
 })();
 
 /* ---------- 07 paged attention ---------- */
