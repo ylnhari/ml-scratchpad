@@ -1494,8 +1494,8 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
     T(svg,32,44,'HBM: big, slow',{class:'lbl'});
     R(svg,470,26,270,170,'fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5',{rx:12});
     T(svg,482,44,'SRAM (on-chip): tiny, fast',{class:'lbl'});
-    let qi=-1,kj=-1,traffic=0,orow=-1,ofrac=0,mat=false;
-    if(mode==='std'){const ph=Math.floor(k/64),idx=k%64;mat=k>0;
+    let qi=-1,kj=-1,traffic=0,orow=-1,ofrac=0,mat=false,ph=-1;
+    if(mode==='std'){ph=Math.floor(k/64);const idx=k%64;mat=k>0;
       qi=Math.floor(idx/8);kj=idx%8;
       traffic=ph===0?idx+1:ph===1?64+2*(idx+1):ph===2?192+idx+1:256;if(k>=192)traffic=Math.min(256,192+(k-192)+1);
       for(let r=0;r<n;r++)for(let c=0;c<n;c++){const t=r*8+c;let st='fill:var(--surface-2)';
@@ -1509,18 +1509,22 @@ function fmt(n,d){return n.toLocaleString('en-US',{minimumFractionDigits:d,maxim
       R(svg,SX+kj*ts-1,SY+qi*ts-1,ts,ts,'fill:var(--g2);stroke:var(--ink);stroke-width:2');
       T(svg,SX,SY+n*ts+18,'S never stored:',{style:'font-weight:600;font-size:11px'});T(svg,SX,SY+n*ts+33,'only this tile exists, in SRAM',{style:'font-weight:600;font-size:11px'});}
     T(svg,SX+80,SY-8,'S  [s × s]',{'text-anchor':'middle',style:'font-weight:700'});
-    bar(40,'Q',qi,'var(--g0)');bar(76,'K',kj,'var(--g3)');bar(112,'V',kj,'var(--g3)');
+    const useQ=mode==='flash'||ph===0,useK=mode==='flash'||ph===0,useV=mode==='flash'||ph>=2;
+    bar(40,'Q',useQ?qi:-1,'var(--g0)');bar(76,'K',useK?kj:-1,'var(--g3)');bar(112,'V',useV?kj:-1,'var(--g3)');
     T(svg,392,SY-8,'O',{'text-anchor':'middle',style:'font-weight:700'});
     for(let i=0;i<n;i++){const done=mode==='flash'?(i<orow||(i===orow&&k===63)):(k>=192&&i<=orow)||k>=255;const cur=i===orow&&!done;
       R(svg,380,SY+i*ts,24,ts-2,`fill:var(--accent);opacity:${done?1:cur?.25+.6*ofrac:.12}`,{rx:2});}
     // SRAM contents
     const sx=500,sy=66;
-    if(k>=0){R(svg,sx,sy,26,26,'fill:var(--g0)',{rx:3});T(svg,sx+13,sy+42,`Q${qi}`,{'text-anchor':'middle',style:'font-size:11px'});
-      R(svg,sx+40,sy,26,26,'fill:var(--g3)',{rx:3});T(svg,sx+53,sy+42,`K${kj}`,{'text-anchor':'middle',style:'font-size:11px'});
-      R(svg,sx+80,sy,26,26,'fill:var(--g3);opacity:.7',{rx:3});T(svg,sx+93,sy+42,`V${kj}`,{'text-anchor':'middle',style:'font-size:11px'});
-      R(svg,sx+130,sy,26,26,'fill:var(--g2)',{rx:3});T(svg,sx+143,sy+42,`S${qi},${kj}`,{'text-anchor':'middle',style:'font-size:11px'});
-      T(svg,sx,sy+76,mode==='flash'?'online softmax: running max m, sum ℓ':'tile passes through → back to HBM',{style:'font-size:11px;fill:var(--muted)'});
-      T(svg,sx,sy+96,mode==='flash'?`accumulating O row block ${qi}`:'',{style:'font-size:11px;fill:var(--muted)'});}
+    const tile=(x,lab,fill,on)=>{R(svg,x,sy,26,26,`fill:${fill};opacity:${on?1:.12}`,{rx:3});T(svg,x+13,sy+42,lab,{'text-anchor':'middle',style:`font-size:11px;${on?'':'fill:var(--muted);opacity:.5'}`});};
+    if(k>=0){const stdPh=mode==='std'?Math.min(ph,2):-1;
+      tile(sx,`Q${qi}`,'var(--g0)',useQ);tile(sx+40,`K${kj}`,'var(--g3)',useK);
+      tile(sx+80,stdPh===1?`S→P`:(stdPh===2?`P${qi},${kj}`:`S${qi},${kj}`),stdPh===2||stdPh===1?'var(--g1)':'var(--g2)',true);
+      tile(sx+120,`V${kj}`,'var(--g3)',useV);tile(sx+160,`O${qi}`,'var(--accent)',mode==='flash'||stdPh===2);
+      const L1=mode==='flash'?'① S tile = Q·Kᵀ':stdPh===0?'step 1/3: S = Q·Kᵀ':stdPh===1?'step 2/3: softmax(S) → P':'step 3/3: O = P·V';
+      const L2=mode==='flash'?'② softmax: running max m, sum ℓ':stdPh===0?'uses only Q and K; S → HBM':stdPh===1?'Q, K, V idle; S, P via HBM':'uses P (from HBM) and V';
+      const L3=mode==='flash'?'③ O += P·V in the same step':'';const L4=mode==='flash'?'→ Q, K and V move together':'';
+      [L1,L2,L3,L4].forEach((t,i)=>T(svg,sx,sy+68+i*17,t,{style:`font-size:11px;${i===0?'font-weight:700;':''}fill:${i===0?'var(--ink)':'var(--muted)'}`}));}
     T(svg,470,228,`score traffic via HBM: ${mode==='std'?traffic:0} tiles`,{style:`font-weight:700;fill:${mode==='std'?'var(--bad)':'var(--ok)'}`});
     T(svg,470,250,`s × s table in HBM: ${mode==='std'?(mat?'yes':'—'):'never'}`,{style:'font-weight:700'});
     stats($('#fa-stats'),[{v:mode==='std'?'4s²':'0',l:'score-matrix HBM reads+writes',c:mode==='std'?'warn':'good'},
